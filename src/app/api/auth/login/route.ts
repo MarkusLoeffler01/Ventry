@@ -3,6 +3,7 @@ import * as bcrypt from "@/lib/bcrypt";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
 import { loginSchema } from "@/types/schemas/auth";
+import jwtService from "@/lib/helpers/jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if(!JWT_SECRET) throw new Error("JWT_SECRET is not defined");
@@ -45,11 +46,10 @@ export async function POST(req: NextRequest) {
 
     console.log("User logged in:", user.email);
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      {expiresIn: "7d" }
-    );
+    const token = jwtService.sign({
+      userId: user.id,
+      email: user.email
+    }, { expiresIn: "7d"});
 
 
     const res = NextResponse.json({ message: "Login successful" }, { status: 200 });

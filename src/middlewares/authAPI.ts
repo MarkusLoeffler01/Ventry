@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
+import jwtService from "@/lib/helpers/jsonwebtoken";
 
 export async function middleware(req: NextRequest) {
     const token = req.headers.get("authorization")?.split(" ")[1];
@@ -12,7 +9,7 @@ export async function middleware(req: NextRequest) {
     }
 
     try {
-        jwt.verify(token, JWT_SECRET);
+        jwtService.verify(token);
         return NextResponse.next();
     } catch {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

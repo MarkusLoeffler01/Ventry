@@ -53,7 +53,7 @@ export function handlePrismaError(error: unknown): ApiErrorResponse {
           message: 'Diese E-Mail-Adresse ist bereits registriert.',
           statusCode: 409
         };
-      } else if (target?.includes('username')) {
+      } else if (target?.includes('name')) {
         return {
           error: RegisterErrorType.DUPLICATE_USERNAME,
           message: 'Dieser Benutzername ist bereits vergeben.',
