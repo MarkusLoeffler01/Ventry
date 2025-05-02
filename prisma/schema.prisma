@@ -15,6 +15,9 @@ datasource db {
 }
 
 
+/**
+There will be many users and multiple admins
+*/
 model User {
   id              String   @id @default(cuid())
   name            String?  @unique
@@ -25,48 +28,96 @@ model User {
   updatedAt       DateTime @updatedAt
   registration    Registration?
   payments        Payment[]
+  isAdmin         Boolean  @default(false)
+  isVerified      Boolean  @default(false)
 }
 
+/**
+  Event-Singleton - In OSS, there will be only be one event at a time
+  With @default(1) for the id, we can have only one event at a time
+*/
 model Event {
-  id            String   @id @default(cuid())
+  id            Int     @id @default(1)
   name          String
   description   String?
   startDate     DateTime
   endDate       DateTime
-  location      String
+  imageUrl      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  location      Location?
+  products      Product[]
 
   // registrations Registration[]
 }
 
+/**
+  Location model to store event locations. As 1:1 relationship with event
+  This will be a venue, most likely a hotel or a conference center
+  This will be a children of the event model and act as a datatype instead of an independent table
+*/
+model Location {
+  id            Int       @id @default(1) // 1:1 relationship with event for singleton pattern
+  name          String
+  address       String
+  city          String
+  state         String
+  country       String
+  postalCode    String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  event         Event     @relation(fields: [eventId], references: [id])
+  eventId       Int       @unique // For 1:1 relationship with event
+}
 
+/**
+  Registration model to store user registrations for the event
+  Normally, there will be only one registration per user
+  And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
+*/
 model Registration {
   id            String              @id @default(cuid())
-  userId        String              @unique  
+  ticketId      Int                 @default(autoincrement()) @unique
   status        RegistrationStatus  @default(PENDING)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
-  ticketId      String?             @unique
 
-  user          User                @relation(fields: [userId], references: [id])
+  userId        String              @unique  
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments      Payment[]
 }
 
 
 model Payment {
   id              String        @id @default(cuid())
-  userId          String
-  registrationId  String
   amount          Float
   currency        String
   paymentStatus   PaymentStatus @default(PENDING)
   paymentProvider String?                         // Stripe, PayPal, Bank Transfer, etc.
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user            User          @relation(fields: [userId], references: [id])
-  registration    Registration  @relation(fields: [registrationId], references: [id])
+  registrationId  String
+  registration    Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+}
+
+/**
+  Product model to store products for the event
+  For example, badges, t-shirts, sponsorships, etc etc.
+*/
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  price         Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  eventId       Int      @default(1)
+  event         Event    @relation(fields: [eventId], references: [id])
 }
 
 enum RegistrationStatus {
@@ -81,3 +132,4 @@ enum PaymentStatus {
   FAILED
   REFUNDED
 }
+
