@@ -45,16 +45,13 @@ export default function LoginForm() {
                 body: JSON.stringify(formData)
             });
 
-            const data = await response.json();
-            
             if(!response.ok) {
+                const data = await response.json();
                 setError(data.error || "An error occurred");
                 return;
             }
 
             setSuccess(true);
-            localStorage.setItem("token", data.token);
-
             setTimeout(() => {
                 router.push("/dashboard");
                 
