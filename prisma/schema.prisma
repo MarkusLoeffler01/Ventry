@@ -23,7 +23,7 @@ model User {
   profilePicture  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  registrations   Registration[]
+  registration    Registration?
   payments        Payment[]
 }
 
@@ -37,21 +37,19 @@ model Event {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  registrations Registration[]
+  // registrations Registration[]
 }
 
 
 model Registration {
   id            String              @id @default(cuid())
-  userId        String
-  eventId       String
+  userId        String              @unique  
   status        RegistrationStatus  @default(PENDING)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   ticketId      String?             @unique
 
   user          User                @relation(fields: [userId], references: [id])
-  event         Event               @relation(fields: [eventId], references: [id])
   payments      Payment[]
 }
 
