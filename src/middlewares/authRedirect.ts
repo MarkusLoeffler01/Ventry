@@ -22,7 +22,7 @@ export async function authRedirectMiddleware(req: NextRequest) {
     
     // Token is valid, continue to the protected route
     return NextResponse.next();
-  } catch (error) {
+  } catch {
     // Token verification failed, redirect to login
     const url = new URL('/login', req.url);
     url.searchParams.set('returnTo', req.nextUrl.pathname);

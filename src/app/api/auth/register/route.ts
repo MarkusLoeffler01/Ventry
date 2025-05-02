@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import * as bcrypt from "@/lib/bcrypt";
 import { registerSchema } from "@/types/schemas/auth";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
 
 export async function POST(req: NextRequest) {
@@ -45,15 +44,5 @@ export async function POST(req: NextRequest) {
         const response = handlePrismaError(error);
         const { statusCode: _, ...rest } = response;
         return NextResponse.json(rest, { status: response.statusCode });
-
-
-        // ! We need to handle multiple errors here. 
-        if(error instanceof PrismaClientKnownRequestError) {
-            console.log(error.code, error.message);
-            
-            return NextResponse.json({ error: "Failed to create user", code: error.code }, { status: 400 });
-                
-            }
-        return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
-        }
+    }
 }

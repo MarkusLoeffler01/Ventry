@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as bcrypt from "@/lib/bcrypt";
 import { prisma } from "@/lib/prisma";
-import jwt from "jsonwebtoken";
 import { loginSchema } from "@/types/schemas/auth";
 import jwtService from "@/lib/helpers/jsonwebtoken";
 
