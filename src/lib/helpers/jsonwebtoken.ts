@@ -1,3 +1,4 @@
+import JwtPayload from "@/types/jwt";
 import jwt from "jsonwebtoken";
 
 
@@ -31,6 +32,19 @@ class JsonWebToken {
             throw new Error("Invalid token");
         }
         return decoded;
+    }
+
+    decode(token: string): null | string |  jwt.JwtPayload | JwtPayload {
+        return jwt.decode(token);
+    }
+
+    validatePayload(payload: null | string | jwt.JwtPayload | JwtPayload | object) {
+        if(payload === null) throw new Error("Invalid token");
+        if(typeof payload === "string") throw new Error("Invalid token");
+        if("userId" in payload && "email" in payload && "iat" in payload && "exp" in payload) {
+            return payload as JwtPayload;
+        }
+        throw new Error("Invalid token");
     }
 }
 

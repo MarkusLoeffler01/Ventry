@@ -1,4 +1,9 @@
 {
     "WillLuke.nextjs.addTypesOnSave": true,
-    "WillLuke.nextjs.hasPrompted": true
+    "WillLuke.nextjs.hasPrompted": true,
+    "workbench.editor.customLabels.patterns": {
+        "/src/app//page.tsx": "(${dirname})/page.${extname}",
+        "/src/app//layout.tsx": "(${dirname})/layout.${extname}",
+        "/src/app//index.tsx": "(${dirname})/index.${extname}"
+    },
 }

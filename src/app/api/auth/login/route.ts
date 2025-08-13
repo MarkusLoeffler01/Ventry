@@ -8,7 +8,27 @@ const JWT_SECRET = process.env.JWT_SECRET as string;
 if(!JWT_SECRET) throw new Error("JWT_SECRET is not defined");
 
 
+export async function GET(req: NextRequest) {
+  try {
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
+    }
 
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ user: { id: user.id, email: user.email } }, { status: 200 });
+  } catch (error) {
+    console.error("Error in GET handler:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,2 +1,3 @@
 export * as auth from "./authAPI";
 export * as logging from "./logging";
+export * as admin from "./admin";

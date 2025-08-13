@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwtService from "@/lib/helpers/jsonwebtoken";
 
 export async function middleware(req: NextRequest) {
-    const token = req.headers.get("authorization")?.split(" ")[1];
+    const token = req.cookies.get("token")?.value;
 
     if (!token) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -10,8 +10,16 @@ export async function middleware(req: NextRequest) {
 
     try {
         jwtService.verify(token);
-        return NextResponse.next();
-    } catch {
+        const user = jwtService.validatePayload(jwtService.decode(token));
+
+        const headers = new Headers(req.headers);
+        headers.set("userId", user.userId);
+        headers.set("email", user.email);
+        const response = NextResponse.next();
+        response.headers.set("userId", user.userId);
+        response.headers.set("email", user.email);
+        return response;
+    } catch (error) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 }

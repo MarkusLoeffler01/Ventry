@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const middlewareMap = [
     { path: "/api/user/:path*", middleware: mws.auth.middleware },
+    { path: "/api/admin/:path*", middleware: mws.admin.middleware },
     { path: "/api*", middleware: mws.logging.loggingMiddleware },
 ];
 
@@ -22,8 +23,9 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
     matcher: [
-        "/api/user/:path*"
-
+        "/api/user/:path*",
+        "/api/admin/:path*",
+        "/api/:path*",
         
     ]
 }

@@ -1,0 +1,16 @@
+name: Add issues to project
+on:
+  issues:
+    types: [opened, labeled]
+permissions:
+  issues: write
+  repository-projects: write
+  contents: read
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v1
+        with:
+          project-url: https://github.com/users/MarkusLoeffler01/projects/4
+          github-token: ${{ secrets.GH_TOKEN_PROJECT }}

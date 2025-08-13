@@ -20,6 +20,7 @@
       }
     ],
     "paths": {
+      // Also configure in vitest.config.ts
       "@/*": ["./src/*"],
       "@root/*": ["./*"]
     }

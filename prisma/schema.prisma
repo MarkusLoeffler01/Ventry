@@ -39,10 +39,12 @@ model User {
 model Event {
   id            Int     @id @default(1)
   name          String
-  description   String?
+  description   String
   startDate     DateTime
   endDate       DateTime
   imageUrl      String?
+  status        EventStatus @default(DRAFT)
+  stayPolicy    Json        @default("{}")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   location      Location?
@@ -131,5 +133,11 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
 }
 
