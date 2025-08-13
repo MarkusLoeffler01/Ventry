@@ -28,12 +28,20 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
     try {
+        const id = req.nextUrl.searchParams.get("id");
+
+        if(!id) return NextResponse.json({ error: "Missing event ID" }, { status: 400 });
+
+        // Safely parse id to number
+        const parsedId = Number.parseInt(id);
+        if (isNaN(parsedId)) return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
+
         const body = await req.json();
         const event = adminUpdateEventSchema.parse(body);
-        const {id, ...data} = event;
+        const {...data} = event;
 
         await prisma.event.update({
-            where: { id },
+            where: { id: parsedId },
             data: data
         });
 
