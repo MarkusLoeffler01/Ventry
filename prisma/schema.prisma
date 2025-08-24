@@ -30,6 +30,7 @@ model User {
   payments        Payment[]
   isAdmin         Boolean  @default(false)
   isVerified      Boolean  @default(false)
+  eventsOwned     Event[]
 }
 
 /**
@@ -37,7 +38,7 @@ model User {
   With @default(1) for the id, we can have only one event at a time
 */
 model Event {
-  id            Int     @id @default(1)
+  id            Int     @id @default(autoincrement())
   name          String
   description   String
   startDate     DateTime
@@ -45,6 +46,8 @@ model Event {
   imageUrl      String?
   status        EventStatus @default(DRAFT)
   stayPolicy    Json        @default("{}")
+  ownerId       String? // temporary nullable for migration; will backfill and make required
+  owner         User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   location      Location?
@@ -68,7 +71,7 @@ model Location {
   postalCode    String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  event         Event     @relation(fields: [eventId], references: [id])
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   eventId       Int       @unique // For 1:1 relationship with event
 }
 
