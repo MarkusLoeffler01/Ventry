@@ -1,4 +1,4 @@
-import { FieldError, ValidationDetails } from "@/types/apiResponses/register";
+import type { FieldError, ValidationDetails } from "@/types/apiResponses/register";
 
 /**
  * Helperfunction tto check if a field has an error

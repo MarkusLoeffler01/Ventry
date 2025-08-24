@@ -1,0 +1,49 @@
+/**
+ * If no admin is found, this route will be enabled (most likely due to setup)
+ */
+
+import prisma from "@/lib/prisma";
+import { registerSchema, type registerType } from "@/types/schemas/auth";
+import { type NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+
+
+    const adminUser = await prisma.user.findFirst({
+        where: {
+            isAdmin: true
+        }
+    });
+
+    if (adminUser) {
+        return NextResponse.json({ error: "Admin user already exists" }, { status: 400 });
+    }
+
+
+
+    let body: registerType;
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const result = registerSchema.safeParse(body);
+    if (!result.success) {
+        return NextResponse.json({ error: "Invalid request data", issues: result.error.issues }, { status: 400 });
+    }
+
+    const { email, password, name } = result.data;
+
+    await prisma.user.create({
+        data: {
+            email,
+            password,
+            name,
+            isAdmin: true,
+            isVerified: true,
+        }
+    });
+
+    return NextResponse.json({ message: "Admin user created successfully" }, { status: 201 });
+}

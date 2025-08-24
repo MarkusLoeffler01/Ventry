@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 
 type isValidDateType = z.ZodObject<{ 
   startDate: z.ZodDate | z.ZodString | z.ZodCoercedDate<unknown>; 

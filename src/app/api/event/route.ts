@@ -1,18 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
-import jwtService from "@/lib/helpers/jsonwebtoken";
 
 
 export async function GET() {
     try {
-        const event = await prisma.event.findFirst();
+        const events = await prisma.event.findMany();
 
-        if (!event) {
-            return NextResponse.json({ error: "Event not found" }, { status: 404 });
+        if (!events) {
+            return NextResponse.json({ error: "Events not found" }, { status: 404 });
         }
-        return NextResponse.json(event, { status: 200 });
+        return NextResponse.json(events, { status: 200 });
     } catch (error) {
         const response = handlePrismaError(error);
         const { statusCode: _, ...rest } = response;

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import * as bcrypt from "@/lib/bcrypt";
-import { registerSchema } from "@/types/schemas/auth";
+import { type registerType, registerSchema } from "@/types/schemas/auth";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
 
 export async function POST(req: NextRequest) {
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid content type" }, { status: 400 });
         }
 
-        let body: { email: string; password: string; name: string };
+        let body: registerType;
         try {
             body = await req.json();
         } catch {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         const hashedPassword = await bcrypt.hashPassword(password);
         const user = await prisma.user.create({
             data: {
-                email,
+                email: email.toLowerCase(),
                 password: hashedPassword,
                 name
             }

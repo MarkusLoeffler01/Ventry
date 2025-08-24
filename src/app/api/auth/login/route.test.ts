@@ -28,7 +28,7 @@ vi.mock("@/lib/helpers/jsonwebtoken", () => ({
 // Type as the actual module to satisfy typings
 let loginRoute: typeof import("@/app/api/auth/login/route");
 beforeAll(async () => {
-  process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
+  // process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
   loginRoute = await import("@/app/api/auth/login/route");
 });
 import { prisma } from "@/lib/prisma";
@@ -161,7 +161,7 @@ describe("App Router: /api/auth/login (route.ts)", () => {
         // Check cookie header contains token
         const setCookie = res.headers.get("set-cookie");
         expect(setCookie).toBeTruthy();
-        expect(setCookie!).toContain("token=");
+        expect(setCookie).toContain("token=");
       },
     });
   });

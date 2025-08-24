@@ -23,7 +23,7 @@ vi.mock('@/lib/helpers/prismaErrorHandler', () => ({
 }));
 
 // Import AFTER mocks so the route picks up the mocked deps
-import * as adminRoute from "@/app/api/admin/event/route";
+import * as adminRoute from "@/app/api/admin/event/[id]/route";
 import { prisma } from "@/lib/prisma";
 import { adminCreateEventSchema, adminUpdateEventSchema } from "@/types/schemas/event/admin";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";

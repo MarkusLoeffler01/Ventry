@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import jwtService from "@/lib/helpers/jsonwebtoken";
 
 export async function middleware(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function middleware(req: NextRequest) {
         response.headers.set("userId", user.userId);
         response.headers.set("email", user.email);
         return response;
-    } catch (error) {
+    } catch (_error) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 }

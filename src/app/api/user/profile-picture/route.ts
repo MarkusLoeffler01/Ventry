@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { profilePictureSchema, profilePicturePATCH } from "@/types/user/profilePicture";
+import { profilePictureSchema, type profilePicturePATCH } from "@/types/user/profilePicture";
 
 // GET: Retrieve a user's profile picture
 export async function GET(req: NextRequest) {

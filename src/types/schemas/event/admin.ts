@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventBaseSchema, EventEntitySchema, EventIdSchema, LocationSchema, StayPolicy } from "./base";
+import { EventBaseSchema, type EventEntitySchema, EventIdSchema, LocationSchema, type StayPolicy } from "./base";
 
 
 /**

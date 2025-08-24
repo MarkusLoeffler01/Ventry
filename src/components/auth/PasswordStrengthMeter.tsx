@@ -92,8 +92,8 @@ export default function PasswordStrengthMeter({
             Suggestions:
           </Typography>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
-            {result.feedback.suggestions.map((suggestion: string, i: number) => (
-              <li key={i}>
+            {result.feedback.suggestions.map((suggestion: string) => (
+              <li key={`suggestion-${suggestion}`}>
                 <Typography variant="caption" color="text.secondary">
                   {suggestion}
                 </Typography>

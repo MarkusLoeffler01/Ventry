@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 import { userSchema, createUserSchema } from "@/types/user";
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid content type" }, { status: 400 });
     }
 
-    let body;
+    let body: unknown;
     try {
       body = await req.json();
     } catch {
@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid content type" }, { status: 400 });
     }
 
-    let body;
+    let body: { id?: string };
     try {
       body = await req.json();
     } catch {
@@ -158,9 +158,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     const userId = body.id;
-    delete body.id; // Remove ID from update data
+    const { id: _, ...updateData } = body;
 
-    const parsed = userSchema.safeParse(body);
+    const parsed = userSchema.safeParse(updateData);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
     }

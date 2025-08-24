@@ -1,23 +1,31 @@
 import * as mws from "./middlewares/";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
-const middlewareMap = [
-    { path: "/api/user/:path*", middleware: mws.auth.middleware },
-    { path: "/api/admin/:path*", middleware: mws.admin.middleware },
-    { path: "/api*", middleware: mws.logging.loggingMiddleware },
+type SubMW = (req: NextRequest, res: NextResponse) => Promise<void | NextResponse> | void | NextResponse;
+
+const routes: Array<{ pattern: URLPattern, mw: SubMW }> = [
+    { pattern: new URLPattern({ pathname: "/api/user/:path*" }), mw: mws.auth.middleware },
+    { pattern: new URLPattern({ pathname: "/api/admin/:path*" }), mw: mws.admin.middleware },
+    { pattern: new URLPattern({ pathname: "/api/:path*" }), mw: mws.logging.loggingMiddleware },
 ];
 
 export async function middleware(req: NextRequest) {
-    const url = req.nextUrl.pathname;
+    const res = NextResponse.next();
 
-    for(const { path, middleware: mw } of middlewareMap) {
-        if (url.startsWith(path)) {
-            const res = await mw(req);
-            if(res.status !== 200) return res; // If the middleware returns a non-200 response, return it
+    for(const { pattern, mw } of routes) {
+        if(pattern.test(req.nextUrl)) {
+            const out = await mw(req, res);
+
+            if(out && out !== res && out.status !== 200) return out;
+
+            if(out && out !== res && out.status === 200) {
+                out.headers.forEach((v, k) => res.headers.set(k, v));
+            }
         }
     }
 
-    return NextResponse.next(); // If all middlewares pass, continue to the next handler
+    // Success
+    return res;
 
 }
 

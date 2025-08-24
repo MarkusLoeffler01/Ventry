@@ -7,7 +7,7 @@
 
 
 import { z } from 'zod';
-import { EventIdSchema, ParticipationBaseSchema, StayPolicy } from "./base";
+import { EventIdSchema, ParticipationBaseSchema, type StayPolicy } from "./base";
 
 
 /**

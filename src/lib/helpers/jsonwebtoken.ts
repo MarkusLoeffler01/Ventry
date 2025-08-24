@@ -1,10 +1,7 @@
-import JwtPayload from "@/types/jwt";
+import type JwtPayload from "@/types/jwt";
+import { getPrivateKey, getPublicKey } from "@/types/schemas/helper/env";
 import jwt from "jsonwebtoken";
 
-
-export const config = {
-    runtime: "edge"
-}
 
 class JsonWebToken {
     private privateKey: string;
@@ -15,9 +12,12 @@ class JsonWebToken {
         this.publicKey = publicKey;
     }
 
-    sign(payload: object, options?: jwt.SignOptions): string {
+    sign(payload: object, userid: string, options?: jwt.SignOptions): string {
         return jwt.sign(payload, this.privateKey, {
             algorithm: "RS256",
+            issuer: process.env.JWT_ISSUER,
+            audience: process.env.JWT_AUDIENCE,
+            subject: userid,
             ...options,
         });
     }
@@ -25,6 +25,9 @@ class JsonWebToken {
     verify(token: string, options?: jwt.VerifyOptions): string | jwt.JwtPayload {
         const decoded = jwt.verify(token, this.publicKey, {
             algorithms: ["RS256"],
+            issuer: process.env.JWT_ISSUER,
+            audience: process.env.JWT_AUDIENCE,
+            clockTolerance: 30, // 30 seconds
             ...options,
         });
 
@@ -34,7 +37,12 @@ class JsonWebToken {
         return decoded;
     }
 
-    decode(token: string): null | string |  jwt.JwtPayload | JwtPayload {
+    /**
+     * @deprecated never use for security, use `verify` instead
+     * @param token 
+     * @returns 
+     */
+    decode(token: string): null | string | jwt.JwtPayload | JwtPayload {
         return jwt.decode(token);
     }
 
@@ -48,20 +56,9 @@ class JsonWebToken {
     }
 }
 
-// const keys = new KeyReader("jwt_private.key", "jwt_public.key");
-
-
-if(process.env.JWT_PRIVATE_KEY === undefined) {
-    throw new Error("JWT_PRIVATE_KEY is not defined");
-}
-
-if(process.env.JWT_PUBLIC_KEY === undefined) {
-    throw new Error("JWT_PUBLIC_KEY is not defined");
-}
-
 const jwtService = new JsonWebToken(
-    process.env.JWT_PRIVATE_KEY,
-    process.env.JWT_PUBLIC_KEY
+    getPrivateKey(),
+    getPublicKey()
 );
 
 export default jwtService;

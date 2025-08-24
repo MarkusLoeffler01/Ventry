@@ -153,6 +153,7 @@ type EventBase = z.infer<typeof EventBaseSchema>;
 const EventEntitySchema = EventBaseSchema.extend({
   id: EventIdSchema,
   status: z.enum(["DRAFT", "PUBLISHED", "CANCELLED"]).default("DRAFT"),
+  ownerId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date()
 }).strict();

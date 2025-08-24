@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Box,
@@ -13,7 +14,7 @@ import {
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import zxcvbn from 'zxcvbn';
 
-import ValidationDetails from '@/types/apiResponses/register';
+import type ValidationDetails from '@/types/apiResponses/register';
 import AuthTemplate from './template';
 import PasswordStrengthMeter from './PasswordStrengthMeter';
 
