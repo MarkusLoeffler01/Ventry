@@ -1,0 +1,34 @@
+{
+    "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+    "files": {
+        "includes": [
+            "biome.json",
+            "src/**/*",
+            "!**/dist/**",
+            "!src/generated/**/*",
+            "!/node_modules/**"
+            
+        ]
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "recommended": true,
+            "correctness": {
+                "noUnusedImports": "error",
+                "useHookAtTopLevel": "error"
+            }
+        }
+    },
+    "formatter": {
+        "enabled": false
+    },
+    "assist": {
+        "actions": {
+            "recommended": true,
+            "source": {
+                "organizeImports": "off"
+            }
+        }
+    }
+}
