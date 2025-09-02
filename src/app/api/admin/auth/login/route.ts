@@ -6,6 +6,7 @@ import { loginSchema } from "@/types/schemas/auth";
 import { generateAuthCookie } from "@/types/schemas/helper/cookie";
 
 export async function POST(req: NextRequest) {
+    console.log("HIT")
     const body = await req.json();
 
     const result = loginSchema.safeParse(body);

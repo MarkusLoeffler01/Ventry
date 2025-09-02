@@ -2,15 +2,106 @@
     "version": "0.2.0",
     "configurations": [
       {
+        "name": "Next.js: debug server-side",
         "type": "node",
         "request": "launch",
-        "name": "Next.js: debug server",
-        "runtimeExecutable": "npm",
-        "runtimeArgs": ["run", "dev"],
-        "env": {
-          "NODE_OPTIONS": "--inspect"
+        "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
+        "args": ["dev"],
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal",
+        "serverReadyAction": {
+          "pattern": "- Local:[ ]*http://localhost:([0-9]+)",
+          "uriFormat": "https://local.dev:3443",
+          "action": "debugWithChrome"
         },
-        "console": "integratedTerminal"
+        "env": {
+          "NODE_OPTIONS": "--inspect",
+          "NEXTAUTH_DEBUG": "1"
+        },
+        "skipFiles": [
+          "<node_internals>/**",
+          "${workspaceFolder}/node_modules/**",
+          "${workspaceFolder}/.next/**"
+        ],
+        "outputCapture": "std"
+      },
+      {
+        "name": "Next.js: debug client-side",
+        "type": "chrome",
+        "request": "launch",
+        "url": "https://local.dev:3443",
+        "webRoot": "${workspaceFolder}",
+        "sourceMapPathOverrides": {
+          "webpack://_N_E/*": "${webRoot}/*",
+          "webpack:///./*": "${webRoot}/*",
+          "webpack:///./~/*": "${webRoot}/node_modules/*",
+          "webpack:///*": "*"
+        }
+      },
+      {
+        "name": "Next.js: debug full stack",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
+        "args": ["dev"],
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal",
+        "serverReadyAction": {
+          "pattern": "- Local:[ ]*http://localhost:([0-9]+)",
+          "uriFormat": "https://local.dev:3443",
+          "action": "debugWithChrome"
+        },
+        "env": {
+          "NODE_OPTIONS": "--inspect",
+          "NEXTAUTH_DEBUG": "1"
+        },
+        "skipFiles": [
+          "<node_internals>/**",
+          "${workspaceFolder}/node_modules/**",
+          "${workspaceFolder}/.next/**"
+        ],
+        "outputCapture": "std"
+      },
+      {
+        "name": "Attach to Next.js",
+        "type": "node",
+        "request": "attach",
+        "port": 9229,
+        "skipFiles": [
+          "<node_internals>/**",
+          "${workspaceFolder}/node_modules/**",
+          "${workspaceFolder}/.next/**"
+        ]
+      },
+      {
+        "name": "Next.js: debug NextAuth API",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
+        "args": ["dev"],
+        "cwd": "${workspaceFolder}",
+        "console": "integratedTerminal",
+        "env": {
+          "NODE_OPTIONS": "--inspect",
+          "NEXTAUTH_DEBUG": "1",
+          "AUTH_DEBUG": "true"
+        },
+        "skipFiles": [
+          "<node_internals>/**",
+          "${workspaceFolder}/node_modules/**"
+        ],
+        "smartStep": true,
+        "stopOnEntry": false
+      }
+    ],
+    "compounds": [
+      {
+        "name": "Next.js: debug full stack (compound)",
+        "configurations": [
+          "Next.js: debug server-side",
+          "Next.js: debug client-side"
+        ],
+        "stopAll": true
       }
     ]
   }

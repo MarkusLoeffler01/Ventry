@@ -8,7 +8,7 @@ import { generateAuthCookie } from "@/types/schemas/helper/cookie";
 
 export async function POST(req: NextRequest) {
   try {
-
+    console.log("HIT");
     let body: { email: string; password: string };
     try {
         body = await req.json();
