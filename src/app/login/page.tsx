@@ -35,6 +35,30 @@ export default function LoginPage() {
   };
 
   return (
+    <LoginContainer>
+          {registered && <JustRegistered /> }
+          <LoginHeader />
+
+          {status === "loading" && <Loading /> }
+          {status === "unauthenticated" && <Unauthenticated loadingPasskey={loadingPasskey} handlePasskey={handlePasskey} /> }
+          {status === "authenticated" && <Typography variant="body1" align="center" content="You're already signed in." />}
+    </LoginContainer>
+  );
+}
+
+function LoginHeader() {
+  return <Typography component="h1" variant="h4" align="center" sx={{ mt: 2, mb: 3 }}>Login</Typography>
+}
+
+function Loading() {
+  return <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ py: 4 }}>
+              <CircularProgress size={24} />
+              <Typography variant="body2">Checking session…</Typography>
+          </Stack>
+}
+
+function LoginContainer({ children }: { children: React.ReactNode }) {
+  return (
     <Container maxWidth="lg">
       <Box
         sx={{
@@ -55,25 +79,23 @@ export default function LoginPage() {
             p: { xs: 2, md: 4 },
           }}
         >
-          {registered && (
-            <Box sx={{ mb: 2 }}>
+          {children}
+        </Paper>
+      </Box>
+    </Container>
+  )
+}
+
+
+function JustRegistered() {
+  return <Box sx={{ mb: 2 }}>
               <Alert severity="success">Registration successful! Please log in.</Alert>
-            </Box>
-          )}
+          </Box>
+}
 
-          <Typography component="h1" variant="h4" align="center" sx={{ mt: 2, mb: 3 }}>
-            Login
-          </Typography>
+function Unauthenticated({ loadingPasskey, handlePasskey }: { loadingPasskey: null | "login" | "register"; handlePasskey: (mode: "login" | "register") => Promise<void> }) {
 
-          {status === "loading" && (
-            <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ py: 4 }}>
-              <CircularProgress size={24} />
-              <Typography variant="body2">Checking session…</Typography>
-            </Stack>
-          )}
-
-          {status === "unauthenticated" && (
-            <Stack spacing={3}>
+  return <Stack spacing={3}>
               <LoginForm />
               <Typography variant="subtitle2" color="text.secondary" align="center">
                 Or
@@ -99,14 +121,5 @@ export default function LoginPage() {
               <Typography variant="caption" color="text.secondary" align="center">
                 A Passkey lets you sign in without a password. If you don&apos;t have one yet, create it.
               </Typography>
-            </Stack>
-          )}
-
-          {status === "authenticated" && (
-            <Typography variant="body1" align="center">You&apos;re already signed in.</Typography>
-          )}
-        </Paper>
-      </Box>
-    </Container>
-  );
+          </Stack>
 }
