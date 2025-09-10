@@ -1,7 +1,7 @@
 // LoginPage.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import LoginForm from "@/components/auth/LoginForm";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import Alert from "@mui/material/Alert";
 import { useSession } from "next-auth/react";
 import { signIn as passkeySignIn } from "next-auth/webauthn"; // Passkey specific signIn helper
+import { signIn } from "next-auth/react";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -24,9 +25,27 @@ export default function LoginPage() {
   const registered = searchParams.get("registered");
   const [loadingPasskey, setLoadingPasskey] = React.useState<null | "login" | "register">(null);
 
+
+  // Side effects for session status can be handled here if needed
+
+  const handleGoogleSignIn = () => {
+    signIn("google", {
+      redirect: true,
+      redirectTo: "/api/auth/callback"
+    });
+  }
+
+
+  const handleGitHubSignIn = () => {
+    signIn("github", {
+      redirect: true,
+      redirectTo: "/api/auth/callback"
+    });
+  }
+
   const handlePasskey = async (mode: "login" | "register") => {
+    setLoadingPasskey(mode);
     try {
-      setLoadingPasskey(mode);
       // According to next-auth v5 passkey helper, registering vs authenticating can be toggled via "action" flag
       await passkeySignIn("passkey", { action: mode === "register" ? "register" : undefined });
     } finally {
@@ -40,8 +59,8 @@ export default function LoginPage() {
           <LoginHeader />
 
           {status === "loading" && <Loading /> }
-          {status === "unauthenticated" && <Unauthenticated loadingPasskey={loadingPasskey} handlePasskey={handlePasskey} /> }
-          {status === "authenticated" && <Typography variant="body1" align="center" content="You're already signed in." />}
+          {status === "unauthenticated" && <Unauthenticated loadingPasskey={loadingPasskey} handlePasskey={() => handlePasskey("login")} handleGitHubSignIn={handleGitHubSignIn} handleGoogleSignIn={handleGoogleSignIn} /> }
+          {status === "authenticated" && <Typography color="#FFFFFF" variant="body1" align="center" content="You're already signed in." />}
     </LoginContainer>
   );
 }
@@ -93,7 +112,19 @@ function JustRegistered() {
           </Box>
 }
 
-function Unauthenticated({ loadingPasskey, handlePasskey }: { loadingPasskey: null | "login" | "register"; handlePasskey: (mode: "login" | "register") => Promise<void> }) {
+type UnauthenticatedProps = {
+  loadingPasskey: null | "login" | "register";
+  handlePasskey: (mode: "login" | "register") => void;
+  handleGoogleSignIn: () => void;
+  handlePasskey: (mode: "login" | "register") => Promise<void>;
+};
+
+function Unauthenticated({
+  loadingPasskey,
+  handlePasskey,
+  handleGoogleSignIn,
+  handleGitHubSignIn,
+}: UnauthenticatedProps) {
 
   return <Stack spacing={3}>
               <LoginForm />
@@ -116,6 +147,22 @@ function Unauthenticated({ loadingPasskey, handlePasskey }: { loadingPasskey: nu
                   disabled={!!loadingPasskey}
                 >
                   {loadingPasskey === "register" ? "Creating Passkey…" : "Create Passkey"}
+                </Button>
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={handleGoogleSignIn}
+                >
+                  Sign in with Google
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={handleGitHubSignIn}
+                >
+                  Sign in with GitHub
                 </Button>
               </Stack>
               <Typography variant="caption" color="text.secondary" align="center">

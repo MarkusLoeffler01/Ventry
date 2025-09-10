@@ -19,17 +19,17 @@ datasource db {
 There will be many users and multiple admins
 */
 model User {
-  id              String   @id @default(cuid())
-  name            String?  @unique
-  email           String   @unique
-  password        String  // Password is crucial in oss
-  profilePicture  String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id              String    @id @default(cuid())
+  name            String?   @unique
+  email           String    @unique
+  password        String?   // Password is crucial in oss
+  profilePicture  String?   // Your field
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   registration    Registration?
   payments        Payment[]
-  isAdmin         Boolean  @default(false)
-  isVerified      Boolean  @default(false)
+  isAdmin         Boolean   @default(false)
+  isVerified      Boolean   @default(false) // Your field
   eventsOwned     Event[]
   accounts        Account[]
   sessions        Session[]

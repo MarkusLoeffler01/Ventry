@@ -1,11 +1,13 @@
 import NextAuth from "next-auth";
-import Passkey from "next-auth/providers/passkey";
 import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "@/lib/prisma";
+import { CustomPrismaAdapter } from "./custom-adapter";
 import { loginSchema } from "@/types/schemas/auth";
 import jwtService from "@/lib/helpers/jsonwebtoken";
+
+import Passkey from "next-auth/providers/passkey";
+import Github from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
 
 // Import bcrypt verification only for the credentials provider (Node.js runtime)
 async function verifyUserCredentials(email: string, password: string) {
@@ -14,11 +16,31 @@ async function verifyUserCredentials(email: string, password: string) {
 }
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
-    adapter: PrismaAdapter(prisma),
+    adapter: CustomPrismaAdapter(), // Use custom adapter
     session: { strategy: "jwt" },
     secret: process.env.AUTH_SECRET,
     providers: [
-        Passkey,
+        Passkey, // ✅ Works with custom adapter
+        Google({
+            clientId: process.env.GOOGLE_CLIENT_ID || "",
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET || ""
+        }),
+        Github({
+            clientId: process.env.GITHUB_CLIENT_ID || "",
+            clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
+            // WARNING: Enabling dangerous email account linking can lead to account takeover vulnerabilities.
+            // Make sure you understand the security implications and have reviewed this decision.
+                        allowDangerousEmailAccountLinking: true,
+                        profile(profile) {
+                            return {
+                    id: profile.id.toString(),
+                    name: profile.name || profile.login,
+                    email: profile.email ?? "",
+                    image: profile.avatar_url,
+                    emailVerified: true, // GitHub emails are verified
+                }
+            }
+        }),
         Credentials({
             name: "Email + Password",
             credentials: {
@@ -48,21 +70,25 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         })
     ],
     callbacks: {
-        jwt: async ({ token, user }) => {
-            if(user) {
-                token.userId = user?.id ?? token.userId;
+        jwt: async ({ token, user, account }) => {
+            if (user) {
+                token.userId = user.id;
+                token.email = user.email;
 
-                // if not present (e.g. Passkey-Login), create here
-                if (!token.apiToken && "userId" in token) {
-                    token.apiToken = jwtService.sign(
-                        { userId: token.userId, email: user?.email ?? "" },
-                        token.userId as string,
-                        { expiresIn: "7d" }
-                    );
+                // Generate API token for credentials/passkey users
+                if (account?.provider === "credentials" || account?.provider === "passkey") {
+                    if (!token.apiToken) {
+                        token.apiToken = jwtService.sign(
+                            { userId: user.id, email: user.email },
+                            user.id,
+                            { expiresIn: "7d" }
+                        );
+                    }
                 }
             }
             return token;
         },
+
         session: async ({ session, token }) => {
             if ("userId" in token && token.userId) session.user.id = token.userId as string;
             if ("apiToken" in token && token.apiToken) session.apiToken = token.apiToken as string;

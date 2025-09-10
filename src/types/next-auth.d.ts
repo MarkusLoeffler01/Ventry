@@ -6,6 +6,7 @@ declare module "next-auth" {
         user: {
             id: string;
             email: string;
+            isVerified: boolean;
         };
         apiToken?: string;
     }
