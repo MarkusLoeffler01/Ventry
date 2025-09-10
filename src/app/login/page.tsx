@@ -153,14 +153,14 @@ function Unauthenticated({
                 <Button
                   variant="outlined"
                   color="secondary"
-                  onClick={() => handleGoogleSignIn}
+                  onClick={() => void handleGoogleSignIn()}
                 >
                   Sign in with Google
                 </Button>
                 <Button
                   variant="outlined"
                   color="secondary"
-                  onClick={() => handleGitHubSignIn}
+                  onClick={() => void handleGitHubSignIn()}
                 >
                   Sign in with GitHub
                 </Button>
