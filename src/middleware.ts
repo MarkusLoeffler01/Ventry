@@ -1,7 +1,7 @@
 import * as mws from "./middlewares/";
 import { type NextRequest, NextResponse } from "next/server";
 
-type SubMW = (req: NextRequest, res: NextResponse) => Promise<void | NextResponse> | void | NextResponse;
+type SubMW = (req: NextRequest, res: NextResponse) => Promise<undefined | NextResponse> | undefined | NextResponse;
 
 const routes: Array<{ pattern: URLPattern, mw: SubMW }> = [
     { pattern: new URLPattern({ pathname: "/api/user/:path*" }), mw: mws.auth.middleware },

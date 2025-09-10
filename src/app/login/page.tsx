@@ -1,7 +1,7 @@
 // LoginPage.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import LoginForm from "@/components/auth/LoginForm";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
@@ -28,16 +28,16 @@ export default function LoginPage() {
 
   // Side effects for session status can be handled here if needed
 
-  const handleGoogleSignIn = () => {
-    signIn("google", {
+  const handleGoogleSignIn = async () => {
+    await signIn("google", {
       redirect: true,
       redirectTo: "/api/auth/callback"
     });
   }
 
 
-  const handleGitHubSignIn = () => {
-    signIn("github", {
+  const handleGitHubSignIn = async () => {
+    await signIn("github", {
       redirect: true,
       redirectTo: "/api/auth/callback"
     });
@@ -59,7 +59,7 @@ export default function LoginPage() {
           <LoginHeader />
 
           {status === "loading" && <Loading /> }
-          {status === "unauthenticated" && <Unauthenticated loadingPasskey={loadingPasskey} handlePasskey={() => handlePasskey("login")} handleGitHubSignIn={handleGitHubSignIn} handleGoogleSignIn={handleGoogleSignIn} /> }
+          {status === "unauthenticated" && <Unauthenticated loadingPasskey={loadingPasskey} handlePasskey={async () => await handlePasskey("login")} handleGitHubSignIn={handleGitHubSignIn} handleGoogleSignIn={handleGoogleSignIn} /> }
           {status === "authenticated" && <Typography color="#FFFFFF" variant="body1" align="center" content="You're already signed in." />}
     </LoginContainer>
   );
@@ -114,9 +114,9 @@ function JustRegistered() {
 
 type UnauthenticatedProps = {
   loadingPasskey: null | "login" | "register";
-  handlePasskey: (mode: "login" | "register") => void;
-  handleGoogleSignIn: () => void;
   handlePasskey: (mode: "login" | "register") => Promise<void>;
+  handleGoogleSignIn: () => Promise<void>;
+  handleGitHubSignIn: () => Promise<void>;
 };
 
 function Unauthenticated({
@@ -153,14 +153,14 @@ function Unauthenticated({
                 <Button
                   variant="outlined"
                   color="secondary"
-                  onClick={handleGoogleSignIn}
+                  onClick={() => handleGoogleSignIn}
                 >
                   Sign in with Google
                 </Button>
                 <Button
                   variant="outlined"
                   color="secondary"
-                  onClick={handleGitHubSignIn}
+                  onClick={() => handleGitHubSignIn}
                 >
                   Sign in with GitHub
                 </Button>

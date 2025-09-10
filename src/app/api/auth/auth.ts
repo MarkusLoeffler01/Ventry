@@ -80,7 +80,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                     if (!token.apiToken) {
                         token.apiToken = jwtService.sign(
                             { userId: user.id, email: user.email },
-                            user.id,
+                            user.id ?? "",
                             { expiresIn: "7d" }
                         );
                     }

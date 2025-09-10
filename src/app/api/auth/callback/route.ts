@@ -1,13 +1,10 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 
 let GET: ((req: NextRequest) => Response) | undefined;
 
 if (process.env.NODE_ENV !== "production") {
-    GET = function (req: NextRequest) {
-        const url = req.nextUrl.clone();
-        const params = url.searchParams;
-        const headers = req.headers;
+    GET = () => {
 
         // Only return non-sensitive information, or remove this endpoint in production
         return new Response(JSON.stringify({
@@ -25,7 +22,7 @@ export { GET };
 let POST: ((req: NextRequest) => Response) | undefined;
 
 if (process.env.NODE_ENV !== "production") {
-    POST = function (req: NextRequest) {
+    POST = (req: NextRequest) => {
         const url = req.nextUrl.clone();
         const params = url.searchParams;
         const headers = req.headers;
