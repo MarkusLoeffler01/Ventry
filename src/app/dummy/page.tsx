@@ -1,5 +1,3 @@
-"use client";
-
 import { AddPasskeyButton } from "@/components/auth/AddPasskey";
 
 export default function Page() {

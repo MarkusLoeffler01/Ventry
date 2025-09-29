@@ -1,6 +1,3 @@
-// RegisterPage.tsx
-"use client";
-
 import { 
   Box, 
   Typography, 
@@ -10,7 +7,6 @@ import {
 import RegisterForm from '@/components/auth/RegisterForm';
 
 export default function RegisterPage() {
-
   return (
     <Container maxWidth="lg">
       <Box sx={{ 
@@ -35,10 +31,8 @@ export default function RegisterPage() {
           </Typography>
           
           <RegisterForm/>
-          
-          
         </Paper>
       </Box>
     </Container>
   );
-};
+}
