@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import jwtService from "@/lib/helpers/jsonwebtoken";
 
+// Note: Don't import auth config here as it causes Edge Runtime issues with bcrypt
+// export { auth as AuthAPI } from "@/app/api/auth/auth";
+
 export async function middleware(req: NextRequest) {
     const token = req.cookies.get("token")?.value;
 

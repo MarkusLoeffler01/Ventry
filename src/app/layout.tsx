@@ -1,6 +1,8 @@
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { auth } from "./api/auth/auth";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,16 +21,21 @@ export const metadata: Metadata = {
   authors: [{ name: "Markus Löffler", url: "https://github.com/MarkusLoeffler01/Ventry"}]
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+  const session = await auth();
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AppRouterCacheProvider>
-          {children}
+          <Providers session={session}>
+            {children}
+          </Providers>
         </AppRouterCacheProvider>
       </body>
     </html>

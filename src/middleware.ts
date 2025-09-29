@@ -1,12 +1,13 @@
 import * as mws from "./middlewares/";
 import { type NextRequest, NextResponse } from "next/server";
 
-type SubMW = (req: NextRequest, res: NextResponse) => Promise<void | NextResponse> | void | NextResponse;
+type SubMW = (req: NextRequest, res: NextResponse) => Promise<undefined | NextResponse> | undefined | NextResponse;
 
 const routes: Array<{ pattern: URLPattern, mw: SubMW }> = [
     { pattern: new URLPattern({ pathname: "/api/user/:path*" }), mw: mws.auth.middleware },
     { pattern: new URLPattern({ pathname: "/api/admin/:path*" }), mw: mws.admin.middleware },
-    { pattern: new URLPattern({ pathname: "/api/:path*" }), mw: mws.logging.loggingMiddleware },
+    // Only apply logging to non-auth API routes
+    { pattern: new URLPattern({ pathname: "/api/(?!auth).*" }), mw: mws.logging.loggingMiddleware },
 ];
 
 export async function middleware(req: NextRequest) {
@@ -33,8 +34,8 @@ export const config = {
     matcher: [
         "/api/user/:path*",
         "/api/admin/:path*",
-        "/api/:path*",
-        
+        // Match API routes but exclude auth routes
+        "/api/((?!auth).)*"
     ]
 }
 

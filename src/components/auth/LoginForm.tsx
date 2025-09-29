@@ -9,13 +9,16 @@ import {
     TextField,
     InputAdornment,
     IconButton,
-    CircularProgress
+    CircularProgress,
+    Icon
 } from "@mui/material";
 import { Visibility, VisibilityOff, CheckCircle } from "@mui/icons-material";
 import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
+import { signIn as reactSignIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/webauthn";
 
-export default function LoginForm() {
+export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [formData, setFormData] = useState({
         email: "",
         password: ""
@@ -25,7 +28,21 @@ export default function LoginForm() {
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    const { status } = useSession();
+
     const router = useRouter();
+
+    const doPasskeyLogin = async () => {
+        try {
+            setLoading(true);
+            await signIn("passkey", {
+                redirect: true,
+                redirectTo: callbackUrl ?? "/"
+            });
+        } finally {
+            setLoading(false);
+        }
+    }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -38,27 +55,19 @@ export default function LoginForm() {
         setLoading(true);
 
         try {
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            });
 
-            if(!response.ok) {
-                const data = await response.json();
-                setError(data.error || "An error occurred");
-                return;
+            const res = await reactSignIn("credentials", { email: formData.email, password: formData.password, redirect: false });
+            if(res?.error) {
+                setError(res.error);
             }
 
             setSuccess(true);
+
             setTimeout(() => {
-                router.push("/dashboard");
-                
+                router.push("/");
+                router.refresh();
             }, 1000);
 
-            
         } catch(err: unknown) {
             if(err instanceof Error) {
                 setError(err.message || "An error occurred");
@@ -152,6 +161,15 @@ export default function LoginForm() {
                     </span>
                     {loading && <CircularProgress size={24} sx={progressSx} />}
                     {success && <CheckCircle sx={{ ...progressSx, animation: "scale 0.3s"}} />}
+                </Button>
+
+                <Button onClick={() => {
+                    void doPasskeyLogin().catch(() => {
+                        console.error("Passkey login failed");
+                    });
+                }} disabled={loading || success || status === "loading"} className="w-full rounded-xl border px-4 py-2">
+                    <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
+                    Login with Passkey
                 </Button>
             </Box>
         </AuthTemplate>
