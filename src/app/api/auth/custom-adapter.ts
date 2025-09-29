@@ -37,19 +37,23 @@ export function CustomPrismaAdapter(): Adapter {
 
     // Override user retrieval to map back to NextAuth format
     async getUser(id) {
+      console.log("CustomAdapter.getUser called for ID:", id);
       const user = await prisma.user.findUnique({
         where: { id }
       });
 
       if (!user) return null;
 
-      return {
+      const adaptedUser = {
         id: user.id,
         name: user.name,
         email: user.email,
         image: user.profilePicture,
         emailVerified: user.isVerified ? new Date() : null,
       };
+
+      console.log("CustomAdapter.getUser returning:", adaptedUser);
+      return adaptedUser;
     },
 
     // Override user update
