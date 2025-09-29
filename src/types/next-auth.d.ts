@@ -6,9 +6,19 @@ declare module "next-auth" {
         user: {
             id: string;
             email: string;
-            isVerified: boolean;
+            name?: string | null;
+            image?: string | null;
+            emailVerified?: Date | null;
         };
         apiToken?: string;
+    }
+
+    interface User {
+        id: string;
+        email: string;
+        name?: string | null;
+        image?: string | null;
+        emailVerified?: Date | null;
     }
 }
 

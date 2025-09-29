@@ -31,7 +31,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     await signIn("google", {
       redirect: true,
-      redirectTo: "/api/auth/callback"
+      redirectTo: "/auth/success?provider=google"
     });
   }
 
@@ -39,7 +39,8 @@ export default function LoginPage() {
   const handleGitHubSignIn = async () => {
     await signIn("github", {
       redirect: true,
-      redirectTo: "/api/auth/callback"
+      //! THIS WORKS EVEN THO THE REDIRECT URL IN GITHUB IS DIFFERENT. BUT IT WORKS
+      redirectTo: "/auth/success?provider=github"
     });
   }
 

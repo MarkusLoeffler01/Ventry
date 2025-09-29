@@ -163,7 +163,11 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     {success && <CheckCircle sx={{ ...progressSx, animation: "scale 0.3s"}} />}
                 </Button>
 
-                <Button onClick={() => doPasskeyLogin} disabled={loading || success || status === "loading"} className="w-full rounded-xl border px-4 py-2">
+                <Button onClick={() => {
+                    void doPasskeyLogin().catch(() => {
+                        console.error("Passkey login failed");
+                    });
+                }} disabled={loading || success || status === "loading"} className="w-full rounded-xl border px-4 py-2">
                     <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
                     Login with Passkey
                 </Button>
