@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     const userData = await prisma.user.findUnique({
       where: { id: userId },
       include: {
+        profilePictures: true,
         registration: {
           include: {
             payments: true
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
         id: userData.id,
         name: userData.name || undefined,
         email: userData.email,
-        profilePicture: userData.profilePicture || undefined,
+        profilePictures: userData.profilePictures || [],
         bio: userData.bio || undefined,
         dateOfBirth: userData.dateOfBirth?.toISOString() || undefined,
         pronouns: userData.pronouns || undefined,

@@ -15,14 +15,12 @@ export function CustomPrismaAdapter(): Adapter {
         id: user.id,
         name: user.name,
         email: user.email,
-        // Map NextAuth fields to your schema
-        profilePicture: user.image, // image -> profilePicture
         isVerified: Boolean(user.emailVerified), // emailVerified -> isVerified
         isAdmin: false,
       };
 
       const createdUser = await prisma.user.create({
-        data: userData
+        data: {...userData, profilePictures: undefined}
       });
 
       // Return in NextAuth format
@@ -30,7 +28,7 @@ export function CustomPrismaAdapter(): Adapter {
         id: createdUser.id,
         name: createdUser.name,
         email: createdUser.email,
-        image: createdUser.profilePicture,
+        image: undefined,
         emailVerified: createdUser.isVerified ? new Date() : null,
       };
     },
@@ -39,16 +37,24 @@ export function CustomPrismaAdapter(): Adapter {
     async getUser(id) {
       console.log("CustomAdapter.getUser called for ID:", id);
       const user = await prisma.user.findUnique({
-        where: { id }
+        where: { id },
+        include: {
+          profilePictures: {
+            where: { isPrimary: true },
+            take: 1
+          }
+        }
       });
 
       if (!user) return null;
+
+      const primaryPicture = user.profilePictures[0];
 
       const adaptedUser = {
         id: user.id,
         name: user.name,
         email: user.email,
-        image: user.profilePicture,
+        image: primaryPicture?.signedUrl || null,
         emailVerified: user.isVerified ? new Date() : null,
       };
 
@@ -62,19 +68,26 @@ export function CustomPrismaAdapter(): Adapter {
       
       if (data.name !== undefined) updateData.name = data.name;
       if (data.email !== undefined) updateData.email = data.email;
-      if (data.image !== undefined) updateData.profilePicture = data.image;
       if (data.emailVerified !== undefined) updateData.isVerified = Boolean(data.emailVerified);
 
       const user = await prisma.user.update({
         where: { id },
-        data: updateData
+        data: updateData,
+        include: {
+          profilePictures: {
+            where: { isPrimary: true },
+            take: 1
+          }
+        }
       });
+
+      const primaryPicture = user.profilePictures[0];
 
       return {
         id: user.id,
         name: user.name,
         email: user.email,
-        image: user.profilePicture,
+        image: primaryPicture?.signedUrl || null,
         emailVerified: user.isVerified ? new Date() : null,
       };
     },
@@ -82,16 +95,24 @@ export function CustomPrismaAdapter(): Adapter {
     // Override getUserByEmail
     async getUserByEmail(email) {
       const user = await prisma.user.findUnique({
-        where: { email }
+        where: { email },
+        include: {
+          profilePictures: {
+            where: { isPrimary: true },
+            take: 1
+          }
+        }
       });
 
       if (!user) return null;
+
+      const primaryPicture = user.profilePictures[0];
 
       return {
         id: user.id,
         name: user.name,
         email: user.email,
-        image: user.profilePicture,
+        image: primaryPicture?.signedUrl || null,
         emailVerified: user.isVerified ? new Date() : null,
       };
     },

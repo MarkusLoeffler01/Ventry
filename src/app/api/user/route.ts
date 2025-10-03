@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         bio: true,
         dateOfBirth: true,
         pronouns: true,
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         createdAt: true,
         updatedAt: true,
       }
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         createdAt: true,
         updatedAt: true,
       }
@@ -203,7 +203,7 @@ export async function PATCH(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         createdAt: true,
         updatedAt: true,
       }

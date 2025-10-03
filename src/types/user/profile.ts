@@ -7,7 +7,13 @@ export const enhancedUserSchema = z.object({
   bio: z.string().max(500).optional(),
   dateOfBirth: z.string().date().optional(), // ISO date string (YYYY-MM-DD)
   pronouns: z.string().max(50).optional(),
-  profilePicture: z.string().url().nullable().optional(),
+  profilePictures: z.array(z.object({
+    id: z.string(),
+    signedUrl: z.string().url().nullable(),
+    storagePath: z.string().nullable(),
+    isPrimary: z.boolean(),
+    createdAt: z.date()
+  })).optional(),
   // Privacy settings
   showAge: z.boolean().optional(),
 });

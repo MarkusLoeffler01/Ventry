@@ -32,7 +32,7 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
     const dbUserData = user.id ? await prisma.user.findUnique({
         where: { id: user.id },
         select: {
-            profilePicture: true,
+            profilePictures: true,
             accounts: {
                 where: {
                     provider: provider || 'unknown'
@@ -44,7 +44,7 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
         }
     }) : null;
 
-    const localProfilePicture = dbUserData?.profilePicture;
+    const localProfilePicture = dbUserData?.profilePictures[0]?.signedUrl;
     const providerProfilePicture = user.image; // This comes from the OAuth provider
 
     console.log("Local profile picture:", localProfilePicture);

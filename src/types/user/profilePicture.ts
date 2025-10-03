@@ -8,7 +8,8 @@ import { z } from 'zod';
 
 
 export const profilePictureSchema = z.object({
-    imageUrl: z.string(),
+    oldImageId: z.string(),
+    newImage: z.file(),
     userId: z.string(),
 });
 

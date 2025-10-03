@@ -30,11 +30,19 @@ import {
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
 
+interface ProfilePicture {
+  id: string;
+  signedUrl?: string | null;
+  storagePath?: string | null;
+  isPrimary: boolean;
+  createdAt: Date;
+}
+
 interface User {
   id: string;
   name?: string | null;
   email: string;
-  profilePicture?: string | null;
+  profilePictures: ProfilePicture[];
   bio?: string | null;
   dateOfBirth?: Date | null;
   pronouns?: string | null;
@@ -52,7 +60,6 @@ interface ProfileFormData {
   bio: string;
   dateOfBirth: string;
   pronouns: string;
-  profilePicture: string;
   showAge: boolean;
 }
 
@@ -73,9 +80,24 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
-    profilePicture: user.profilePicture || '',
     showAge: user.showAge ?? true
   });
+
+  // Manage profile pictures state locally
+  const [profilePictures, setProfilePictures] = useState<ProfilePicture[]>(user.profilePictures);
+
+  // Function to refresh profile pictures from API
+  const refreshProfilePictures = async () => {
+    try {
+      const response = await fetch(`/api/user/profile-picture?userId=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProfilePictures(data.profilePictures || []);
+      }
+    } catch (error) {
+      console.error('Failed to refresh profile pictures:', error);
+    }
+  };
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +124,6 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
           bio: formData.bio,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : null,
           pronouns: formData.pronouns,
-          profilePicture: formData.profilePicture || null,
           showAge: formData.showAge
         })
       });
@@ -191,13 +212,14 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         {/* Profile Picture Section */}
         <Box>
           <Typography variant="h5" gutterBottom>
-            Profile Picture
+            Profile Pictures
           </Typography>
           <ProfilePictureGallery
-            currentPicture={formData.profilePicture}
+            userId={user.id}
+            profilePictures={profilePictures}
             userName={formData.name}
             userEmail={user.email}
-            onPictureUpdate={(url) => setFormData(prev => ({ ...prev, profilePicture: url }))}
+            onPicturesUpdate={refreshProfilePictures}
           />
         </Box>
 
@@ -386,11 +408,14 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             <Button 
               color="error" 
               variant="contained"
-              onClick={async () => {
+              onClick={() => {
                 const input = document.getElementById('delete-confirmation') as HTMLInputElement;
                 if (input?.value === user.email) {
                   try {
-                    await handleDeleteAccount();
+                    handleDeleteAccount()
+                      .catch(err => {
+                        setError(err instanceof Error ? err.message : 'Failed to delete account');
+                      });
                   } catch (err) {
                     setError(err instanceof Error ? err.message : 'Failed to delete account');
                   }
@@ -419,12 +444,10 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             <Button onClick={() => setDownloadDialogOpen(false)}>Cancel</Button>
             <Button
               variant="contained"
-              onClick={async () => {
-                try {
-                  await handleDownloadData();
-                } catch (err) {
+              onClick={() => {
+                handleDownloadData().catch(err => {
                   setError(err instanceof Error ? err.message : 'Failed to export data');
-                }
+                });
               }}
             >
               Download

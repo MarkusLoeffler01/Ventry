@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
         hostname: 'avatars.githubusercontent.com',
         port: '',
         pathname: '/**'
+      },
+      {
+        protocol: 'https',
+        hostname: 'itpwjkidppeoypefvvxe.supabase.co',
+        port: '',
+        pathname: '/**'
       }
     ]
   }

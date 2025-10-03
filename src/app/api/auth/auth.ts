@@ -9,7 +9,7 @@ import Passkey from "next-auth/providers/passkey";
 import Github from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import * as SECCONFIG from "@/lib/security/config";
-
+import { getPrimary, validatePicture } from "@/lib/user/profilePicture";
 
 // Import bcrypt verification only for the credentials provider (Node.js runtime)
 async function verifyUserCredentials(email: string, password: string) {
@@ -99,11 +99,16 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             // If we have a userId but no image, fetch it from the database
             if (token.userId && !token.image) {
                 try {
-                    const dbUser = await prisma.user.findUnique({
-                        where: { id: token.userId as string }
+                    const dbUser = await prisma.user.findFirst({
+                        where: { id: token.userId as string },
+                        include: { profilePictures: true } // Why tf do we need this here???
                     });
-                    if (dbUser?.profilePicture) {
-                        token.image = dbUser.profilePicture;
+                    if (dbUser?.profilePictures) {
+                        const primaryPicture = await getPrimary(token.userId as string);
+                        if(!primaryPicture) return token;
+
+                        const validatedPicture = await validatePicture(token.userId as string, primaryPicture.id);
+                        token.image = validatedPicture;
                     }
                 } catch (error) {
                     console.error("JWT Callback - Error fetching user image:", error);
