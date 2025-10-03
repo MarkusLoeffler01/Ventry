@@ -24,6 +24,10 @@ model User {
   email           String    @unique
   password        String?   // Password is crucial in oss
   profilePicture  String?   // Your field
+  bio             String?   // Profile bio
+  dateOfBirth     DateTime? // User's date of birth
+  pronouns        String?   // User's pronouns
+  showAge         Boolean   @default(true) // Privacy setting for showing age
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   registration    Registration?

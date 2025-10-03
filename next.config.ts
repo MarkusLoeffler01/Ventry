@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
+import { validateSecurityConfig } from "./src/lib/security/config";
+
+// Validate security configuration on startup
+try {
+  validateSecurityConfig();
+} catch (error) {
+  console.error('Security Configuration Error:', error);
+  process.exit(1);
+}
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['localhost', 'local.dev'],
+  experimental: {
+    serverSourceMaps: true,
+  },
   /* config options here */
   images: {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",

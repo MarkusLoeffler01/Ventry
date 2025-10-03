@@ -3,12 +3,13 @@ import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
 import { CustomPrismaAdapter } from "./custom-adapter";
 import { loginSchema } from "@/types/schemas/auth";
-import jwtService from "@/lib/helpers/jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 
 import Passkey from "next-auth/providers/passkey";
 import Github from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
+import * as SECCONFIG from "@/lib/security/config";
+
 
 // Import bcrypt verification only for the credentials provider (Node.js runtime)
 async function verifyUserCredentials(email: string, password: string) {
@@ -18,14 +19,19 @@ async function verifyUserCredentials(email: string, password: string) {
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
     adapter: CustomPrismaAdapter(), // Use custom adapter
-    session: { strategy: "jwt" },
+    session: { 
+        strategy: "jwt",
+        maxAge: SECCONFIG.SECURITY_CONFIG.JWT_MAX_AGE,
+        updateAge: SECCONFIG.SECURITY_CONFIG.JWT_UPDATE_AGE, // 24 hours - refresh session daily
+    },
     secret: process.env.AUTH_SECRET,
+    trustHost: true, // Required for production deployments
     providers: [
         Passkey, // ✅ Works with custom adapter
         Google({
             clientId: process.env.GOOGLE_CLIENT_ID || "",
             clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-            allowDangerousEmailAccountLinking: true,
+            allowDangerousEmailAccountLinking: false, // ✅ SECURITY: Prevent account takeover
             profile(profile) {
                 return {
                     id: profile.sub,
@@ -39,10 +45,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         Github({
             clientId: process.env.GITHUB_CLIENT_ID || "",
             clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-            // WARNING: Enabling dangerous email account linking can lead to account takeover vulnerabilities.
-            // Make sure you understand the security implications and have reviewed this decision.
-                        allowDangerousEmailAccountLinking: true,
-                        profile(profile) {
+            // SECURITY: Disabled dangerous email account linking to prevent account takeover
+            allowDangerousEmailAccountLinking: false,
+            profile(profile) {
                             return {
                     id: profile.id.toString(),
                     name: profile.name || profile.login,
@@ -59,7 +64,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                 password: { label: "Password", type: "password" }
             },
             authorize: async (creds) => {
-                console.log("Authorizing user...");
                 const parsed = loginSchema.safeParse({
                     email: String(creds?.email ?? ""),
                     password: String(creds?.password ?? "")
@@ -70,51 +74,36 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                 const user = await verifyUserCredentials(parsed.data.email, parsed.data.password);
                 if(!user) return null;
 
-                const apiToken = jwtService.sign(
-                    { userId: user.id, email: user.email },
-                    user.id,
-                    { expiresIn: "7d" }
-                );
-
-                return {...user, apiToken}
+                // No need for custom apiToken since we're using NextAuth JWT strategy
+                return user
             }
         })
     ],
     callbacks: {
         jwt: async ({ token, user, account }) => {
             if (user) {
-                console.log("JWT Callback - User object:", user);
-                console.log("JWT Callback - Account:", account);
+                // Only log in development
+                if (process.env.NODE_ENV === "development") {
+                    console.log("JWT Callback - User object:", user);
+                    console.log("JWT Callback - Account:", account);
+                }
                 
                 token.userId = user.id;
                 token.email = user.email;
                 token.name = user.name || undefined;
                 token.image = user.image || undefined;
 
-                console.log("JWT Callback - Token after update:", token);
-
-                // Generate API token for credentials/passkey users
-                if (account?.provider === "credentials" || account?.provider === "passkey") {
-                    if (!token.apiToken) {
-                        token.apiToken = jwtService.sign(
-                            { userId: user.id, email: user.email },
-                            user.id ?? "",
-                            { expiresIn: "7d" }
-                        );
-                    }
-                }
+                // NextAuth JWT handles all token management - no need for custom tokens
             }
 
             // If we have a userId but no image, fetch it from the database
             if (token.userId && !token.image) {
-                console.log("JWT Callback - Fetching missing image for user:", token.userId);
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: token.userId as string }
                     });
                     if (dbUser?.profilePicture) {
                         token.image = dbUser.profilePicture;
-                        console.log("JWT Callback - Added image from database:", token.image);
                     }
                 } catch (error) {
                     console.error("JWT Callback - Error fetching user image:", error);
@@ -125,19 +114,44 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         },
 
         session: async ({ session, token }) => {
-            console.log("Session Callback - Token:", token);
-            
             if ("userId" in token && token.userId) session.user.id = token.userId as string;
             if ("name" in token) session.user.name = token.name as string | null;
             if ("image" in token) session.user.image = token.image as string | null;
-            if ("apiToken" in token && token.apiToken) session.apiToken = token.apiToken as string;
+            // No custom apiToken needed - NextAuth handles all token management
             
-            console.log("Session Callback - Final session:", session);
             return session;
         }
     },
     experimental: {
         enableWebAuthn: true
     },
-    pages: { signIn: "/login" }
+    pages: { signIn: "/login" },
+    cookies: {
+        sessionToken: {
+            name: process.env.NODE_ENV === "production" ? 
+                `__Secure-next-auth.session-token` : 
+                `next-auth.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === "production", // Only HTTPS in production
+                domain: process.env.NODE_ENV === "production" ? 
+                    process.env.NEXTAUTH_URL?.replace(/https?:\/\//, '') : 
+                    undefined
+            }
+        }
+    },
+    events: {
+        async signIn({ user, account }) {
+            // Log successful sign-ins for security monitoring
+            console.log(`User ${user.email} signed in with ${account?.provider}`);
+        },
+        async signOut(message) {
+            // Log sign-outs for security monitoring  
+            if ('token' in message && message.token?.email) {
+                console.log(`User ${message.token.email} signed out`);
+            }
+        }
+    }
 } satisfies NextAuthConfig)

@@ -3,9 +3,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
+import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 
 export async function POST(req: NextRequest) {
     try {
+        // Check admin authorization
+        const authResult = await checkAdminAuth();
+        if (!authResult.authorized) {
+            return forbiddenResponse(authResult.error);
+        }
+
         const body = await req.json();
         const event = adminCreateEventSchema.parse(body);
         // Allow only a single event: use upsert on id=1 (implicit for first row with autoincrement)
@@ -70,6 +77,12 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
     try {
+        // Check admin authorization
+        const authResult = await checkAdminAuth();
+        if (!authResult.authorized) {
+            return forbiddenResponse(authResult.error);
+        }
+
         const id = req.nextUrl.searchParams.get("id");
 
         // For singleton event pattern, if no id is supplied, assume first (only) event
@@ -130,6 +143,12 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
+        // Check admin authorization
+        const authResult = await checkAdminAuth();
+        if (!authResult.authorized) {
+            return forbiddenResponse(authResult.error);
+        }
+
         const id = req.nextUrl.searchParams.get("id");
 
         if (!id) return NextResponse.json({ error: "Event ID is required" }, { status: 400 });
