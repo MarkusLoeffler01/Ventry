@@ -53,6 +53,7 @@ model User {
   accounts        Account[]
   sessions        Session[]
   Authenticator   Authenticator[]
+  pendingAccountLinks PendingAccountLink[]
 }
 
 model Account {
@@ -219,4 +220,35 @@ model Authenticator {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, credentialID])
+}
+model PendingAccountLink {
+  id                  String   @id @default(cuid())
+  userId              String
+  provider            String   // github, google, etc.
+  providerAccountId   String
+  providerEmail       String
+  emailVerified       Boolean  @default(false)
+  
+  // OAuth tokens (to complete linking later)
+  accessToken         String?  @db.Text
+  refreshToken        String?  @db.Text
+  idToken             String?  @db.Text
+  tokenExpiresAt      Int?
+  tokenType           String?
+  scope               String?
+  
+  // Option B: Email verification fields (reserved for future use)
+  emailToken          String?   @unique
+  emailTokenSentAt    DateTime?
+  confirmedAt         DateTime?
+  disableEmailLogin   Boolean   @default(false)
+  
+  createdAt           DateTime @default(now())
+  expiresAt           DateTime // Pending links expire after 1 hour
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, provider])
+  @@index([emailToken])
+  @@map("pending_account_links")
 }

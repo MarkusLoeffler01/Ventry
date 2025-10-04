@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ky from "ky";
 import {
     Box,
     Button,
@@ -17,6 +18,7 @@ import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
 import { signIn as reactSignIn, useSession } from "next-auth/react";
 import { signIn } from "next-auth/webauthn";
+import type { PendingAccountLink } from "@/generated/prisma";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [formData, setFormData] = useState({
@@ -59,14 +61,40 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
             const res = await reactSignIn("credentials", { email: formData.email, password: formData.password, redirect: false });
             if(res?.error) {
                 setError(res.error);
+                setLoading(false);
+                return;
             }
 
             setSuccess(true);
 
-            setTimeout(() => {
-                router.push("/");
-                router.refresh();
-            }, 1000);
+            // Wait a bit for session to be established
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Check for pending account links
+            try {
+                const pendingResponse = await ky.get<{pendingLinks: PendingAccountLink[]}>("/api/user/link-account/pending", {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (pendingResponse.ok) {
+                    const data = await pendingResponse.json();
+                    const pendingLinks = data.pendingLinks;
+                    
+                    if (Array.isArray(pendingLinks) && pendingLinks.length > 0) {
+                        // Redirect to link-account page immediately without query params
+                        router.push("/link-account");
+                        return;
+                    }
+                }
+            } catch (fetchError) {
+                console.error("Error checking pending links:", fetchError);
+            }
+
+            // No pending links, go to home
+            router.push("/");
 
         } catch(err: unknown) {
             if(err instanceof Error) {

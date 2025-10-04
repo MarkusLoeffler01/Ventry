@@ -29,6 +29,7 @@ import {
   VisibilityOff
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
+import LinkedAccounts from './LinkedAccounts';
 
 interface ProfilePicture {
   id: string;
@@ -42,7 +43,12 @@ interface User {
   id: string;
   name?: string | null;
   email: string;
+  password?: string | null;
   profilePictures: ProfilePicture[];
+  accounts: Array<{
+    provider: string;
+    providerAccountId: string;
+  }>;
   bio?: string | null;
   dateOfBirth?: Date | null;
   pronouns?: string | null;
@@ -315,6 +321,17 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               When enabled, your age will be visible to other users. When disabled, only you can see your age.
             </Typography>
           </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* Linked Accounts */}
+        <Box>
+          <LinkedAccounts
+            accounts={user.accounts}
+            hasPassword={!!user.password}
+            hasOAuthProviders={user.accounts.some(a => a.provider === 'github' || a.provider === 'google')}
+          />
         </Box>
 
         <Divider />

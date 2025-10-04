@@ -3,8 +3,31 @@ import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import LoginPageClient from "@/components/auth/LoginPageClient";
+import { auth } from "@/app/api/auth/auth";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Check if user is already logged in and has pending links
+  const session = await auth();
+  
+  if (session?.user?.id) {
+    // User is logged in, check for pending links
+    const pendingLinks = await prisma.pendingAccountLink.findMany({
+      where: {
+        userId: session.user.id,
+        expiresAt: {
+          gt: new Date()
+        }
+      }
+    });
+    
+    if (pendingLinks.length > 0) {
+      // Redirect to link-account page
+      redirect("/link-account");
+    }
+  }
+
   return (
     <Container maxWidth="lg">
       <Box
