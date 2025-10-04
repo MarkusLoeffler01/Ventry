@@ -1,28 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server";
-import jwtService from "@/lib/helpers/jsonwebtoken";
 
-// Note: Don't import auth config here as it causes Edge Runtime issues with bcrypt
-// export { auth as AuthAPI } from "@/app/api/auth/auth";
-
+// Note: Using NextAuth session cookies instead of custom JWT tokens
 export async function middleware(req: NextRequest) {
-    const token = req.cookies.get("token")?.value;
+    // Look for NextAuth session token cookie
+    const sessionToken = req.cookies.get("next-auth.session-token")?.value || 
+                        req.cookies.get("__Secure-next-auth.session-token")?.value;
 
-    if (!token) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!sessionToken) {
+        return NextResponse.json({ error: "Unauthorized - No session token" }, { status: 401 });
     }
 
-    try {
-        jwtService.verify(token);
-        const user = jwtService.validatePayload(jwtService.decode(token));
-
-        const headers = new Headers(req.headers);
-        headers.set("userId", user.userId);
-        headers.set("email", user.email);
-        const response = NextResponse.next();
-        response.headers.set("userId", user.userId);
-        response.headers.set("email", user.email);
-        return response;
-    } catch (_error) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // For API routes, we'll rely on the auth() function in the route handlers
+    // This middleware just checks for the presence of a session cookie
+    // The actual user validation should be done in the API route using auth()
+    
+    return NextResponse.next();
 }

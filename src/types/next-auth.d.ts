@@ -10,7 +10,7 @@ declare module "next-auth" {
             image?: string | null;
             emailVerified?: Date | null;
         };
-        apiToken?: string;
+        // Removed apiToken - NextAuth JWT handles all token management
     }
 
     interface User {
@@ -27,6 +27,6 @@ declare module "next-auth/jwt" {
         userId?: string;
         name?: string | null;
         image?: string | null;
-        apiToken?: string;
+        // Removed apiToken - NextAuth handles internal token management
     }
 }

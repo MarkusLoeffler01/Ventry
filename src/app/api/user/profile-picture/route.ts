@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { profilePictureSchema, type profilePicturePATCH } from "@/types/user/profilePicture";
+import { USER_CONFIG } from "@/lib/config";
+import { getUserIdFromRequest } from "@/lib/helpers/user";
+import { uploadProfilePicture, getSignedUrl } from "@/lib/supabase";
+import { add, remove, setPrimary } from "@/lib/user/profilePicture";
+import { prisma } from "@/lib/prisma";
 
-// GET: Retrieve a user's profile picture
+// GET: Retrieve a user's profile pictures
 export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
@@ -14,101 +17,133 @@ export async function GET(req: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { profilePicture: true }
+            select: { 
+                profilePictures: {
+                    orderBy: [
+                        { isPrimary: 'desc' }, // Primary first
+                        { createdAt: 'desc' }  // Then newest first
+                    ]
+                } 
+            }
         });
 
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        return NextResponse.json({ profilePicture: user.profilePicture }, { status: 200 });
+        return NextResponse.json({ profilePictures: user.profilePictures }, { status: 200 });
     } catch (error) {
-        console.error("Error retrieving profile picture:", error);
+        console.error("Error retrieving profile pictures:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
 
-// POST: Create a new profile picture (for new users)
+// POST: Upload a new profile picture
 export async function POST(req: NextRequest) {
     try {
-        if (!req.headers.get("content-type")?.includes("application/json")) {
-            return NextResponse.json({ error: "Invalid content type" }, { status: 400 });
+        const userId = await getUserIdFromRequest();
+        if (!userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        let body: profilePicturePATCH;
-        try {
-            body = await req.json();
-        } catch {
-            return NextResponse.json({ error: "Invalid json" }, { status: 400 });
+        const formData = await req.formData();
+        const file = formData.get("file") as File | null;
+        const isPrimary = formData.get("isPrimary") === "true";
+
+        if (!file) {
+            return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
         }
 
-        const parsed = profilePictureSchema.safeParse(body);
+        const bytes = Buffer.from(await file.arrayBuffer());
 
-        if (!parsed.success) {
-            return NextResponse.json(parsed.error.format(), { status: 400 });
+        if (bytes.length > USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB * 1024 * 1024) {
+            return NextResponse.json({ 
+                error: `File size exceeds ${USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB}MB limit` 
+            }, { status: 400 });
         }
 
-        const { userId, imageUrl } = parsed.data;
-
-        if (!userId || !imageUrl) {
-            return NextResponse.json({ error: "Missing userId or imageUrl" }, { status: 400 });
-        }
-
-        // Check if user exists
-        const existingUser = await prisma.user.findUnique({
-            where: { id: userId }
+        // Upload to Supabase
+        const uploadResult = await uploadProfilePicture(file, userId);
+        
+        // Generate signed URL with 24h expiry
+        const signedUrlData = await getSignedUrl(uploadResult.path, 24 * 60 * 60); // 24 hours
+        
+        // Add to database using our service
+        await add({
+            userId,
+            path: uploadResult.path,
+            signedUrl: signedUrlData.signedUrl,
+            expiresIn: signedUrlData.expiresIn
         });
 
-        if (!existingUser) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
-        }
-
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: { profilePicture: imageUrl },
+        // Get the created profile picture
+        const profilePicture = await prisma.profilePicture.findFirst({
+            where: {
+                userID: userId,
+                storagePath: uploadResult.path
+            },
+            orderBy: { createdAt: 'desc' }
         });
 
-        return NextResponse.json({ message: "Profile picture created successfully", user: updatedUser }, { status: 201 });
+        // If this should be primary, set it as primary
+        if (isPrimary && profilePicture) {
+            await setPrimary({
+                userId,
+                id: profilePicture.id,
+                path: uploadResult.path
+            });
+        }
+
+        return NextResponse.json({ 
+            message: "Profile picture uploaded successfully", 
+            profilePicture,
+            url: signedUrlData.signedUrl
+        }, { status: 200 });
     } catch (error) {
-        console.error("Error creating profile picture:", error);
+        console.error("Error uploading profile picture:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
 
-// PATCH: Update an existing profile picture
+
+// PATCH: Set a profile picture as primary
 export async function PATCH(req: NextRequest) {
     try {
+        const userId = await getUserIdFromRequest();
+        if (!userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         if (!req.headers.get("content-type")?.includes("application/json")) {
             return NextResponse.json({ error: "Invalid content type" }, { status: 400 });
         }
 
-        let body: profilePicturePATCH;
-        try {
-            body = await req.json();
-        } catch {
-            return NextResponse.json({ error: "Invalid json" }, { status: 400 });
+        const body = await req.json();
+        const { profilePictureId } = body;
+
+        if (!profilePictureId) {
+            return NextResponse.json({ error: "Missing profilePictureId" }, { status: 400 });
         }
 
-        const parsed = profilePictureSchema.safeParse(body);
-
-        if (!parsed.success) {
-            return NextResponse.json(parsed.error.format(), { status: 400 });
-        }
-
-        const { userId, imageUrl } = parsed.data;
-
-        if (userId === null || userId === undefined || imageUrl === null || imageUrl === undefined) {
-            return NextResponse.json({ error: "Missing userId or imageUrl" }, { status: 400 });
-        }
-
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: { profilePicture: imageUrl },
+        // Verify the profile picture belongs to the user
+        const profilePicture = await prisma.profilePicture.findUnique({
+            where: { id: profilePictureId }
         });
 
-        return NextResponse.json({ message: "Profile Image updated successfully", user: updatedUser }, { status: 200 });
+        if (!profilePicture || profilePicture.userID !== userId) {
+            return NextResponse.json({ error: "Profile picture not found" }, { status: 404 });
+        }
+
+        // Set as primary using service function
+        await setPrimary({
+            userId,
+            id: profilePictureId,
+            path: profilePicture.storagePath || ""
+        });
+
+        return NextResponse.json({ message: "Profile picture set as primary successfully" }, { status: 200 });
     } catch (error) {
-        console.error("Error updating profile picture:", error);
+        console.error("Error setting primary profile picture:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -116,27 +151,25 @@ export async function PATCH(req: NextRequest) {
 // DELETE: Remove a profile picture
 export async function DELETE(req: NextRequest) {
     try {
-        const url = new URL(req.url);
-        const userId = url.searchParams.get("userId");
-
+        const userId = await getUserIdFromRequest();
         if (!userId) {
-            return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: userId }
-        });
+        const url = new URL(req.url);
+        const profilePictureId = url.searchParams.get("profilePictureId");
 
-        if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!profilePictureId) {
+            return NextResponse.json({ error: "Missing profilePictureId parameter" }, { status: 400 });
         }
 
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: { profilePicture: null },
+        // Use service function to remove profile picture
+        await remove({
+            userId,
+            id: profilePictureId
         });
 
-        return NextResponse.json({ message: "Profile picture removed successfully", user: updatedUser }, { status: 200 });
+        return NextResponse.json({ message: "Profile picture removed successfully" }, { status: 200 });
     } catch (error) {
         console.error("Error deleting profile picture:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

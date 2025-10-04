@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { auth } from "@/app/api/auth/auth";
 
 import { userSchema, createUserSchema } from "@/types/user";
 import { hashPassword } from "@/lib/bcrypt";
@@ -16,14 +17,18 @@ export async function GET(req: NextRequest) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: {
-          id: true,
-          name: true,
-          email: true,
-          profilePicture: true,
-          createdAt: true,
-          updatedAt: true,
-          // Exclude password for security
-        }
+        id: true,
+        name: true,
+        email: true,
+        profilePictures: true,
+        bio: true,
+        dateOfBirth: true,
+        pronouns: true,
+        showAge: true,
+        createdAt: true,
+        updatedAt: true,
+        // Exclude password for security
+      }
       });
 
       if (!user) {
@@ -45,7 +50,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         createdAt: true,
         updatedAt: true,
       }
@@ -125,7 +130,7 @@ export async function POST(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         createdAt: true,
         updatedAt: true,
       }
@@ -141,6 +146,12 @@ export async function POST(req: NextRequest) {
 // PATCH: Update an existing user
 export async function PATCH(req: NextRequest) {
   try {
+    // Check authentication
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     if (!req.headers.get("content-type")?.includes("application/json")) {
       return NextResponse.json({ error: "Invalid content type" }, { status: 400 });
     }
@@ -158,6 +169,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     const userId = body.id;
+    
+    // Users can only update their own profile
+    if (userId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden - You can only update your own profile" }, { status: 403 });
+    }
+
     const { id: _, ...updateData } = body;
 
     const parsed = userSchema.safeParse(updateData);
@@ -186,7 +203,7 @@ export async function PATCH(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePicture: true,
+        profilePictures: true,
         createdAt: true,
         updatedAt: true,
       }
@@ -202,11 +219,22 @@ export async function PATCH(req: NextRequest) {
 // DELETE: Remove a user
 export async function DELETE(req: NextRequest) {
   try {
+    // Check authentication
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
 
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    // Users can only delete their own account
+    if (userId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden - You can only delete your own account" }, { status: 403 });
     }
 
     // Check if user exists

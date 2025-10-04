@@ -14,6 +14,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model ProfilePicture {
+
+  id          String   @id @default(cuid())
+  userID      String
+  user        User     @relation(fields: [userID], references: [id], onDelete: Cascade)
+
+  signedUrl String? // Signed URL for profile picture (cached)
+  storagePath String // Storage path for profile picture
+  cachedUntil DateTime? // Optional: when the cached URL expires
+  isPrimary  Boolean  @default(false) // If user has multiple, which one is primary
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
 
 /**
 There will be many users and multiple admins
@@ -23,7 +37,11 @@ model User {
   name            String?   @unique
   email           String    @unique
   password        String?   // Password is crucial in oss
-  profilePicture  String?   // Your field
+  profilePictures  ProfilePicture[]    // Signed URL for profile picture (cached)
+  bio             String?   // Profile bio
+  dateOfBirth     DateTime? // User's date of birth
+  pronouns        String?   // User's pronouns
+  showAge         Boolean   @default(true) // Privacy setting for showing age
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   registration    Registration?
