@@ -59,14 +59,39 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
             const res = await reactSignIn("credentials", { email: formData.email, password: formData.password, redirect: false });
             if(res?.error) {
                 setError(res.error);
+                setLoading(false);
+                return;
             }
 
             setSuccess(true);
 
-            setTimeout(() => {
-                router.push("/");
-                router.refresh();
-            }, 1000);
+            // Wait a bit for session to be established
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Check for pending account links
+            try {
+                const pendingResponse = await fetch("/api/user/link-account/pending", {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (pendingResponse.ok) {
+                    const pendingLinks = await pendingResponse.json();
+                    
+                    if (Array.isArray(pendingLinks) && pendingLinks.length > 0) {
+                        // Redirect to link-account page immediately without query params
+                        router.push("/link-account");
+                        return;
+                    }
+                }
+            } catch (fetchError) {
+                console.error("Error checking pending links:", fetchError);
+            }
+
+            // No pending links, go to home
+            router.push("/");
 
         } catch(err: unknown) {
             if(err instanceof Error) {

@@ -20,12 +20,19 @@ export default async function ProfilePage() {
       id: true,
       name: true,
       email: true,
+      password: true, // Check if password is set
       profilePictures: {
         orderBy: [
           { order: 'asc' },
           { isPrimary: 'desc' },
           { createdAt: 'desc' }
         ]
+      },
+      accounts: {
+        select: {
+          provider: true,
+          providerAccountId: true
+        }
       },
       bio: true,
       dateOfBirth: true,

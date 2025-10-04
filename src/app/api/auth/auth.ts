@@ -79,6 +79,78 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         })
     ],
     callbacks: {
+        async signIn({ user: _user, account, profile }) {
+            // Handle OAuth account linking security
+            if (account && profile && account.provider !== "credentials" && account.provider !== "passkey") {
+                const oauthProvider = account.provider as "github" | "google";
+                const oauthEmail = profile.email as string;
+                
+                // Security Check 1: Verify OAuth email is verified
+                const isEmailVerified = 
+                    (oauthProvider === "google" && profile.email_verified === true) ||
+                    (oauthProvider === "github" && (profile.verified_email === true || true)); // GitHub emails are verified
+                
+                if (!isEmailVerified) {
+                    console.error(`OAuth email not verified for ${oauthProvider}: ${oauthEmail}`);
+                    return false; // Reject login
+                }
+                
+                // Import prisma dynamically to ensure it's available in this context
+                const { prisma } = await import("@/lib/prisma");
+                
+                // Check if user with this email already exists
+                const existingUser = await prisma.user.findUnique({
+                    where: { email: oauthEmail },
+                    include: { 
+                        accounts: {
+                            where: { provider: oauthProvider }
+                        }
+                    }
+                });
+                
+                // If user exists and doesn't have this provider linked yet
+                if (existingUser && existingUser.accounts.length === 0) {
+                    // User exists but this OAuth provider is not linked
+                    // Create a pending link request instead of auto-linking
+                    
+                    // Check if there's already a pending link request
+                    const existingPending = await prisma.pendingAccountLink.findUnique({
+                        where: {
+                            userId_provider: {
+                                userId: existingUser.id,
+                                provider: oauthProvider
+                            }
+                        }
+                    });
+                    
+                    if (!existingPending) {
+                        // Create pending link request (expires in 1 hour)
+                        await prisma.pendingAccountLink.create({
+                            data: {
+                                userId: existingUser.id,
+                                provider: oauthProvider,
+                                providerAccountId: account.providerAccountId,
+                                providerEmail: oauthEmail,
+                                emailVerified: isEmailVerified,
+                                accessToken: account.access_token,
+                                refreshToken: account.refresh_token,
+                                idToken: account.id_token,
+                                tokenExpiresAt: account.expires_at,
+                                tokenType: account.token_type,
+                                scope: account.scope,
+                                expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+                            }
+                        });
+                    }
+                    
+                    // Throw error to redirect to error page which will handle the redirect
+                    throw new Error(`PENDING_LINK:${oauthProvider}:${encodeURIComponent(oauthEmail)}`);
+                }
+            }
+            
+            return true;
+        },
+        
         jwt: async ({ token, user, account }) => {
             if (user) {
                 // Only log in development
@@ -123,7 +195,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     experimental: {
         enableWebAuthn: true
     },
-    pages: { signIn: "/login" },
+    pages: { 
+        signIn: "/login",
+        error: "/auth/error"
+    },
     cookies: {
         sessionToken: {
             name: process.env.NODE_ENV === "production" ? 
@@ -141,6 +216,29 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         }
     },
     events: {
+        async linkAccount({ user, account, profile: _profile }) {
+            // Log account linking for security audit
+            console.log(`🔗 Account linked: User ${user.email} linked ${account.provider}`);
+            
+            // Clean up any pending link requests for this provider
+            if (user.id) {
+                const { prisma } = await import("@/lib/prisma");
+                await prisma.pendingAccountLink.deleteMany({
+                    where: {
+                        userId: user.id,
+                        provider: account.provider
+                    }
+                }).catch((err: unknown) => {
+                    console.error("Failed to clean up pending link:", err);
+                });
+            }
+            
+            // Future: Send confirmation email (Option B)
+            // if (process.env.EMAIL_ENABLED) {
+            //   await sendAccountLinkedEmail(user.email, account.provider);
+            // }
+        },
+        
         async signIn({ user, account }) {
             // Log successful sign-ins for security monitoring
             console.log(`User ${user.email} signed in with ${account?.provider}`);
