@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ky from "ky";
 import {
     Box,
     Button,
@@ -17,6 +18,7 @@ import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
 import { signIn as reactSignIn, useSession } from "next-auth/react";
 import { signIn } from "next-auth/webauthn";
+import type { PendingAccountLink } from "@/generated/prisma";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [formData, setFormData] = useState({
@@ -70,7 +72,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
 
             // Check for pending account links
             try {
-                const pendingResponse = await fetch("/api/user/link-account/pending", {
+                const pendingResponse = await ky.get<{pendingLinks: PendingAccountLink[]}>("/api/user/link-account/pending", {
                     cache: 'no-store',
                     headers: {
                         'Cache-Control': 'no-cache'
@@ -78,7 +80,8 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                 });
                 
                 if (pendingResponse.ok) {
-                    const pendingLinks = await pendingResponse.json();
+                    const data = await pendingResponse.json();
+                    const pendingLinks = data.pendingLinks;
                     
                     if (Array.isArray(pendingLinks) && pendingLinks.length > 0) {
                         // Redirect to link-account page immediately without query params

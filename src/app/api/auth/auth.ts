@@ -88,7 +88,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                 // Security Check 1: Verify OAuth email is verified
                 const isEmailVerified = 
                     (oauthProvider === "google" && profile.email_verified === true) ||
-                    (oauthProvider === "github" && (profile.verified_email === true || true)); // GitHub emails are verified
+                    (oauthProvider === "github" && (profile.verified_email === true)); // GitHub emails are verified
                 
                 if (!isEmailVerified) {
                     console.error(`OAuth email not verified for ${oauthProvider}: ${oauthEmail}`);

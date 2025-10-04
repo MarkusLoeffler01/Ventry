@@ -3,6 +3,16 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/app/api/auth/auth';
 import { prisma } from '@/lib/prisma';
 
+export type PendingLink = {
+    id: string;
+    createdAt: Date;
+    provider: string;
+    providerEmail: string;
+    emailVerified: boolean;
+    expiresAt: Date;
+};
+
+
 /**
  * GET /api/user/link-account/pending
  * Get pending account link requests for the current user
@@ -35,7 +45,7 @@ export async function GET(_request: NextRequest) {
         createdAt: true,
         expiresAt: true
       }
-    });
+    }) satisfies PendingLink[];
 
     return NextResponse.json(
       { pendingLinks },
