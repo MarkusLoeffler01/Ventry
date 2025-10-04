@@ -3,7 +3,6 @@ import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
 import { CustomPrismaAdapter } from "./custom-adapter";
 import { loginSchema } from "@/types/schemas/auth";
-import { prisma } from "@/lib/prisma";
 
 import Passkey from "next-auth/providers/passkey";
 import Github from "next-auth/providers/github";
@@ -99,14 +98,8 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             // If we have a userId but no image, fetch it from the database
             if (token.userId && !token.image) {
                 try {
-                    const dbUser = await prisma.user.findFirst({
-                        where: { id: token.userId as string },
-                        include: { profilePictures: true } // Why tf do we need this here???
-                    });
-                    if (dbUser?.profilePictures) {
-                        const primaryPicture = await getPrimary(token.userId as string);
-                        if(!primaryPicture) return token;
-
+                    const primaryPicture = await getPrimary(token.userId as string);
+                    if (primaryPicture) {
                         const validatedPicture = await validatePicture(token.userId as string, primaryPicture.id);
                         token.image = validatedPicture;
                     }

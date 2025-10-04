@@ -14,7 +14,7 @@ interface ProfilePicture {
   id: string;
   signedUrl?: string | null;
   isPrimary: boolean;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 interface ProfileHeaderProps {
@@ -79,6 +79,8 @@ export default function ProfileHeader({
                 width={200}
                 height={200}
                 style={{ objectFit: 'cover' }}
+                unoptimized={true}
+                priority
               />
             ) : (
               <Typography variant="h1" sx={{ fontSize: '4rem', fontWeight: 'bold' }}>

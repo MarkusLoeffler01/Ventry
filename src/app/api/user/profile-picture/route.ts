@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
             select: { 
                 profilePictures: {
                     orderBy: [
-                        { isPrimary: 'desc' }, // Primary first
+                        { order: 'asc' },      // User-defined order first
+                        { isPrimary: 'desc' }, // Primary first for ties
                         { createdAt: 'desc' }  // Then newest first
                     ]
                 } 
@@ -31,7 +32,38 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        return NextResponse.json({ profilePictures: user.profilePictures }, { status: 200 });
+        // Validate and refresh expired signed URLs
+        const now = new Date();
+        const validatedPictures = await Promise.all(
+            user.profilePictures.map(async (picture) => {
+                if (!picture.signedUrl || !picture.cachedUntil || picture.cachedUntil <= now) {
+                    try {
+                        const { signedUrl, expiresIn } = await getSignedUrl(picture.storagePath, 24 * 60 * 60);
+                        
+                        await prisma.profilePicture.update({
+                            where: { id: picture.id },
+                            data: {
+                                signedUrl,
+                                cachedUntil: new Date(Date.now() + expiresIn * 1000)
+                            }
+                        });
+                        
+                        return {
+                            ...picture,
+                            signedUrl,
+                            cachedUntil: new Date(Date.now() + expiresIn * 1000)
+                        };
+                    } catch (error) {
+                        console.error(`Failed to refresh signed URL for picture ${picture.id}:`, error);
+                        return picture;
+                    }
+                }
+                
+                return picture;
+            })
+        );
+
+        return NextResponse.json({ profilePictures: validatedPictures }, { status: 200 });
     } catch (error) {
         console.error("Error retrieving profile pictures:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

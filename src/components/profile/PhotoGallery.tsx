@@ -17,7 +17,9 @@ import {
   Close,
   ChevronLeft,
   ChevronRight,
-  Star
+  Star,
+  StarBorder,
+  Delete
 } from "@mui/icons-material";
 import Image from "next/image";
 
@@ -25,12 +27,16 @@ interface ProfilePicture {
   id: string;
   signedUrl?: string | null;
   isPrimary: boolean;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 interface PhotoGalleryProps {
   profilePictures: ProfilePicture[];
   userName: string | null;
+  // Optional management callbacks for when viewing own profile
+  onSetPrimary?: (pictureId: string) => Promise<void>;
+  onDelete?: (pictureId: string) => Promise<void>;
+  isOwnProfile?: boolean;
 }
 
 // Photo grid component with clickable cards
@@ -215,6 +221,9 @@ interface OverlayDialogProps {
   profilePictures: ProfilePicture[];
   userName: string | null;
   onThumbnailClick: (index: number) => void;
+  onSetPrimary?: (pictureId: string) => Promise<void>;
+  onDelete?: (pictureId: string) => Promise<void>;
+  isOwnProfile?: boolean;
 }
 
 const overlayDialogStyles = {
@@ -250,6 +259,14 @@ const overlayDialogStyles = {
     bgcolor: 'rgba(0, 0, 0, 0.7)',
     color: 'white',
     borderRadius: 2
+  },
+  actionButtons: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    display: 'flex',
+    gap: 1,
+    zIndex: 1
   }
 };
 
@@ -288,6 +305,7 @@ function PhotoGrid({ profilePictures, userName, onImageClick }: PhotoGridProps) 
               alt="Profile picture"
               fill
               style={{ objectFit: 'cover' }}
+              unoptimized={true}
             />
           ) : (
             <Box sx={photoGridStyles.placeholderBox}>
@@ -358,6 +376,7 @@ function MainImage({ currentPicture, currentIndex, userName, open }: MainImagePr
                 borderRadius: '8px'
               }}
               priority
+              unoptimized={true}
             />
             
             {/* Primary Badge for Overlay */}
@@ -405,6 +424,7 @@ function ThumbnailStrip({ profilePictures, currentIndex, userName, onThumbnailCl
               width={60}
               height={60}
               style={{ objectFit: 'cover' }}
+              unoptimized={true}
             />
           ) : (
             <Box sx={thumbnailStripStyles.placeholderBox}>
@@ -429,8 +449,37 @@ function OverlayDialog({
   currentIndex,
   profilePictures,
   userName,
-  onThumbnailClick
+  onThumbnailClick,
+  onSetPrimary,
+  onDelete,
+  isOwnProfile
 }: OverlayDialogProps) {
+  const [actionLoading, setActionLoading] = useState<'primary' | 'delete' | null>(null);
+
+  const handleSetPrimary = async () => {
+    if (!currentPicture?.id || !onSetPrimary || currentPicture.isPrimary) return;
+    setActionLoading('primary');
+    try {
+      await onSetPrimary(currentPicture.id);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!currentPicture?.id || !onDelete || profilePictures.length <= 1) return;
+    setActionLoading('delete');
+    try {
+      await onDelete(currentPicture.id);
+      // Move to previous image if we deleted the last one
+      if (currentIndex >= profilePictures.length - 1) {
+        onThumbnailClick(Math.max(0, currentIndex - 1));
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <Dialog
       open={open}
@@ -440,6 +489,49 @@ function OverlayDialog({
       sx={overlayDialogStyles.dialog}
     >
       <DialogContent sx={overlayDialogStyles.dialogContent}>
+        {/* Action Buttons (only show for own profile) */}
+        {isOwnProfile && onSetPrimary && onDelete && (
+          <Box sx={overlayDialogStyles.actionButtons}>
+            <IconButton
+              onClick={() => void handleSetPrimary()}
+              disabled={currentPicture?.isPrimary || actionLoading === 'primary'}
+              sx={{
+                color: 'white',
+                bgcolor: currentPicture?.isPrimary ? 'rgba(255, 215, 0, 0.3)' : 'rgba(0, 0, 0, 0.5)',
+                '&:hover': {
+                  bgcolor: currentPicture?.isPrimary ? 'rgba(255, 215, 0, 0.4)' : 'rgba(0, 0, 0, 0.7)'
+                },
+                '&:disabled': {
+                  color: 'rgba(255, 255, 255, 0.3)',
+                  bgcolor: 'rgba(0, 0, 0, 0.3)'
+                }
+              }}
+              title={currentPicture?.isPrimary ? 'Primary Photo' : 'Set as Primary'}
+            >
+              {currentPicture?.isPrimary ? <Star /> : <StarBorder />}
+            </IconButton>
+
+            <IconButton
+              onClick={() => void handleDelete()}
+              disabled={profilePictures.length <= 1 || actionLoading === 'delete'}
+              sx={{
+                color: 'white',
+                bgcolor: 'rgba(0, 0, 0, 0.5)',
+                '&:hover': {
+                  bgcolor: 'rgba(211, 47, 47, 0.7)'
+                },
+                '&:disabled': {
+                  color: 'rgba(255, 255, 255, 0.3)',
+                  bgcolor: 'rgba(0, 0, 0, 0.3)'
+                }
+              }}
+              title="Delete Photo"
+            >
+              <Delete />
+            </IconButton>
+          </Box>
+        )}
+
         <NavigationButtons onClose={onClose} onPrevious={onPrevious} onNext={onNext} />
         
         <MainImage currentPicture={currentPicture} currentIndex={currentIndex} userName={userName} open={open} />
@@ -463,7 +555,13 @@ function OverlayDialog({
 }
 
 
-export default function PhotoGallery({ profilePictures, userName }: PhotoGalleryProps) {
+export default function PhotoGallery({ 
+  profilePictures, 
+  userName,
+  onSetPrimary,
+  onDelete,
+  isOwnProfile 
+}: PhotoGalleryProps) {
   const [open, setOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -541,6 +639,9 @@ export default function PhotoGallery({ profilePictures, userName }: PhotoGallery
         profilePictures={profilePictures}
         userName={userName}
         onThumbnailClick={setCurrentIndex}
+        onSetPrimary={onSetPrimary}
+        onDelete={onDelete}
+        isOwnProfile={isOwnProfile}
       />
     </Box>
   );

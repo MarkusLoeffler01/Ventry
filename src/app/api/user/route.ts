@@ -20,7 +20,13 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePictures: true,
+        profilePictures: {
+          orderBy: [
+            { order: 'asc' },
+            { isPrimary: 'desc' },
+            { createdAt: 'desc' }
+          ]
+        },
         bio: true,
         dateOfBirth: true,
         pronouns: true,
@@ -50,7 +56,13 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
-        profilePictures: true,
+        profilePictures: {
+          orderBy: [
+            { order: 'asc' },
+            { isPrimary: 'desc' },
+            { createdAt: 'desc' }
+          ]
+        },
         createdAt: true,
         updatedAt: true,
       }
