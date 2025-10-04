@@ -32,7 +32,14 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
     const dbUserData = user.id ? await prisma.user.findUnique({
         where: { id: user.id },
         select: {
-            profilePictures: true,
+            profilePictures: {
+                orderBy: [
+                    { order: 'asc' },
+                    { isPrimary: 'desc' },
+                    { createdAt: 'desc' }
+                ],
+                take: 1
+            },
             accounts: {
                 where: {
                     provider: provider || 'unknown'
