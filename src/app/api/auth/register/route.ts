@@ -48,5 +48,7 @@ export async function POST(req: NextRequest) {
 }
 
 export const generateNewPasswordHash = async (password: string) => {
-    
+    const x = password;
+    console.log(x);
+    return x;
 }

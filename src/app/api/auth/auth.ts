@@ -71,8 +71,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
                 if(!parsed.success) return null;
 
-                const user = await verifyUserCredentials(parsed.data.email, parsed.data.password);
-                if(!user) return null;
+                const [user, error] = await verifyUserCredentials(parsed.data.email, parsed.data.password);
+                if(error) {
+                    throw new Error(error);
+                }
 
                 // No need for custom apiToken since we're using NextAuth JWT strategy
                 return user

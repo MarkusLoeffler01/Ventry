@@ -1,17 +1,19 @@
-import { PrismaClient } from "@/generated/prisma";
-import { ensureSessionKey } from "./middleware/sessionKey";
+import { PrismaClient, type Prisma } from "@/generated/prisma";
+import crypto from "node:crypto";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 export const prisma = globalForPrisma.prisma || new PrismaClient().$extends({
     model: {
         user: {
-            create(original: any) {
-                return (args: any) => {
-                    if (!args.data.sessionKey) {
-                        args.data.sessionKey = crypto.randomUUID();
+            create(original: Prisma.UserDelegate["create"]) {
+                return (args: Prisma.UserCreateArgs) => {
+
+                    const data = {
+                        ...args.data,
+                        sessionKey: args.data.sessionKey ?? crypto.randomUUID()
                     }
-                    return original(args);
+                    return original({ ...args, data });
                 }
             }
         }
