@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/app/api/auth/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import { redirect } from "next/navigation";
 
 /**

@@ -31,7 +31,7 @@ beforeAll(async () => {
   // process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
   loginRoute = await import("@/app/api/auth/login/route");
 });
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import { loginSchema } from "@/types/schemas/auth";
 import * as bcrypt from "@/lib/bcrypt";
 import jwtService from "@/lib/helpers/jsonwebtoken";

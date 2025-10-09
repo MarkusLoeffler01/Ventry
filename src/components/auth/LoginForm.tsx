@@ -19,6 +19,7 @@ import { green } from "@mui/material/colors";
 import { signIn as reactSignIn, useSession } from "next-auth/react";
 import { signIn } from "next-auth/webauthn";
 import type { PendingAccountLink } from "@/generated/prisma";
+import ForgotPassword from "./ForgotPassword";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [formData, setFormData] = useState({
@@ -29,6 +30,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
     const { status } = useSession();
 
@@ -172,6 +174,18 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     }}
                 />
                 
+                <Box sx={{ textAlign: 'right', mt: 1 }}>
+                    <Button 
+                        variant="text" 
+                        size="small" 
+                        color="primary" 
+                        onClick={() => setForgotPasswordOpen(true)}
+                        disabled={loading || success}
+                    >
+                        Forgot password?
+                    </Button>
+                </Box>
+                
                 <Button
                     // type={(loading || success) ? "button" : "submit"}
                     type="submit"
@@ -200,6 +214,11 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     Login with Passkey
                 </Button>
             </Box>
+            
+            <ForgotPassword 
+                open={forgotPasswordOpen} 
+                onClose={() => setForgotPasswordOpen(false)} 
+            />
         </AuthTemplate>
     );
 }

@@ -1,5 +1,5 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import type { Adapter } from "next-auth/adapters";
 import type { User } from "@/generated/prisma";
 

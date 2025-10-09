@@ -1,6 +1,6 @@
 import { auth } from "@/app/api/auth/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import LinkAccountClient from "@/components/auth/LinkAccountClient";
 
 export default async function LinkAccountPage() {

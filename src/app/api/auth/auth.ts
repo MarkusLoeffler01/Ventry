@@ -9,6 +9,7 @@ import Github from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import * as SECCONFIG from "@/lib/security/config";
 import { getPrimary, validatePicture } from "@/lib/user/profilePicture";
+import prisma from "@/lib/prisma/prisma";
 
 // Import bcrypt verification only for the credentials provider (Node.js runtime)
 async function verifyUserCredentials(email: string, password: string) {
@@ -96,7 +97,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                 }
                 
                 // Import prisma dynamically to ensure it's available in this context
-                const { prisma } = await import("@/lib/prisma");
+                const { prisma } = await import("@/lib/prisma/prisma");
                 
                 // Check if user with this email already exists
                 const existingUser = await prisma.user.findUnique({
@@ -158,11 +159,34 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                     console.log("JWT Callback - User object:", user);
                     console.log("JWT Callback - Account:", account);
                 }
-                
-                token.userId = user.id;
+
+                let dbUser = await prisma.user.findUnique({
+                    where: { id: user.id },
+                    select: {
+                        id: true,
+                        sessionKey: true
+                    }
+                });
+
+                if(!dbUser) {
+                    console.error("JWT Callback - User not found in database:", user.id);
+                    return token;
+                }
+
+                if (!dbUser?.sessionKey) {
+                    const newKey = crypto.randomUUID();
+                    dbUser = await prisma.user.update({
+                        where: { id: user.id },
+                        data: { sessionKey: newKey },
+                        select: { id: true, sessionKey: true }
+                    });
+                }
+
+                token.userId = dbUser.id;
                 token.email = user.email;
                 token.name = user.name || undefined;
                 token.image = user.image || undefined;
+                token.sessionKey = dbUser.sessionKey;
 
                 // NextAuth JWT handles all token management - no need for custom tokens
             }
@@ -222,7 +246,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             
             // Clean up any pending link requests for this provider
             if (user.id) {
-                const { prisma } = await import("@/lib/prisma");
+                const { prisma } = await import("@/lib/prisma/prisma");
                 await prisma.pendingAccountLink.deleteMany({
                     where: {
                         userId: user.id,

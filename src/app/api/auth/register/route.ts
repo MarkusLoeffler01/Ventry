@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma/prisma";
 import * as bcrypt from "@/lib/bcrypt";
 import { type registerType, registerSchema } from "@/types/schemas/auth";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
@@ -45,4 +45,8 @@ export async function POST(req: NextRequest) {
         const { statusCode: _, ...rest } = response;
         return NextResponse.json(rest, { status: response.statusCode });
     }
+}
+
+export const generateNewPasswordHash = async (password: string) => {
+    
 }

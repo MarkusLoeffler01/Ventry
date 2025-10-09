@@ -1,4 +1,4 @@
-import prisma from "../prisma";
+import prisma from "../prisma/prisma";
 import * as bcrypt from "@/lib/bcrypt";
 
 

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/auth";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma/prisma";
 import type { UserDataExport } from "@/types/user/profile";
 
 // GET: Export user data (GDPR compliance)
