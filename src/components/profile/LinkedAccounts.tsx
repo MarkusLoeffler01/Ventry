@@ -20,12 +20,11 @@ import {
   CheckCircle,
   Link as LinkIcon
 } from "@mui/icons-material";
-import { signIn } from "next-auth/react";
+import authClient from "@/lib/auth/client";
 
 interface LinkedAccountsProps {
   accounts: Array<{
-    provider: string;
-    providerAccountId: string;
+    providerId: string;  // Changed from 'provider' for better-auth
   }>;
   hasPassword: boolean;
   hasOAuthProviders: boolean;
@@ -34,12 +33,13 @@ interface LinkedAccountsProps {
 export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProviders }: LinkedAccountsProps) {
   const [linking, setLinking] = useState<string | null>(null);
 
-  const getProviderIcon = (provider: string) => {
-    switch (provider) {
+  const getProviderIcon = (providerId: string) => {
+    switch (providerId) {
       case "github":
         return <GitHub />;
       case "google":
         return <Google />;
+      case "credential":
       case "credentials":
         return <Email />;
       default:
@@ -47,16 +47,17 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     }
   };
 
-  const getProviderName = (provider: string) => {
-    switch (provider) {
+  const getProviderName = (providerId: string) => {
+    switch (providerId) {
       case "github":
         return "GitHub";
       case "google":
         return "Google";
+      case "credential":
       case "credentials":
         return "Email & Password";
       default:
-        return provider;
+        return providerId;
     }
   };
 
@@ -65,7 +66,7 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     { id: "google", name: "Google", icon: <Google /> }
   ];
 
-  const linkedProviders = accounts.map(a => a.provider);
+  const linkedProviders = accounts.map(a => a.providerId);
   
   // Add credentials if user has password
   const allLinkedProviders = hasPassword 
@@ -76,22 +77,31 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     p => !linkedProviders.includes(p.id)
   );
 
-  const handleLinkProvider = async (provider: string) => {
+  const handleLinkProvider = async (providerId: string) => {
     if (!hasPassword && !hasOAuthProviders) {
       alert("Please set a password or link an OAuth provider first");
       return;
     }
 
-    setLinking(provider);
+    setLinking(providerId);
     
     try {
-      // Initiate OAuth flow - this will create a pending link request
-      await signIn(provider, {
-        redirect: true,
-        redirectTo: "/link-account"
+      // Store linking intent in sessionStorage
+      sessionStorage.setItem('oauth_linking_intent', JSON.stringify({
+        provider: providerId,
+        timestamp: Date.now(),
+        mode: 'link' // This tells us it's a linking attempt, not a new sign-in
+      }));
+
+      // Initiate OAuth flow - better-auth will handle this
+      // The callback will check sessionStorage to determine if this is a link or new sign-in
+      await authClient.signIn.social({
+        provider: providerId as "github" | "google",
+        callbackURL: "/auth/callback/link" // Special callback for linking
       });
     } catch (error) {
       console.error("Error linking account:", error);
+      sessionStorage.removeItem('oauth_linking_intent');
       setLinking(null);
     }
   };
@@ -128,9 +138,9 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
           </Alert>
         ) : (
           <Stack spacing={1} sx={{ mb: 3 }}>
-            {allLinkedProviders.map((provider) => (
+            {allLinkedProviders.map((providerId) => (
               <Box
-                key={provider}
+                key={providerId}
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -143,9 +153,9 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {getProviderIcon(provider)}
+                  {getProviderIcon(providerId)}
                   <Typography variant="body2">
-                    {getProviderName(provider)}
+                    {getProviderName(providerId)}
                   </Typography>
                 </Box>
                 <Chip

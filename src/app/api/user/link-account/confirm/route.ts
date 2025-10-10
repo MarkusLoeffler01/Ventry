@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { auth } from '@/app/api/auth/auth';
+import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma';
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const session = await auth();
+    const session = await getSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             email: true,
-            password: true
           }
         }
       }
@@ -90,16 +89,37 @@ export async function POST(request: NextRequest) {
     const existingOAuthAccounts = await prisma.account.findMany({
       where: {
         userId: session.user.id,
-        provider: { in: ['github', 'google'] }
+        providerId: { in: ['github', 'google'] }  // Changed from 'provider' for better-auth
       }
     });
 
     const hasOAuthProviders = existingOAuthAccounts.length > 0;
 
-    if (pendingLink.user.password && password) {
+    // Check if user has a credential account with password
+    const credentialAccount = await prisma.account.findFirst({
+      where: {
+        userId: session.user.id,
+        providerId: 'credential'
+      },
+      select: {
+        password: true
+      }
+    });
+
+    const hasPassword = !!credentialAccount?.password;
+
+    if (hasPassword && password) {
       // Option A: User has password and provided it - verify it
       const { comparePassword } = await import('@/lib/bcrypt');
-      const isPasswordValid = await comparePassword(password, pendingLink.user.password);
+      
+      if (!credentialAccount.password) {
+        return NextResponse.json(
+          { error: 'Password not found' },
+          { status: 500 }
+        );
+      }
+      
+      const isPasswordValid = await comparePassword(password, credentialAccount.password);
 
       if (!isPasswordValid) {
         return NextResponse.json(
@@ -112,7 +132,7 @@ export async function POST(request: NextRequest) {
     } else if (hasOAuthProviders) {
       // Option B: User has OAuth providers linked - allow linking without password
       isAuthenticated = true;
-    } else if (!pendingLink.user.password && !hasOAuthProviders) {
+    } else if (!hasPassword && !hasOAuthProviders) {
       // Edge case: User has no password and no OAuth providers
       return NextResponse.json(
         { error: 'Cannot verify identity - no password or OAuth providers' },
@@ -145,7 +165,7 @@ export async function POST(request: NextRequest) {
     const existingAccount = await prisma.account.findFirst({
       where: {
         userId: session.user.id,
-        provider: pendingLink.provider
+        providerId: pendingLink.provider  // Changed from 'provider' for better-auth
       }
     });
 
@@ -166,22 +186,23 @@ export async function POST(request: NextRequest) {
       await tx.account.create({
         data: {
           userId: session.user.id,
-          type: 'oauth',
-          provider: pendingLink.provider,
-          providerAccountId: pendingLink.providerAccountId,
-          access_token: pendingLink.accessToken,
-          refresh_token: pendingLink.refreshToken,
-          id_token: pendingLink.idToken,
-          expires_at: pendingLink.tokenExpiresAt,
-          token_type: pendingLink.tokenType,
+          accountId: pendingLink.providerAccountId,  // Changed from 'providerAccountId' for better-auth
+          providerId: pendingLink.provider,          // Changed from 'provider' for better-auth
+          accessToken: pendingLink.accessToken,      // Changed from 'access_token' for better-auth
+          refreshToken: pendingLink.refreshToken,    // Changed from 'refresh_token' for better-auth
+          idToken: pendingLink.idToken,              // Changed from 'id_token' for better-auth
+          accessTokenExpiresAt: pendingLink.tokenExpiresAt ? new Date(pendingLink.tokenExpiresAt * 1000) : undefined,  // Changed from 'expires_at' for better-auth
           scope: pendingLink.scope,
         }
       });
 
-      // 2. If user chose to disable email login, remove password
-      if (disableEmailLogin === true) {
-        await tx.user.update({
-          where: { id: session.user.id },
+      // 2. If user chose to disable email login, remove password from credential account
+      if (disableEmailLogin === true && credentialAccount) {
+        await tx.account.updateMany({
+          where: {
+            userId: session.user.id,
+            providerId: 'credential'
+          },
           data: { password: null }
         });
       }

@@ -3,13 +3,13 @@ import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import LoginPageClient from "@/components/auth/LoginPageClient";
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
 export default async function LoginPage() {
   // Check if user is already logged in and has pending links
-  const session = await auth();
+  const session = await getSession();
   
   if (session?.user?.id) {
     // User is logged in, check for pending links

@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import zxcvbn from 'zxcvbn';
+import authClient from '@/lib/auth/client';
 
 import type ValidationDetails from '@/types/apiResponses/register';
 import AuthTemplate from './template';
@@ -38,39 +39,25 @@ const RegisterForm = () => {
 
     const handleRegister = async ({email, name, password}: {email: string, name: string, password: string}) => {
       try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, name, password }),
+        const { error } = await authClient.signUp.email({
+          email,
+          name,
+          password,
         });
 
-        const data = await response.json();
-
-        if (!response.ok && "error" in data) {
-            const error: ValidationDetails = data;
-
-            setError(error.message || 'Registrierung fehlgeschlagen');
-
-            if("details" in error) {
-              if(error.details.email?._errors) {
-                setEmailError(error.details.email._errors.join(", "));
-              }
-              if(error.details.name?._errors) {
-                  setUsernameError(error.details.name._errors.join(", "));
-              }
-              if(error.details.password?._errors) {
-                  setPasswordError(error.details.password._errors.join(", "));
-              }
-            }
-            return;
+        if (error) {
+          const validationError: ValidationDetails = {
+            message: error.message || 'Registration failed',
+            details: {}
+          };
+          setError(validationError.message);
+          return;
         }
 
-        // Erfolgreiche Registrierung, weiterleiten zur Login-Seite
+        // Successful registration, redirect to login
         router.push('/login?registered=true');
       } catch (error) {
-        console.error('Registrierungsfehler:', error);
+        console.error('Registration error:', error);
         throw error;
       }
     };

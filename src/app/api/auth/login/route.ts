@@ -33,12 +33,28 @@ export async function POST(req: NextRequest) {
           equals: email,
           mode: "insensitive"
         } 
+      },
+      select: {
+        email: true,
+        id: true,
+        accounts: {
+          where: {
+            providerId: "credential"
+          },
+          select: {
+            id: true,
+            user: true,
+            password: true
+          },
+          distinct: ["providerId"],
+          take: 1
+        }
       }
     });
     if(!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-    if(!user.password) return NextResponse.json({ error: "Invalid credentials" }, { status: 401});
+    if(!user.accounts[0]?.password) return NextResponse.json({ error: "Invalid credentials" }, { status: 401});
 
-    const isValid = await bcrypt.comparePassword(password, user.password);
+    const isValid = await bcrypt.comparePassword(password, user.accounts[0].password);
     if(!isValid) return NextResponse.json({ error: "Invalid credentials" }, { status: 401});
 
     console.log("User logged in:", user.email);

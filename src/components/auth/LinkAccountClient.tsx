@@ -127,7 +127,7 @@ export default function LinkAccountClient({
         },
         body: JSON.stringify({
           pendingLinkId: selectedLink.id,
-          password: password || undefined, // Send undefined if no password
+          password: password || undefined,
           disableEmailLogin: disableEmailLogin
         })
       });

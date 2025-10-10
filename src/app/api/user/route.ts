@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 
 import { userSchema, createUserSchema } from "@/types/user";
 import { hashPassword } from "@/lib/bcrypt";
@@ -155,11 +155,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH: Update an existing user
+// PATCH: Update user
 export async function PATCH(req: NextRequest) {
   try {
     // Check authentication
-    const session = await auth();
+    const session = await getSession();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -228,11 +228,11 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE: Remove a user
+// DELETE: Delete user
 export async function DELETE(req: NextRequest) {
   try {
     // Check authentication
-    const session = await auth();
+    const session = await getSession();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

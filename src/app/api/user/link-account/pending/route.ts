@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { auth } from '@/app/api/auth/auth';
+import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma';
 
 export type PendingLink = {
@@ -20,7 +20,7 @@ export type PendingLink = {
 export async function GET(_request: NextRequest) {
   try {
     // Authenticate user
-    const session = await auth();
+    const session = await getSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -67,7 +67,7 @@ export async function GET(_request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // Authenticate user
-    const session = await auth();
+    const session = await getSession();
     
     if (!session?.user?.id) {
       return NextResponse.json(

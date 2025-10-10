@@ -38,10 +38,14 @@ export async function POST(req: NextRequest) {
     await prisma.user.create({
         data: {
             email,
-            password,
             name,
             isAdmin: true,
-            isVerified: true,
+            emailVerified: true,
+            accounts: {
+                create: {
+                    providerId: "credential"
+                }
+            }
         }
     });
 

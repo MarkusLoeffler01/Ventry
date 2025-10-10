@@ -43,16 +43,15 @@ interface User {
   id: string;
   name?: string | null;
   email: string;
-  password?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
-    provider: string;
-    providerAccountId: string;
+    providerId: string;  // Changed from 'provider' for better-auth
+    password?: string | null; // Password stored in credential account
   }>;
   bio?: string | null;
   dateOfBirth?: Date | null;
   pronouns?: string | null;
-  showAge?: boolean;
+  showAge: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -329,8 +328,8 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         <Box>
           <LinkedAccounts
             accounts={user.accounts}
-            hasPassword={!!user.password}
-            hasOAuthProviders={user.accounts.some(a => a.provider === 'github' || a.provider === 'google')}
+            hasPassword={!!user.accounts.find(a => a.providerId === 'credential')?.password}
+            hasOAuthProviders={user.accounts.some(a => a.providerId === 'github' || a.providerId === 'google')}
           />
         </Box>
 

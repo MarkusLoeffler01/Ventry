@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import prisma from "@/lib/prisma";
 import type { UserDataExport } from "@/types/user/profile";
 
 // GET: Export user data (GDPR compliance)
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
+    const session = await getSession();
 
     
     if (!session?.user?.id) {
@@ -41,9 +41,8 @@ export async function GET(req: NextRequest) {
         eventsOwned: true,
         accounts: {
           select: {
-            provider: true,
-            providerAccountId: true,
-            type: true,
+            providerId: true,  // Changed from 'provider' for better-auth
+            accountId: true,   // Changed from 'providerAccountId' for better-auth
             // Don't include sensitive tokens
           }
         },
