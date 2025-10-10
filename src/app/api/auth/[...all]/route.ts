@@ -20,13 +20,16 @@ export async function GET(request: NextRequest) {
     if (isOAuthCallback) {
         const cookieStore = await cookies();
         const linkingCookie = cookieStore.get('allow_oauth_linking');
-        const stateCookie = cookieStore.get('__Secure-better-auth.state');
         
-        console.log('=== OAUTH CALLBACK INTERCEPTOR ===');
-        console.log('Path:', pathname);
-        console.log('Linking cookie:', linkingCookie?.value);
-        console.log('State cookie:', stateCookie?.value);
-        console.log('All cookies:', cookieStore.getAll().map(c => c.name));
+        // Development logging only
+        if (process.env.NODE_ENV === 'development') {
+            const stateCookie = cookieStore.get('__Secure-VENTRY.state');
+            console.log('=== OAUTH CALLBACK INTERCEPTOR ===');
+            console.log('Path:', pathname);
+            console.log('Linking cookie:', linkingCookie?.value);
+            console.log('State cookie:', stateCookie?.value);
+            console.log('All cookies:', cookieStore.getAll().map(c => c.name));
+        }
         
         // If no linking cookie, this might be a first-time OAuth attempt
         // Let better-auth handle it - it will return account_not_linked if needed
@@ -37,12 +40,16 @@ export async function GET(request: NextRequest) {
                 const linkingData = JSON.parse(linkingCookie.value);
                 const provider = pathname.includes('/google') ? 'google' : 'github';
                 
-                console.log('Linking authorized for user:', linkingData.userId, 'provider:', linkingData.provider);
-                console.log('Current OAuth provider:', provider);
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Linking authorized for user:', linkingData.userId, 'provider:', linkingData.provider);
+                    console.log('Current OAuth provider:', provider);
+                }
                 
                 // Verify the cookie is for the correct provider
                 if (linkingData.provider !== provider) {
-                    console.warn('⚠️  Provider mismatch - cookie is for', linkingData.provider, 'but OAuth is', provider);
+                    if (process.env.NODE_ENV === 'development') {
+                        console.warn('⚠️  Provider mismatch - cookie is for', linkingData.provider, 'but OAuth is', provider);
+                    }
                     cookieStore.delete('allow_oauth_linking');
                     // Let better-auth handle it normally (will likely return account_not_linked)
                     return BetterAuthGET(request);
@@ -57,7 +64,9 @@ export async function GET(request: NextRequest) {
                 if (response.status === 200 || response.status === 302) {
                     const cookieStore = await cookies();
                     cookieStore.delete('allow_oauth_linking');
-                    console.log('✅ OAuth linking completed, cookie cleaned up');
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('✅ OAuth linking completed, cookie cleaned up');
+                    }
                 }
                 
                 return response;
