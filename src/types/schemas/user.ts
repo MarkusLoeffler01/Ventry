@@ -67,7 +67,7 @@ export const userSelfSchema = z.object({
     password: z.string().min(8, "Password must be at least 8 characters long"),
     profilePicture: z.string().url("Invalid URL").optional().nullable(),
     isAdmin: z.boolean().optional(),
-    isVerified: z.boolean().optional(),
+    emailVerified: z.boolean().optional(),
 });
 
 /**
@@ -77,6 +77,6 @@ export const userSelfSchema = z.object({
 export const userAdminUserUpdateSchema = z.object({
     ...userSelfUpdateSchema.omit({ currentPassword: true }).shape,
     isAdmin: z.boolean().optional(),
-    isVerified: z.boolean().optional(),
+    emailVerified: z.boolean().optional(),
 });
 

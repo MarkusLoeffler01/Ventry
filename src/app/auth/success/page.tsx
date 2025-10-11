@@ -1,4 +1,4 @@
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,7 +14,7 @@ interface SuccessPageProps {
 
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {
     // Get the current session
-    const session = await auth();
+    const session = await getSession();
     
     // If no user is authenticated, redirect to login
     if (!session?.user) {
@@ -42,10 +42,10 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
             },
             accounts: {
                 where: {
-                    provider: provider || 'unknown'
+                    providerId: provider || 'unknown'  // Changed from 'provider' for better-auth
                 },
                 select: {
-                    provider: true
+                    providerId: true  // Changed from 'provider' for better-auth
                 }
             }
         }

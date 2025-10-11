@@ -1,13 +1,11 @@
-
-
 import { redirect } from "next/navigation";
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
 import { Container, Box, Typography, Paper } from "@mui/material";
 
 export default async function ProfilePage() {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user?.id) {
     redirect("/login");
@@ -20,7 +18,6 @@ export default async function ProfilePage() {
       id: true,
       name: true,
       email: true,
-      password: true, // Check if password is set
       profilePictures: {
         orderBy: [
           { order: 'asc' },
@@ -30,8 +27,8 @@ export default async function ProfilePage() {
       },
       accounts: {
         select: {
-          provider: true,
-          providerAccountId: true
+          providerId: true,
+          password: true // Check if password is set (in credential account)
         }
       },
       bio: true,
