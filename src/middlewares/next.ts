@@ -6,7 +6,7 @@ export function middleware(req: NextRequest) {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   const origin = `${proto}://${host}`;
 
-  // Klonen der Response, um Header zu setzen
+  // Clone the response to set headers
   const res = NextResponse.next({
     request: {
       headers: new Headers(req.headers),
