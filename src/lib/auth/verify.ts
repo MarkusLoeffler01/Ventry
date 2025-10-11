@@ -27,7 +27,7 @@ export async function verifyUser(email: string, password: string) {
     if (!user) return null;
 
     // Get the credential account (password is stored there)
-    const credentialAccount = user.accounts?.[0];
+    const credentialAccount = user.accounts?.find(acc => acc.providerId === 'credential');
 
     if(!credentialAccount?.password) return null;
 

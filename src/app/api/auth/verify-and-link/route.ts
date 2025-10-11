@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
             include: {
                 accounts: {
                     where: {
-                        providerId: 'credential' // better-auth uses 'credential' for email/password
+                        // better-auth uses 'credential' for email/password
+                        providerId: 'credential'
                     }
                 }
             }
