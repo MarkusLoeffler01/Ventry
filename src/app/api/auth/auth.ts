@@ -40,7 +40,7 @@ export const auth = betterAuth({
     },
     account: {
         accountLinking: {
-            enabled: true, // Enable linking - security enforced by middleware checking allow_oauth_linking cookie
+            enabled: true, // Enable - but we control it via allow_oauth_linking cookie
             trustedProviders: ["github", "google"]
         }
     },

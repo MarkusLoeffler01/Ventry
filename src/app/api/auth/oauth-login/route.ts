@@ -63,10 +63,10 @@ export async function GET(request: NextRequest) {
                 if (user) {
                     // Create pending link with minimal data
                     // (We'll need to re-OAuth to get full tokens later)
+                    // Prisma will auto-generate accountId with cuid(2)
                     await prisma.pendingAccountLink.create({
                         data: {
                             userId: user.id,
-                            accountId: `pending_${provider}_${Date.now()}`, // Temporary ID until account is created
                             provider,
                             providerAccountId: '', // Will be filled on confirmation
                             providerEmail: email,

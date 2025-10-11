@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
         },
         sessions: {
           select: {
-            expires: true,
+            ipAddress: true,
+            userAgent: true,
+            createdAt: true
             // Don't include session tokens
           }
         }

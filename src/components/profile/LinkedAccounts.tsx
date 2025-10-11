@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Box,
   Card,
@@ -20,7 +19,6 @@ import {
   CheckCircle,
   Link as LinkIcon
 } from "@mui/icons-material";
-import authClient from "@/lib/auth/client";
 
 interface LinkedAccountsProps {
   accounts: Array<{
@@ -31,8 +29,6 @@ interface LinkedAccountsProps {
 }
 
 export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProviders }: LinkedAccountsProps) {
-  const [linking, setLinking] = useState<string | null>(null);
-
   const getProviderIcon = (providerId: string) => {
     switch (providerId) {
       case "github":
@@ -68,11 +64,6 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
 
   const linkedProviders = accounts.map(a => a.providerId);
   
-  // Add credentials if user has password
-  const allLinkedProviders = hasPassword 
-    ? [...linkedProviders, "credentials"]
-    : linkedProviders;
-
   const unlinkableProviders = availableProviders.filter(
     p => !linkedProviders.includes(p.id)
   );
@@ -83,27 +74,8 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
       return;
     }
 
-    setLinking(providerId);
-    
-    try {
-      // Store linking intent in sessionStorage
-      sessionStorage.setItem('oauth_linking_intent', JSON.stringify({
-        provider: providerId,
-        timestamp: Date.now(),
-        mode: 'link' // This tells us it's a linking attempt, not a new sign-in
-      }));
-
-      // Initiate OAuth flow - better-auth will handle this
-      // The callback will check sessionStorage to determine if this is a link or new sign-in
-      await authClient.signIn.social({
-        provider: providerId as "github" | "google",
-        callbackURL: "/auth/callback/link" // Special callback for linking
-      });
-    } catch (error) {
-      console.error("Error linking account:", error);
-      sessionStorage.removeItem('oauth_linking_intent');
-      setLinking(null);
-    }
+    // Redirect to password verification page
+    window.location.href = `/link-account/verify?provider=${providerId}&returnTo=${encodeURIComponent('/profile')}`;
   };
 
   return (
@@ -118,7 +90,7 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
           Manage how you sign in to your account. You can link multiple providers.
         </Typography>
 
-        {!hasPassword && !hasOAuthProviders && allLinkedProviders.length > 0 && (
+        {!hasPassword && !hasOAuthProviders && linkedProviders.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             <Typography variant="caption">
               <strong>Security Notice:</strong> Set a password or link an OAuth provider to enable linking additional accounts.
@@ -132,13 +104,13 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
           Currently Linked:
         </Typography>
 
-        {allLinkedProviders.length === 0 ? (
+        {linkedProviders.length === 0 ? (
           <Alert severity="info" sx={{ mb: 2 }}>
             No accounts linked yet. Link an account to enable sign-in.
           </Alert>
         ) : (
           <Stack spacing={1} sx={{ mb: 3 }}>
-            {allLinkedProviders.map((providerId) => (
+            {linkedProviders.map((providerId) => (
               <Box
                 key={providerId}
                 sx={{
@@ -202,9 +174,9 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
                     variant="outlined"
                     startIcon={<Add />}
                     onClick={() => void handleLinkProvider(provider.id)}
-                    disabled={(!hasPassword && !hasOAuthProviders) || linking === provider.id}
+                    disabled={!hasPassword && !hasOAuthProviders}
                   >
-                    {linking === provider.id ? "Linking..." : "Link"}
+                    Link
                   </Button>
                 </Box>
               ))}

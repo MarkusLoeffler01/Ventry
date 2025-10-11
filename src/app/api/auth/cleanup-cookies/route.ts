@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 /**
  * Cleanup old NextAuth.js cookies after migration to better-auth
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     // Get remaining cookies
     const remainingCookies = cookieStore.getAll().map(c => ({
         name: c.name,
-        value: c.value.substring(0, 30) + '...'
+        value: `${c.value.substring(0, 30)}...`
     }));
     
     return NextResponse.json({ 

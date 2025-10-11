@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
 
     const { email, password, name } = result.data;
 
+    // Create admin user with credential account
+    // Prisma auto-generates: id (cuid), accountId (cuid), userId (from relation), createdAt, updatedAt
     await prisma.user.create({
         data: {
             email,
@@ -43,9 +45,10 @@ export async function POST(req: NextRequest) {
             emailVerified: true,
             accounts: {
                 create: {
-                    providerId: "credential"
+                    providerId: "credential",
+                    password: password
                 }
-            }
+            },
         }
     });
 

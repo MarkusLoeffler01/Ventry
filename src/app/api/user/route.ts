@@ -132,11 +132,19 @@ export async function POST(req: NextRequest) {
     // Hash the password before storing it
     const hashedPassword = await hashPassword(parsed.data.password);
 
-    // Create new user
+    // Create new user with credential account
+    // Prisma auto-generates accountId with cuid(2)
     const newUser = await prisma.user.create({
       data: { 
-        ...parsed.data,
-        password: hashedPassword
+        name: parsed.data.name,
+        email: parsed.data.email,
+        emailVerified: false,
+        accounts: {
+          create: {
+            providerId: 'credential',
+            password: hashedPassword,
+          }
+        }
       },
       select: {
         id: true,
@@ -196,18 +204,53 @@ export async function PATCH(req: NextRequest) {
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: {
+        accounts: {
+          where: { providerId: 'credential' }
+        }
+      }
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Handle password update separately (in accounts table)
     if (parsed.data.password) {
-      parsed.data.password = await hashPassword(parsed.data.password);
+      const hashedPassword = await hashPassword(parsed.data.password);
+      
+      // Find or create credential account
+      const credentialAccount = user.accounts.find(acc => acc.providerId === 'credential');
+      
+      if (credentialAccount) {
+        // Update existing credential account
+        await prisma.account.update({
+          where: { 
+            id_providerId: {
+              id: credentialAccount.id,
+              providerId: 'credential'
+            }
+          },
+          data: { password: hashedPassword }
+        });
+      } else {
+        // Create new credential account if it doesn't exist
+        // Prisma auto-generates accountId with cuid(2)
+        await prisma.account.create({
+          data: {
+            providerId: 'credential',
+            userId: userId,
+            password: hashedPassword,
+          }
+        });
+      }
+      
+      // Remove password from update data (it's not in user table)
+      delete parsed.data.password;
     }
 
-    // Update user
+    // Update user (without password)
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: parsed.data,

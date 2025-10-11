@@ -8,8 +8,9 @@ import { cookies } from "next/headers";
 /**
  * Wrapper for GET requests to OAuth callbacks
  * 
- * Checks for allow_oauth_linking cookie when account linking is attempted.
- * This enforces password verification before allowing account linking.
+ * Intercepts OAuth callbacks to implement secure account linking:
+ * - If linking cookie present: Allow better-auth to link, then redirect to confirmation
+ * - If no cookie: Block linking, redirect to password verification
  */
 export async function GET(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
@@ -23,58 +24,81 @@ export async function GET(request: NextRequest) {
         
         // Development logging only
         if (process.env.NODE_ENV === 'development') {
-            const stateCookie = cookieStore.get('__Secure-VENTRY.state');
             console.log('=== OAUTH CALLBACK INTERCEPTOR ===');
             console.log('Path:', pathname);
             console.log('Linking cookie:', linkingCookie?.value);
-            console.log('State cookie:', stateCookie?.value);
-            console.log('All cookies:', cookieStore.getAll().map(c => c.name));
         }
         
-        // If no linking cookie, this might be a first-time OAuth attempt
-        // Let better-auth handle it - it will return account_not_linked if needed
-        // The error handler will then show the password prompt
-        
+        // If linking cookie exists, this is an authorized account linking attempt
         if (linkingCookie) {
             try {
                 const linkingData = JSON.parse(linkingCookie.value);
                 const provider = pathname.includes('/google') ? 'google' : 'github';
                 
                 if (process.env.NODE_ENV === 'development') {
-                    console.log('Linking authorized for user:', linkingData.userId, 'provider:', linkingData.provider);
-                    console.log('Current OAuth provider:', provider);
+                    console.log('🔗 Authorized account linking for user:', linkingData.userId, 'provider:', provider);
                 }
                 
                 // Verify the cookie is for the correct provider
                 if (linkingData.provider !== provider) {
                     if (process.env.NODE_ENV === 'development') {
-                        console.warn('⚠️  Provider mismatch - cookie is for', linkingData.provider, 'but OAuth is', provider);
+                        console.warn('⚠️  Provider mismatch');
                     }
                     cookieStore.delete('allow_oauth_linking');
-                    // Let better-auth handle it normally (will likely return account_not_linked)
                     return BetterAuthGET(request);
                 }
                 
-                // Cookie exists and matches - allow linking by letting better-auth proceed
-                // After successful linking, delete the cookie
+                // Let better-auth handle the OAuth callback and link the account
                 const response = await BetterAuthGET(request);
                 
-                // Check if linking was successful (no error in response)
-                // If successful, clean up the authorization cookie
-                if (response.status === 200 || response.status === 302) {
-                    const cookieStore = await cookies();
-                    cookieStore.delete('allow_oauth_linking');
+                // Clean up cookie after handling
+                cookieStore.delete('allow_oauth_linking');
+                
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ Account linked by better-auth, response status:', response.status);
+                }
+                
+                // If successful (redirect), change destination to our confirmation page
+                if (response.status === 302 || response.status === 301) {
+                    const location = response.headers.get('location');
                     if (process.env.NODE_ENV === 'development') {
-                        console.log('✅ OAuth linking completed, cookie cleaned up');
+                        console.log('Original redirect:', location);
                     }
+                    // Redirect to profile with success message instead
+                    return Response.redirect(new URL('/profile?linked=success', request.url));
                 }
                 
                 return response;
             } catch (err) {
-                console.error('Error parsing linking cookie:', err);
-                // Invalid cookie - delete it and let better-auth handle normally
+                console.error('Error handling linking callback:', err);
                 cookieStore.delete('allow_oauth_linking');
             }
+        } else {
+            // No linking cookie - this might be an unauthorized linking attempt
+            // Check if this would be a linking scenario (user already logged in)
+            const response = await BetterAuthGET(request);
+            
+            // If better-auth returns account_not_linked error, intercept it
+            if (response.status === 302 || response.status === 301) {
+                const location = response.headers.get('location');
+                if (location?.includes('error=account_not_linked')) {
+                    // Extract email and provider from the error redirect
+                    const url = new URL(location, request.url);
+                    const email = url.searchParams.get('email');
+                    const provider = pathname.includes('/google') ? 'google' : 'github';
+                    
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('⛔ Unauthorized linking attempt blocked, redirecting to verification');
+                    }
+                    
+                    // Redirect to our password verification page instead
+                    return Response.redirect(
+                        new URL(`/link-account/verify?provider=${provider}&email=${email || ''}`, request.url)
+                    );
+                }
+            }
+            
+            return response;
         }
     }
     

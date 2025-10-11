@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import prisma from '../../../../lib/prisma';
 
 /**
  * Check if an OAuth provider email already has an account

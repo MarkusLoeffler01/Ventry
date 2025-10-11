@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -107,8 +107,21 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [linkSuccess, setLinkSuccess] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+
+  // Check for linking success in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('linked') === 'success') {
+      setLinkSuccess(true);
+      // Clean URL
+      window.history.replaceState({}, '', '/profile');
+      // Auto-hide after 5 seconds
+      setTimeout(() => setLinkSuccess(false), 5000);
+    }
+  }, []);
 
   const handleInputChange = (field: keyof ProfileFormData) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.type === 'checkbox' ? (event.target as HTMLInputElement).checked : event.target.value;
@@ -211,6 +224,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         {success && (
           <Alert severity="success" onClose={() => setSuccess(false)}>
             Profile updated successfully!
+          </Alert>
+        )}
+
+        {linkSuccess && (
+          <Alert severity="success" onClose={() => setLinkSuccess(false)}>
+            Account linked successfully!
           </Alert>
         )}
 

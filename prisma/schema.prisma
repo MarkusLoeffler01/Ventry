@@ -32,7 +32,7 @@ model ProfilePicture {
  * There will be many users and multiple admins
  */
 model User {
-  id                   String               @id @default(cuid())
+  id                   String               @id @default(cuid(2))
   name                 String?              @unique
   email                String               @unique
   profilePictures      ProfilePicture[] // Signed URL for profile picture (cached)
@@ -58,9 +58,9 @@ model User {
 
 // Better-auth Account model
 model Account {
-  id                    String    @id @default(cuid())
+  id                    String    @id @default(cuid(2))
   userId                String
-  accountId             String // The ID of the account as provided by the SSO or equal to userId for credential accounts
+  accountId             String    @default(cuid(2)) // Auto-generated for credential accounts, overridable for OAuth
   providerId            String // The ID of the provider (e.g., "google", "github", "credential")
   accessToken           String?   @db.Text
   refreshToken          String?   @db.Text
@@ -239,7 +239,7 @@ model Passkey {
 model PendingAccountLink {
   id                String  @id @default(cuid())
   userId            String
-  accountId         String // The ID of the account as provided by the SSO or equal to userId for credential accounts
+  accountId         String  @default(cuid(2)) // Auto-generated, overridable when linking to existing account
   provider          String // github, google, etc.
   providerAccountId String
   providerEmail     String
