@@ -10,7 +10,15 @@ jobs:
   add:
     runs-on: ubuntu-latest
     steps:
+      - name: Create board management token
+        id: board-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
+          private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
+          owner: Ventry-io
+
       - uses: actions/add-to-project@v1.0.2
         with:
-          project-url: https://github.com/users/MarkusLoeffler01/projects/4
-          github-token: ${{ secrets.GH_TOKEN_PROJECT }}
+          project-url: https://github.com/orgs/Ventry-io/projects/1
+          github-token: ${{ steps.board-token.outputs.token }}

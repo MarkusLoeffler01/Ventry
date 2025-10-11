@@ -1,3 +1,4 @@
+"use client";
 import type React from "react";
 import {
     Box,
@@ -8,20 +9,25 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import MuiLink from "@mui/material/Link";
-
+import ForgotPassword from "./ForgotPassword";
 
 export interface AuthTemplateProps {
     children: React.ReactNode;
     form: "login" | "register";
     title?: string;
     error: string | null;
+    resetPasswordOpen?: boolean;
+    onClose?: () => void;
 }
 
 const AuthTemplate = ({ 
     children, 
     form, 
-    error 
+    error,
+    resetPasswordOpen = false,
+    onClose = () => void 0
 }: AuthTemplateProps) => {
+
     return (
         <Container component="main" maxWidth="sm">
             <Paper 
@@ -43,6 +49,7 @@ const AuthTemplate = ({
                 {children}
                 
                 {form === "login" ? <NotYetRegistered /> : <AlreadyRegistered />}
+                {form === "login" && <ForgotPassword onClose={onClose} open={resetPasswordOpen} />}
             </Paper>
         </Container>
     );

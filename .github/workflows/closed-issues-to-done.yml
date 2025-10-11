@@ -1,0 +1,37 @@
+name: Move closed issues to Done
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  PROJECT_URL: https://github.com/orgs/Ventry-io/projects/1
+  PROJECT_STATUS_FIELD: Status
+  PROJECT_DONE_STATUS: Done
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create board management token
+        id: board-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
+          private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
+          owner: Ventry-io
+
+      - name: Move issue to Done
+        env:
+          GITHUB_TOKEN: ${{ steps.board-token.outputs.token }}
+          ISSUE_NUMBERS: ${{ github.event.issue.number }}
+          PROJECT_URL: ${{ env.PROJECT_URL }}
+          PROJECT_STATUS_FIELD: ${{ env.PROJECT_STATUS_FIELD }}
+          PROJECT_STATUS_NAME: ${{ env.PROJECT_DONE_STATUS }}
+        run: node .github/scripts/move-project-issue-status.mjs

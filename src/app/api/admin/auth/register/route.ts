@@ -2,7 +2,7 @@
  * If no admin is found, this route will be enabled (most likely due to setup)
  */
 
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma/prisma";
 import { registerSchema, type registerType } from "@/types/schemas/auth";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -35,13 +35,20 @@ export async function POST(req: NextRequest) {
 
     const { email, password, name } = result.data;
 
+    // Create admin user with credential account
+    // Prisma auto-generates: id (cuid), accountId (cuid), userId (from relation), createdAt, updatedAt
     await prisma.user.create({
         data: {
             email,
-            password,
             name,
             isAdmin: true,
-            isVerified: true,
+            emailVerified: true,
+            accounts: {
+                create: {
+                    providerId: "credential",
+                    password: password
+                }
+            },
         }
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -43,16 +43,15 @@ interface User {
   id: string;
   name?: string | null;
   email: string;
-  password?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
-    provider: string;
-    providerAccountId: string;
+    providerId: string;  // Changed from 'provider' for better-auth
+    password?: string | null; // Password stored in credential account
   }>;
   bio?: string | null;
   dateOfBirth?: Date | null;
   pronouns?: string | null;
-  showAge?: boolean;
+  showAge: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -108,8 +107,21 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [linkSuccess, setLinkSuccess] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+
+  // Check for linking success in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('linked') === 'success') {
+      setLinkSuccess(true);
+      // Clean URL
+      window.history.replaceState({}, '', '/profile');
+      // Auto-hide after 5 seconds
+      setTimeout(() => setLinkSuccess(false), 5000);
+    }
+  }, []);
 
   const handleInputChange = (field: keyof ProfileFormData) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.type === 'checkbox' ? (event.target as HTMLInputElement).checked : event.target.value;
@@ -212,6 +224,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         {success && (
           <Alert severity="success" onClose={() => setSuccess(false)}>
             Profile updated successfully!
+          </Alert>
+        )}
+
+        {linkSuccess && (
+          <Alert severity="success" onClose={() => setLinkSuccess(false)}>
+            Account linked successfully!
           </Alert>
         )}
 
@@ -329,8 +347,8 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         <Box>
           <LinkedAccounts
             accounts={user.accounts}
-            hasPassword={!!user.password}
-            hasOAuthProviders={user.accounts.some(a => a.provider === 'github' || a.provider === 'google')}
+            hasPassword={!!user.accounts.find(a => a.providerId === 'credential')?.password}
+            hasOAuthProviders={user.accounts.some(a => a.providerId === 'github' || a.providerId === 'google')}
           />
         </Box>
 
@@ -404,45 +422,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Box>
 
         {/* Confirmation Dialogs */}
-        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete Account</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to delete your account? This will permanently remove all your data and cannot be undone.
-            </Typography>
-            <Typography sx={{ mt: 2, fontWeight: 'bold' }}>
-              Type &quot;{user.email}&quot; to confirm:
-            </Typography>
-            <TextField
-              fullWidth
-              sx={{ mt: 1 }}
-              id="delete-confirmation"
-              placeholder={user.email}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button 
-              color="error" 
-              variant="contained"
-              onClick={() => {
-                const input = document.getElementById('delete-confirmation') as HTMLInputElement;
-                if (input?.value === user.email) {
-                  try {
-                    handleDeleteAccount()
-                      .catch(err => {
-                        setError(err instanceof Error ? err.message : 'Failed to delete account');
-                      });
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to delete account');
-                  }
-                }
-              }}
-            >
-              Delete Account
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <DeleteAccountDialog onClose={() => setDeleteDialogOpen(false)} onDelete={handleDeleteAccount} open={deleteDialogOpen} userEmail={user.email} />
 
         <Dialog open={downloadDialogOpen} onClose={() => setDownloadDialogOpen(false)}>
           <DialogTitle>Download Your Data</DialogTitle>
@@ -473,4 +453,79 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Dialog>
       </Stack>
   );
+}
+
+function DeleteAccountDialog({
+  open,
+  userEmail,
+  onClose,
+  onDelete
+}: {
+  open: boolean;
+  userEmail: string;
+  onClose: () => void;
+  onDelete: () => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    const value = inputRef.current?.value.trim();
+    if (value !== userEmail) {
+      setError('Email does not match');
+      return;
+    }
+
+    setError(null);
+    setIsDeleting(true);
+
+    try {
+      await onDelete();
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete account';
+      setError(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  return <Dialog open={open} onClose={onClose} aria-labelledby='delete-dialog-title'>
+          <DialogTitle>Delete Account</DialogTitle>
+
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete your account? This will permanently remove all your data and cannot be undone.
+            </Typography>
+
+            <Typography sx={{ mt: 2, fontWeight: 'bold' }}>
+              Type &quot;{userEmail}&quot; to confirm:
+            </Typography>
+
+            <TextField
+              fullWidth
+              inputRef={inputRef}
+              sx={{ mt: 1 }}
+              error={!!error}
+              placeholder={userEmail}
+              helperText={error || 'This action cannot be undone'}
+              disabled={isDeleting}
+            />
+          </DialogContent>
+
+          <DialogActions>
+            <Button onClick={onClose}>
+              Cancel
+            </Button>
+            <Button 
+              color="error" 
+              variant="contained"
+              onClick={() => void handleConfirmDelete()}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Account'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 }

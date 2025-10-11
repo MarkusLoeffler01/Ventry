@@ -1,0 +1,132 @@
+name: Link dev PR to branch issue
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+    branches: [dev]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const branch = pr.head.ref;
+            const match = branch.match(/^(\d+)(?:[-_/]|$)/);
+            const warningMarker = "<!-- ventry:branch-issue-warning -->";
+            const fixesStart = "<!-- ventry:auto-fixes:start -->";
+            const fixesEnd = "<!-- ventry:auto-fixes:end -->";
+
+            async function findWarningComment() {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100,
+              });
+
+              return comments.find((comment) =>
+                comment.user?.type === "Bot" && comment.body?.includes(warningMarker)
+              );
+            }
+
+            async function upsertWarning(body) {
+              const existing = await findWarningComment();
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+                return;
+              }
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body,
+              });
+            }
+
+            async function clearWarning() {
+              const existing = await findWarningComment();
+              if (!existing) return;
+
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+              });
+            }
+
+            if (!match) {
+              const message = [
+                warningMarker,
+                "Warning: This PR branch does not start with an issue number.",
+                "",
+                "Expected a branch name like `21-fix-names`. This PR will not be picked up automatically for release issue closing and needs manual cleanup.",
+              ].join("\n");
+
+              core.warning(`Branch "${branch}" does not start with an issue number.`);
+              await upsertWarning(message);
+              return;
+            }
+
+            const issueNumber = Number(match[1]);
+
+            try {
+              await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+
+              const message = [
+                warningMarker,
+                `Warning: This PR branch starts with issue number \`#${issueNumber}\`, but that issue does not exist.`,
+                "",
+                "This PR will not be picked up automatically for release issue closing and needs manual cleanup.",
+              ].join("\n");
+
+              core.warning(`Issue #${issueNumber} does not exist.`);
+              await upsertWarning(message);
+              return;
+            }
+
+            await clearWarning();
+
+            const body = pr.body || "";
+            const fixesLine = `Fixes #${issueNumber}`;
+            const fixesRegex = new RegExp(`\\b(?:fix|fixes|fixed)\\s+#${issueNumber}\\b`, "i");
+
+            if (fixesRegex.test(body)) {
+              core.info(`${fixesLine} is already present.`);
+              return;
+            }
+
+            const generated = `${fixesStart}\n${fixesLine}\n${fixesEnd}`;
+            const markedRegex = new RegExp(`${fixesStart}[\\s\\S]*?${fixesEnd}`, "m");
+            const nextBody = markedRegex.test(body)
+              ? body.replace(markedRegex, generated)
+              : `${body.trim()}\n\n${generated}\n`.trimStart();
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body: nextBody,
+            });
+
+            core.info(`Added ${fixesLine} to PR #${pr.number}.`);

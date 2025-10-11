@@ -20,7 +20,7 @@ export async function middleware(req: NextRequest) {
             if(out && out !== res && out.status !== 200) return out;
 
             if(out && out !== res && out.status === 200) {
-                out.headers.forEach((v, k) => res.headers.set(k, v));
+                out.headers.forEach((v, k) => void res.headers.set(k, v));
             }
         }
     }
@@ -30,7 +30,7 @@ export async function middleware(req: NextRequest) {
         const out = mws.logging.loggingMiddleware(req);
         if(out && out !== res && out.status !== 200) return out;
         if(out && out !== res && out.status === 200) {
-            out.headers.forEach((v, k) => res.headers.set(k, v));
+            out.headers.forEach((v, k) => void res.headers.set(k, v));
         }
     }
 

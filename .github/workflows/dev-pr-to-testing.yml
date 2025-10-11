@@ -1,0 +1,71 @@
+name: Move merged dev issues to Testing
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [dev]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+env:
+  PROJECT_URL: https://github.com/orgs/Ventry-io/projects/1
+  PROJECT_STATUS_FIELD: Status
+  PROJECT_TESTING_STATUS: Testing
+
+jobs:
+  move:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Create board management token
+        id: board-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
+          private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
+          owner: Ventry-io
+
+      - name: Collect linked issues
+        id: issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+
+            function issueNumbersFrom(text) {
+              const numbers = new Set();
+              const regex = /\b(?:fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+(?:https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/|(?:[\w.-]+\/[\w.-]+)?#)(\d+)\b/gi;
+              let match;
+
+              while ((match = regex.exec(text || ""))) {
+                numbers.add(Number(match[1]));
+              }
+
+              return [...numbers];
+            }
+
+            const issueNumbers = issueNumbersFrom(pr.body);
+
+            if (issueNumbers.length === 0) {
+              core.warning(`PR #${pr.number} has no closing keyword issue references. Nothing was moved to Testing.`);
+              return;
+            }
+
+            core.setOutput("issue_numbers", issueNumbers.join(","));
+
+      - name: Move issues to Testing
+        if: steps.issues.outputs.issue_numbers != ''
+        env:
+          GITHUB_TOKEN: ${{ steps.board-token.outputs.token }}
+          ISSUE_NUMBERS: ${{ steps.issues.outputs.issue_numbers }}
+          PROJECT_URL: ${{ env.PROJECT_URL }}
+          PROJECT_STATUS_FIELD: ${{ env.PROJECT_STATUS_FIELD }}
+          PROJECT_STATUS_NAME: ${{ env.PROJECT_TESTING_STATUS }}
+        run: node .github/scripts/move-project-issue-status.mjs

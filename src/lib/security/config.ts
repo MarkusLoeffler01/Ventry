@@ -31,7 +31,7 @@ export const SECURITY_CONFIG = {
     undefined,
     
   // OAuth Security
-  OAUTH_ALLOWED_DOMAINS: ['gmail.com', 'github.com'], // Restrict OAuth domains if needed
+  OAUTH_ALLOWED_DOMAINS: ['google.com', 'github.com'], // Restrict OAuth domains if needed
 } as const;
 
 // Enforce OAuth domain restriction
@@ -58,7 +58,7 @@ export const getSecurityHeaders = () => {
 
 // Validate environment variables on startup
 export const validateSecurityConfig = () => {
-  const required = ['AUTH_SECRET', 'NEXTAUTH_URL'];
+  const required = ['AUTH_SECRET', 'BETTER_AUTH_URL'];
   const missing = required.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
