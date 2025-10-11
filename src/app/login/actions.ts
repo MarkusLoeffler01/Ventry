@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
  * and redirect to link-account page if they do
  */
 export async function checkPendingLinksAndRedirect() {
-  const session = await auth();
+  const session = await getSession();
   
   if (!session?.user?.id) {
     return null;

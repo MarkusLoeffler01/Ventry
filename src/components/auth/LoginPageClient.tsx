@@ -4,64 +4,101 @@ import React from "react";
 import LoginForm from "@/components/auth/LoginForm";
 import { useSearchParams } from "next/navigation";
 import Alert from "@mui/material/Alert";
-import { useSession } from "next-auth/react";
-import { signIn as passkeySignIn } from "next-auth/webauthn";
-import { signIn } from "next-auth/react";
+import authClient from "@/lib/auth/client";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
-import CircularProgress from "@mui/material/CircularProgress";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+import CircularProgress from "@mui/material/CircularProgress";
 
 export default function LoginPageClient() {
   const searchParams = useSearchParams();
-  const { status } = useSession();
   const registered = searchParams.get("registered");
   const error = searchParams.get("error");
   const provider = searchParams.get("provider");
   const message = searchParams.get("message");
+  const accountExists = searchParams.get("account_exists");
+  const linkRequired = searchParams.get("link_required");
+  const linkProvider = searchParams.get("link_provider") as "google" | "github" | null;
+  const linkEmail = searchParams.get("email");
+  
   const [loadingPasskey, setLoadingPasskey] = React.useState<null | "login" | "register">(null);
-  const [countdown, setCountdown] = React.useState(5);
-
-  // Auto-redirect countdown when user is authenticated with pending link error
-  React.useEffect(() => {
-    if (status === "authenticated" && error === "AccessDenied" && message === "AccountExists") {
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            // Reload the page to trigger server-side redirect
-            window.location.href = "/login";
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [status, error, message]);
+  const [linkingPassword, setLinkingPassword] = React.useState("");
+  const [linkingLoading, setLinkingLoading] = React.useState(false);
+  const [linkingError, setLinkingError] = React.useState("");
 
   const handleGoogleSignIn = async () => {
-    await signIn("google", {
-      redirect: true,
-      redirectTo: "/auth/success?provider=google"
+    await authClient.signIn.social({
+      provider: "google",
+      callbackURL: "/dashboard",
     });
   }
 
   const handleGitHubSignIn = async () => {
-    await signIn("github", {
-      redirect: true,
-      redirectTo: "/auth/success?provider=github"
+    await authClient.signIn.social({
+      provider: "github",
+      callbackURL: "/dashboard",
     });
   }
 
   const handlePasskey = async (mode: "login" | "register") => {
     setLoadingPasskey(mode);
     try {
-      await passkeySignIn("passkey", { action: mode === "register" ? "register" : undefined });
+      if (mode === "register") {
+        await authClient.signIn.passkey();
+      } else {
+        await authClient.signIn.passkey();
+      }
+    } catch (error) {
+      console.error("Passkey error:", error);
     } finally {
       setLoadingPasskey(null);
+    }
+  };
+
+  const handleLinkingLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLinkingError("");
+    setLinkingLoading(true);
+
+    if (!linkEmail || !linkProvider) {
+      setLinkingError("Email or provider not found. Please try signing in with OAuth again.");
+      setLinkingLoading(false);
+      return;
+    }
+
+    try {
+      // Call our API to verify password and set linking cookie
+      const response = await fetch('/api/auth/verify-and-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: linkEmail,
+          password: linkingPassword,
+          provider: linkProvider,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setLinkingError(data.error || "Invalid password");
+        setLinkingLoading(false);
+        return;
+      }
+
+      // Password verified! Now initiate OAuth flow which will auto-link
+      await authClient.signIn.social({
+        provider: linkProvider,
+        callbackURL: "/dashboard",
+      });
+    } catch (err) {
+      console.error("Linking login error:", err);
+      setLinkingError("An error occurred. Please try again.");
+      setLinkingLoading(false);
     }
   };
 
@@ -70,6 +107,62 @@ export default function LoginPageClient() {
       {registered && (
         <Box sx={{ mb: 2 }}>
           <Alert severity="success">Registration successful! Please log in.</Alert>
+        </Box>
+      )}
+
+      {accountExists && provider && (
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="info">
+            <Typography variant="body2" fontWeight="bold" gutterBottom>
+              Account Already Exists
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              We found an existing account with this email. Please log in below, then you can link your {provider === "github" ? "GitHub" : "Google"} account from your profile.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
+              After logging in: Profile → Linked Accounts → Link {provider === "github" ? "GitHub" : "Google"}
+            </Typography>
+          </Alert>
+        </Box>
+      )}
+
+      {linkRequired && linkProvider && linkEmail && (
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="info">
+            <Typography variant="body2" fontWeight="bold" gutterBottom>
+              Link {linkProvider === "github" ? "GitHub" : "Google"} Account
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              We found an existing account with email <strong>{linkEmail}</strong>. Please enter your password to link your {linkProvider === "github" ? "GitHub" : "Google"} account.
+            </Typography>
+            
+            <form onSubmit={(e) => { void handleLinkingLogin(e); }}>
+              <Stack spacing={2}>
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={linkingPassword}
+                  onChange={(e) => setLinkingPassword(e.target.value)}
+                  required
+                  fullWidth
+                  autoFocus
+                  helperText={`Password for ${linkEmail}`}
+                />
+                {linkingError && (
+                  <Alert severity="error">{linkingError}</Alert>
+                )}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  disabled={linkingLoading}
+                  startIcon={linkingLoading ? <CircularProgress size={20} /> : null}
+                >
+                  {linkingLoading ? "Verifying..." : `Verify & Link ${linkProvider === "github" ? "GitHub" : "Google"}`}
+                </Button>
+              </Stack>
+            </form>
+          </Alert>
         </Box>
       )}
 
@@ -100,75 +193,50 @@ export default function LoginPageClient() {
         </Box>
       )}
 
-      {status === "loading" && (
-        <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ py: 4 }}>
-          <CircularProgress size={24} />
-          <Typography variant="body2">Checking session…</Typography>
-        </Stack>
-      )}
-
-      {status === "authenticated" && error === "AccessDenied" && message === "AccountExists" && (
-        <Box sx={{ textAlign: "center", py: 4 }}>
-          <CircularProgress size={48} sx={{ mb: 2 }} />
-          <Typography variant="h6" gutterBottom>
-            Redirecting to Account Linking...
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}...
-          </Typography>
-        </Box>
-      )}
-
-      {status === "unauthenticated" && (
+      {!linkRequired && (
         <Stack spacing={3}>
           <LoginForm />
-          <Typography variant="subtitle2" color="text.secondary" align="center">
-            Or
-          </Typography>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => { void handlePasskey("login"); }}
-              disabled={!!loadingPasskey}
-            >
-              {loadingPasskey === "login" ? "Using Passkey…" : "Sign in with Passkey"}
-            </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => { void handlePasskey("register"); }}
-              disabled={!!loadingPasskey}
-            >
-              {loadingPasskey === "register" ? "Creating Passkey…" : "Create Passkey"}
-            </Button>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => void handleGoogleSignIn()}
-            >
-              Sign in with Google
-            </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => void handleGitHubSignIn()}
-            >
-              Sign in with GitHub
-            </Button>
-          </Stack>
-          <Typography variant="caption" color="text.secondary" align="center">
-            A Passkey lets you sign in without a password. If you don&apos;t have one yet, create it.
-          </Typography>
-        </Stack>
-      )}
-
-      {status === "authenticated" && !(error === "AccessDenied" && message === "AccountExists") && (
-        <Typography color="#FFFFFF" variant="body1" align="center">
-          You&apos;re already signed in.
+        <Typography variant="subtitle2" color="text.secondary" align="center">
+          Or
         </Typography>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => { void handlePasskey("login"); }}
+            disabled={!!loadingPasskey}
+          >
+            {loadingPasskey === "login" ? "Using Passkey…" : "Sign in with Passkey"}
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => { void handlePasskey("register"); }}
+            disabled={!!loadingPasskey}
+          >
+            {loadingPasskey === "register" ? "Creating Passkey…" : "Create Passkey"}
+          </Button>
+        </Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => void handleGoogleSignIn()}
+          >
+            Sign in with Google
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => void handleGitHubSignIn()}
+          >
+            Sign in with GitHub
+          </Button>
+        </Stack>
+        <Typography variant="caption" color="text.secondary" align="center">
+          A Passkey lets you sign in without a password. If you don&apos;t have one yet, create it.
+        </Typography>
+      </Stack>
       )}
     </>
   );

@@ -15,176 +15,187 @@ datasource db {
 }
 
 model ProfilePicture {
+  id     String @id @default(cuid())
+  userID String
+  user   User   @relation(fields: [userID], references: [id], onDelete: Cascade)
 
-  id          String   @id @default(cuid())
-  userID      String
-  user        User     @relation(fields: [userID], references: [id], onDelete: Cascade)
-
-  signedUrl String? // Signed URL for profile picture (cached)
+  signedUrl   String? // Signed URL for profile picture (cached)
   storagePath String // Storage path for profile picture
   cachedUntil DateTime? // Optional: when the cached URL expires
-  isPrimary  Boolean  @default(false) // If user has multiple, which one is primary
-  order      Int      @default(0) // Display order for profile pictures
+  isPrimary   Boolean   @default(false) // If user has multiple, which one is primary
+  order       Int       @default(0) // Display order for profile pictures
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+/**
+ * There will be many users and multiple admins
+ */
+model User {
+  id                   String               @id @default(cuid(2))
+  name                 String?              @unique
+  email                String               @unique
+  profilePictures      ProfilePicture[] // Signed URL for profile picture (cached)
+  bio                  String? // Profile bio
+  dateOfBirth          DateTime? // User's date of birth
+  pronouns             String? // User's pronouns
+  showAge              Boolean              @default(true) // Privacy setting for showing age
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  registration         Registration?
+  payments             Payment[]
+  isAdmin              Boolean              @default(false)
+  emailVerified        Boolean              @default(false) // Changed from isVerified to match better-auth
+  twoFactorEnabled     Boolean              @default(false) // Required by better-auth twoFactor plugin
+  twoFactorSecret      String? // TOTP secret for two-factor authentication
+  twoFactorBackupCodes String? // Encrypted backup codes for account recovery
+  eventsOwned          Event[]
+  accounts             Account[]
+  sessions             Session[]
+  passkeys             Passkey[] // Changed from Authenticator to Passkey for better-auth
+  pendingAccountLinks  PendingAccountLink[]
+}
+
+// Better-auth Account model
+model Account {
+  id                    String    @id @default(cuid(2))
+  userId                String
+  accountId             String    @default(cuid(2)) // Auto-generated for credential accounts, overridable for OAuth
+  providerId            String // The ID of the provider (e.g., "google", "github", "credential")
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?   @db.Text
+  password              String? // For email/password authentication
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  PendingAccountLink PendingAccountLink[]
+
+  @@unique([id, providerId])
+  @@map("account")
+}
+
+// Better-auth Session model
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique // The unique session token
+  expiresAt DateTime // The time when the session expires
+  ipAddress String? // The IP address of the device
+  userAgent String? // The user agent information of the device
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-}
-
-/**
-There will be many users and multiple admins
-*/
-model User {
-  id              String    @id @default(cuid())
-  name            String?   @unique
-  email           String    @unique
-  password        String?   // Password is crucial in oss
-  profilePictures  ProfilePicture[]    // Signed URL for profile picture (cached)
-  bio             String?   // Profile bio
-  dateOfBirth     DateTime? // User's date of birth
-  pronouns        String?   // User's pronouns
-  showAge         Boolean   @default(true) // Privacy setting for showing age
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  registration    Registration?
-  payments        Payment[]
-  isAdmin         Boolean   @default(false)
-  isVerified      Boolean   @default(false) // Your field
-  eventsOwned     Event[]
-  accounts        Account[]
-  sessions        Session[]
-  Authenticator   Authenticator[]
-  pendingAccountLinks PendingAccountLink[]
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
+  @@map("session")
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+// Better-auth Verification model
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String // The identifier for the verification request
+  value      String // The value to be verified
+  expiresAt  DateTime // The time when the verification request expires
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@map("sessions")
-}
-
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verificationtokens")
+  @@map("verification")
 }
 
 /**
-  Event-Singleton - In OSS, there will be only be one event at a time
-  With @default(1) for the id, we can have only one event at a time
-*/
+ * Event-Singleton - In OSS, there will be only be one event at a time
+ * With @default(1) for the id, we can have only one event at a time
+ */
 model Event {
-  id            Int     @id @default(autoincrement())
-  name          String
-  description   String
-  startDate     DateTime
-  endDate       DateTime
-  imageUrl      String?
-  status        EventStatus @default(DRAFT)
-  stayPolicy    Json        @default("{}")
-  ownerId       String? // temporary nullable for migration; will backfill and make required
-  owner         User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  location      Location?
-  products      Product[]
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  imageUrl    String?
+  status      EventStatus @default(DRAFT)
+  stayPolicy  Json        @default("{}")
+  ownerId     String? // temporary nullable for migration; will backfill and make required
+  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  location    Location?
+  products    Product[]
 
   // registrations Registration[]
 }
 
 /**
-  Location model to store event locations. As 1:1 relationship with event
-  This will be a venue, most likely a hotel or a conference center
-  This will be a children of the event model and act as a datatype instead of an independent table
-*/
+ * Location model to store event locations. As 1:1 relationship with event
+ * This will be a venue, most likely a hotel or a conference center
+ * This will be a children of the event model and act as a datatype instead of an independent table
+ */
 model Location {
-  id            Int       @id @default(1) // 1:1 relationship with event for singleton pattern
-  name          String
-  address       String
-  city          String
-  state         String
-  country       String
-  postalCode    String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  eventId       Int       @unique // For 1:1 relationship with event
+  id         Int      @id @default(1) // 1:1 relationship with event for singleton pattern
+  name       String
+  address    String
+  city       String
+  state      String
+  country    String
+  postalCode String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId    Int      @unique // For 1:1 relationship with event
 }
 
 /**
-  Registration model to store user registrations for the event
-  Normally, there will be only one registration per user
-  And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
-*/
+ * Registration model to store user registrations for the event
+ * Normally, there will be only one registration per user
+ * And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
+ */
 model Registration {
-  id            String              @id @default(cuid())
-  ticketId      Int                 @default(autoincrement()) @unique
-  status        RegistrationStatus  @default(PENDING)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id        String             @id @default(cuid())
+  ticketId  Int                @unique @default(autoincrement())
+  status    RegistrationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
-  userId        String              @unique  
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments      Payment[]
+  userId   String    @unique
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
 }
-
 
 model Payment {
   id              String        @id @default(cuid())
   amount          Float
   currency        String
   paymentStatus   PaymentStatus @default(PENDING)
-  paymentProvider String?                         // Stripe, PayPal, Bank Transfer, etc.
+  paymentProvider String? // Stripe, PayPal, Bank Transfer, etc.
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  
-  userId          String
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  registrationId  String
-  registration    Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 }
 
 /**
-  Product model to store products for the event
-  For example, badges, t-shirts, sponsorships, etc etc.
-*/
+ * Product model to store products for the event
+ * For example, badges, t-shirts, sponsorships, etc etc.
+ */
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  price         Float
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  eventId       Int      @default(1)
-  event         Event    @relation(fields: [eventId], references: [id])
+  eventId Int   @default(1)
+  event   Event @relation(fields: [eventId], references: [id])
 }
 
 enum RegistrationStatus {
@@ -206,48 +217,54 @@ enum EventStatus {
   CANCELLED
 }
 
-model Authenticator {
-  // id                    String   @id @default(cuid())
-  credentialID          String   @unique
-  userId                String
-  providerAccountId     String
-  credentialPublicKey   String
-  counter               Int
-  credentialDeviceType  String
-  credentialBackedUp    Boolean
-  transports            String?
+// Better-auth Passkey model (replaces Authenticator)
+model Passkey {
+  id           String   @id @default(cuid())
+  name         String? // The name of the passkey
+  publicKey    String // The public key of the passkey
+  userId       String // The ID of the user
+  credentialID String   @unique // The unique identifier of the registered credential
+  counter      Int // The counter of the passkey
+  deviceType   String // The type of device used to register the passkey
+  backedUp     Boolean // Whether the passkey is backed up
+  transports   String? // The transports used to register the passkey
+  createdAt    DateTime @default(now())
+  aaguid       String? // Authenticator's Attestation GUID
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@id([userId, credentialID])
+  @@map("passkey")
 }
+
 model PendingAccountLink {
-  id                  String   @id @default(cuid())
-  userId              String
-  provider            String   // github, google, etc.
-  providerAccountId   String
-  providerEmail       String
-  emailVerified       Boolean  @default(false)
-  
+  id                String  @id @default(cuid())
+  userId            String
+  accountId         String  @default(cuid(2)) // Auto-generated, overridable when linking to existing account
+  provider          String // github, google, etc.
+  providerAccountId String
+  providerEmail     String
+  emailVerified     Boolean @default(false)
+
   // OAuth tokens (to complete linking later)
-  accessToken         String?  @db.Text
-  refreshToken        String?  @db.Text
-  idToken             String?  @db.Text
-  tokenExpiresAt      Int?
-  tokenType           String?
-  scope               String?
-  
+  accessToken    String? @db.Text
+  refreshToken   String? @db.Text
+  idToken        String? @db.Text
+  tokenExpiresAt Int?
+  tokenType      String?
+  scope          String?
+
   // Option B: Email verification fields (reserved for future use)
-  emailToken          String?   @unique
-  emailTokenSentAt    DateTime?
-  confirmedAt         DateTime?
-  disableEmailLogin   Boolean   @default(false)
-  
-  createdAt           DateTime @default(now())
-  expiresAt           DateTime // Pending links expire after 1 hour
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  emailToken        String?   @unique
+  emailTokenSentAt  DateTime?
+  confirmedAt       DateTime?
+  disableEmailLogin Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Pending links expire after 1 hour
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account? @relation(fields: [accountId, provider], references: [id, providerId], onDelete: Cascade)
+
   @@unique([userId, provider])
   @@index([emailToken])
   @@map("pending_account_links")

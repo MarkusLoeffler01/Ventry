@@ -1,11 +1,11 @@
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import LinkAccountClient from "@/components/auth/LinkAccountClient";
 
 export default async function LinkAccountPage() {
   // Require authentication
-  const session = await auth();
+  const session = await getSession();
   
   if (!session?.user) {
     redirect("/login?callbackUrl=/link-account");
@@ -38,25 +38,20 @@ export default async function LinkAccountPage() {
       userId: session.user.id
     },
     select: {
-      provider: true
+      providerId: true,  // Changed from 'provider' for better-auth
+      password: true     // Check if credential account has password
     }
   });
 
-  // Check if user has a password (for password verification)
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      password: true
-    }
-  });
-
-  const hasPassword = !!user?.password;
-  const hasOAuthProviders = userAccounts.some(a => a.provider === 'github' || a.provider === 'google');
+  // Check if user has a password (in their credential account)
+  const credentialAccount = userAccounts.find(a => a.providerId === 'credential');
+  const hasPassword = !!credentialAccount?.password;
+  const hasOAuthProviders = userAccounts.some(a => a.providerId === 'github' || a.providerId === 'google');
 
   return (
     <LinkAccountClient
       pendingLinks={pendingLinks}
-      currentProviders={userAccounts.map(a => a.provider)}
+      currentProviders={userAccounts.map(a => a.providerId)}
       hasPassword={hasPassword}
       hasOAuthProviders={hasOAuthProviders}
     />
