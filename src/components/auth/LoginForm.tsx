@@ -16,9 +16,8 @@ import {
 import { Visibility, VisibilityOff, CheckCircle } from "@mui/icons-material";
 import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
-import { signIn as reactSignIn, useSession } from "next-auth/react";
-import { signIn } from "next-auth/webauthn";
 import type { PendingAccountLink } from "@/generated/prisma";
+import authClient from "@/lib/auth/client";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [formData, setFormData] = useState({
@@ -29,18 +28,19 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-
-    const { status } = useSession();
+    const [rememberMe, _setRememberMe] = useState(false);
 
     const router = useRouter();
 
     const doPasskeyLogin = async () => {
         try {
             setLoading(true);
-            await signIn("passkey", {
-                redirect: true,
-                redirectTo: callbackUrl ?? "/"
-            });
+            await authClient.signIn.passkey();
+            // After successful passkey login, redirect
+            router.push(callbackUrl ?? "/");
+        } catch (err) {
+            console.error("Passkey login failed", err);
+            setError("Passkey login failed");
         } finally {
             setLoading(false);
         }
@@ -58,9 +58,13 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
 
         try {
 
-            const res = await reactSignIn("credentials", { email: formData.email, password: formData.password, redirect: false });
-            if(res?.error) {
-                setError(res.error);
+            const { error } = await authClient.signIn.email({
+                email: formData.email,
+                password: formData.password,
+                rememberMe: rememberMe
+            })
+            if(error) {
+                setError(error.message ?? error.statusText);
                 setLoading(false);
                 return;
             }
@@ -195,7 +199,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     void doPasskeyLogin().catch(() => {
                         console.error("Passkey login failed");
                     });
-                }} disabled={loading || success || status === "loading"} className="w-full rounded-xl border px-4 py-2">
+                }} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
                     <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
                     Login with Passkey
                 </Button>

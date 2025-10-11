@@ -5,9 +5,9 @@ const middleware = async (req: NextRequest) => {
     const { pathname } = req.nextUrl;
     if(!pathname.startsWith("/api/admin")) return NextResponse.next();
 
-    // Security: Check for NextAuth session token
-    const sessionToken = req.cookies.get("next-auth.session-token")?.value || 
-                        req.cookies.get("__Secure-next-auth.session-token")?.value;
+    // Security: Check for better-auth session token
+    const sessionToken = req.cookies.get("better-auth.session_token")?.value || 
+                        req.cookies.get("__Secure-better-auth.session_token")?.value;
     
     if (!sessionToken) {
         // Security: Rate limiting headers for failed auth attempts

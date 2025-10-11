@@ -12,6 +12,9 @@ try {
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['localhost', 'local.dev'],
   experimental: {
+    serverActions: {
+      allowedOrigins: ['https://local.dev:3443', 'http://localhost:3000'],
+    },
     serverSourceMaps: true,
   },
   /* config options here */

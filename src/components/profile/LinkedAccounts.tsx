@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Box,
   Card,
@@ -20,26 +19,23 @@ import {
   CheckCircle,
   Link as LinkIcon
 } from "@mui/icons-material";
-import { signIn } from "next-auth/react";
 
 interface LinkedAccountsProps {
   accounts: Array<{
-    provider: string;
-    providerAccountId: string;
+    providerId: string;  // Changed from 'provider' for better-auth
   }>;
   hasPassword: boolean;
   hasOAuthProviders: boolean;
 }
 
 export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProviders }: LinkedAccountsProps) {
-  const [linking, setLinking] = useState<string | null>(null);
-
-  const getProviderIcon = (provider: string) => {
-    switch (provider) {
+  const getProviderIcon = (providerId: string) => {
+    switch (providerId) {
       case "github":
         return <GitHub />;
       case "google":
         return <Google />;
+      case "credential":
       case "credentials":
         return <Email />;
       default:
@@ -47,16 +43,17 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     }
   };
 
-  const getProviderName = (provider: string) => {
-    switch (provider) {
+  const getProviderName = (providerId: string) => {
+    switch (providerId) {
       case "github":
         return "GitHub";
       case "google":
         return "Google";
+      case "credential":
       case "credentials":
         return "Email & Password";
       default:
-        return provider;
+        return providerId;
     }
   };
 
@@ -65,35 +62,20 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     { id: "google", name: "Google", icon: <Google /> }
   ];
 
-  const linkedProviders = accounts.map(a => a.provider);
+  const linkedProviders = accounts.map(a => a.providerId);
   
-  // Add credentials if user has password
-  const allLinkedProviders = hasPassword 
-    ? [...linkedProviders, "credentials"]
-    : linkedProviders;
-
   const unlinkableProviders = availableProviders.filter(
     p => !linkedProviders.includes(p.id)
   );
 
-  const handleLinkProvider = async (provider: string) => {
+  const handleLinkProvider = async (providerId: string) => {
     if (!hasPassword && !hasOAuthProviders) {
       alert("Please set a password or link an OAuth provider first");
       return;
     }
 
-    setLinking(provider);
-    
-    try {
-      // Initiate OAuth flow - this will create a pending link request
-      await signIn(provider, {
-        redirect: true,
-        redirectTo: "/link-account"
-      });
-    } catch (error) {
-      console.error("Error linking account:", error);
-      setLinking(null);
-    }
+    // Redirect to password verification page
+    window.location.href = `/link-account/verify?provider=${providerId}&returnTo=${encodeURIComponent('/profile')}`;
   };
 
   return (
@@ -108,7 +90,7 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
           Manage how you sign in to your account. You can link multiple providers.
         </Typography>
 
-        {!hasPassword && !hasOAuthProviders && allLinkedProviders.length > 0 && (
+        {!hasPassword && !hasOAuthProviders && linkedProviders.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             <Typography variant="caption">
               <strong>Security Notice:</strong> Set a password or link an OAuth provider to enable linking additional accounts.
@@ -122,15 +104,15 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
           Currently Linked:
         </Typography>
 
-        {allLinkedProviders.length === 0 ? (
+        {linkedProviders.length === 0 ? (
           <Alert severity="info" sx={{ mb: 2 }}>
             No accounts linked yet. Link an account to enable sign-in.
           </Alert>
         ) : (
           <Stack spacing={1} sx={{ mb: 3 }}>
-            {allLinkedProviders.map((provider) => (
+            {linkedProviders.map((providerId) => (
               <Box
-                key={provider}
+                key={providerId}
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -143,9 +125,9 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {getProviderIcon(provider)}
+                  {getProviderIcon(providerId)}
                   <Typography variant="body2">
-                    {getProviderName(provider)}
+                    {getProviderName(providerId)}
                   </Typography>
                 </Box>
                 <Chip
@@ -192,9 +174,9 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
                     variant="outlined"
                     startIcon={<Add />}
                     onClick={() => void handleLinkProvider(provider.id)}
-                    disabled={(!hasPassword && !hasOAuthProviders) || linking === provider.id}
+                    disabled={!hasPassword && !hasOAuthProviders}
                   >
-                    {linking === provider.id ? "Linking..." : "Link"}
+                    Link
                   </Button>
                 </Box>
               ))}

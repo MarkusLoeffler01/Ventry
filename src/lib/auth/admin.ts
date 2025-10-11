@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/auth";
 import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
 
-// Helper function to check admin authorization using NextAuth only
+// Helper function to check admin authorization using better-auth
 export async function checkAdminAuth(): Promise<{ 
   authorized: boolean; 
   user?: { id: string; email: string }; 
   error?: string 
 }> {
   try {
-    // Use NextAuth session for all authentication
-    const session = await auth();
+    // Use better-auth session for all authentication
+    const session = await auth.api.getSession({
+      headers: await headers()
+    });
     
     if (!session?.user?.id) {
       return { authorized: false, error: "Not authenticated" };

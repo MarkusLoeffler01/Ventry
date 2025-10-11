@@ -2,12 +2,12 @@
 
 import { Button } from "@mui/material";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth/client";
 import { useEffect } from "react";
 
 export default function LogoutClient() {
     useEffect(() => {
-        signOut({ redirect: false });
+        void signOut();
     }, []);
 
     return (

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/app/api/auth/auth";
+import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 
 interface ErrorPageProps {
@@ -16,7 +16,7 @@ export default async function AuthErrorPage({ searchParams }: ErrorPageProps) {
   if (error === "AccessDenied" || error?.startsWith("PENDING_LINK:")) {
     // Check if there are any pending link requests
     // This works for both logged-in and logged-out users
-    const session = await auth();
+    const session = await getSession();
     
     if (session?.user?.id) {
       // User is logged in - check for pending links
