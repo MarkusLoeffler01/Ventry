@@ -3,10 +3,13 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
 import { toNextJsHandler } from "better-auth/next-js";
 import { passkey } from "better-auth/plugins/passkey"
-import { twoFactor } from "better-auth/plugins/two-factor"
-import { multiSession } from "better-auth/plugins/multi-session"
+import { lastLoginMethod, twoFactor, multiSession } from "better-auth/plugins";
 import { hashPassword } from "@/lib/bcrypt";
 import { verifyPassword } from "@/lib/auth/verify";
+import { sendMail } from "@/lib/mail";
+import { renderComponentToHTML } from "@/lib/helpers/html";
+import WelcomeMail from "@/components/emails/WelcomeMail";
+import EmailVerificationMail from "@/components/emails/EmailVerificationMail";
 
 const cookiePrefix = "VENTRY";
 
@@ -24,6 +27,7 @@ export const auth = betterAuth({
     secret: process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
     plugins: [
         passkey(),
+        lastLoginMethod(),
         multiSession(),
         // REMOVED nextCookies() - causes state_mismatch with custom domains
         twoFactor({
@@ -48,18 +52,36 @@ export const auth = betterAuth({
         sendOnSignUp: false, // TODO: Set to true
         sendOnSignIn: false,
         expiresIn: 24 * 60 * 60, // 24 hours (correct property name)
-        linkUrl: `${process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL}/verify-email?token=`,
+
         fromEmail: process.env.SMTP_FROM || "<ventry@m-loeffler.de>",
         autoSignInAfterVerification: true,
+
         sendVerificationEmail: async ({ user, url }) => {
-            //TODO: Implement email sending logic here
-            if (process.env.NODE_ENV === 'development') {
-                console.log(`Send verification email to ${user.email}: ${url}`);
+            // Send email verification using proper template
+            try {
+                const verificationHTML = await renderComponentToHTML(EmailVerificationMail, {
+                    userName: user.name,
+                    verificationUrl: url,
+                    expiryHours: 24
+                });
+
+                const { success, error } = await sendMail(
+                    user.email,
+                    "Verify Your Email Address - Ventry",
+                    verificationHTML
+                );
+                
+                if (!success) {
+                    console.error("Failed to send verification email:", error);
+                }
+            } catch (err) {
+                console.error("Error sending verification email:", err);
             }
         }
     },
     database: prismaAdapter(prisma, {
-        provider: "postgresql"
+        provider: "postgresql",
+        transaction: true
     }),
     emailAndPassword: {
         enabled: true,
@@ -68,8 +90,26 @@ export const auth = betterAuth({
             hash: hashPassword,
             verify: verifyPassword
         },
-        async sendResetPassword({ user: _user, url: _url}) {
-            //TODO: Implement email sending logic here
+        revokeSessionsOnPasswordReset: true,
+        async onPasswordReset(data) {
+            console.log("Password reset requested for:", data.user.email);
+
+        },
+        async sendResetPassword({ user, url}) {
+            // Send password reset email
+            try {
+                const { success, error } = await sendMail(
+                    user.email,
+                    "Reset Your Password",
+                    `<p>Hi ${user.name || 'there'},</p><p>You requested to reset your password. Click the link below to continue:</p><p><a href="${url}">Reset Password</a></p><p>If you didn't request this, you can safely ignore this email.</p>`
+                );
+                
+                if (!success) {
+                    console.error("Failed to send password reset email:", error);
+                }
+            } catch (err) {
+                console.error("Error sending password reset email:", err);
+            }
         },
     },
     socialProviders: {
@@ -102,7 +142,39 @@ export const auth = betterAuth({
                 }
             },
             disableSignUp: true // Allow new users to sign up via GitHub
+        }
+    },
+    events: {
+        signUp: {
+            after: async (context: unknown) => {
+                // Send welcome email after successful registration
+                const { user } = context as { user: { email: string; name: string } };
+                
+                if (user?.email && user?.name) {
+                    try {
+                        console.log("🎉 Sending welcome email to new user:", user.email);
+                        
+                        const welcomeHTML = await renderComponentToHTML(WelcomeMail, {
+                            userName: user.name,
+                            loginUrl: `${process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || 'https://local.dev:3443'}/login`
+                        });
 
+                        const { success, error } = await sendMail(
+                            user.email,
+                            "Welcome to Ventry!",
+                            welcomeHTML
+                        );
+
+                        if (success) {
+                            console.log("✅ Welcome email sent successfully to:", user.email);
+                        } else {
+                            console.error("❌ Failed to send welcome email:", error);
+                        }
+                    } catch (err) {
+                        console.error("💥 Error sending welcome email:", err);
+                    }
+                }
+            }
         }
     }
 });

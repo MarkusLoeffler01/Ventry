@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { 
   Box, 
   TextField, 
@@ -50,7 +50,7 @@ export default function PasswordTestClient() {
       <TextField
         margin="normal"
         fullWidth
-        id="name"
+        id={useId()}
         label="Name"
         name="name"
         autoComplete="name"
@@ -61,7 +61,7 @@ export default function PasswordTestClient() {
       <TextField
         margin="normal"
         fullWidth
-        id="email"
+        id={useId()}
         label="Email Address"
         name="email"
         autoComplete="email"
@@ -72,7 +72,7 @@ export default function PasswordTestClient() {
       <FormControl fullWidth margin="normal" variant="outlined">
         <InputLabel htmlFor="password">Password</InputLabel>
         <OutlinedInput
-          id="password"
+          id={useId()}
           type={showPassword ? 'text' : 'password'}
           value={formValues.password}
           onChange={handleChange('password')}
@@ -111,6 +111,7 @@ export default function PasswordTestClient() {
           <PasswordStrengthMeter 
             password={formValues.password}
             userInputs={userInputs}
+            setWarning={() => {}} // We should probably do something about this
           />
         </Box>
       )}

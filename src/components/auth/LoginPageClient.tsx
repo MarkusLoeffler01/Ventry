@@ -11,10 +11,13 @@ import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import CircularProgress from "@mui/material/CircularProgress";
+import { isLastUsedLoginMethod } from "@/lib/auth/client";
+import LastUsedIndicator from "./LastUsedIndicator";
 
 export default function LoginPageClient() {
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered");
+  const passwordReset = searchParams.get("message") === "Password reset successful";
   const error = searchParams.get("error");
   const provider = searchParams.get("provider");
   const message = searchParams.get("message");
@@ -23,7 +26,6 @@ export default function LoginPageClient() {
   const linkProvider = searchParams.get("link_provider") as "google" | "github" | null;
   const linkEmail = searchParams.get("email");
   
-  const [loadingPasskey, setLoadingPasskey] = React.useState<null | "login" | "register">(null);
   const [linkingPassword, setLinkingPassword] = React.useState("");
   const [linkingLoading, setLinkingLoading] = React.useState(false);
   const [linkingError, setLinkingError] = React.useState("");
@@ -41,21 +43,6 @@ export default function LoginPageClient() {
       callbackURL: "/dashboard",
     });
   }
-
-  const handlePasskey = async (mode: "login" | "register") => {
-    setLoadingPasskey(mode);
-    try {
-      if (mode === "register") {
-        await authClient.signIn.passkey();
-      } else {
-        await authClient.signIn.passkey();
-      }
-    } catch (error) {
-      console.error("Passkey error:", error);
-    } finally {
-      setLoadingPasskey(null);
-    }
-  };
 
   const handleLinkingLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +93,20 @@ export default function LoginPageClient() {
     <>
       {registered && (
         <Box sx={{ mb: 2 }}>
-          <Alert severity="success">Registration successful! Please log in.</Alert>
+          <Alert severity="success">Registration successful! A validation E-Mail has been sent. Please check your E-Mail and validate your account!</Alert>
+        </Box>
+      )}
+
+      {passwordReset && (
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="success">
+            <Typography variant="body2" fontWeight="bold" gutterBottom>
+              Password Reset Successful!
+            </Typography>
+            <Typography variant="body2">
+              Your password has been successfully updated. You can now log in with your new password.
+            </Typography>
+          </Alert>
         </Box>
       )}
 
@@ -200,38 +200,26 @@ export default function LoginPageClient() {
           Or
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => { void handlePasskey("login"); }}
-            disabled={!!loadingPasskey}
-          >
-            {loadingPasskey === "login" ? "Using Passkey…" : "Sign in with Passkey"}
-          </Button>
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={() => { void handlePasskey("register"); }}
-            disabled={!!loadingPasskey}
-          >
-            {loadingPasskey === "register" ? "Creating Passkey…" : "Create Passkey"}
-          </Button>
-        </Stack>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="center">
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={() => void handleGoogleSignIn()}
-          >
-            Sign in with Google
-          </Button>
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={() => void handleGitHubSignIn()}
-          >
-            Sign in with GitHub
-          </Button>
+          <LoginMethodBox>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => void handleGoogleSignIn()}
+            >
+              Sign in with Google
+            </Button>
+            <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("google")} />
+          </LoginMethodBox>
+          <LoginMethodBox>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => void handleGitHubSignIn()}
+            >
+              Sign in with GitHub
+            </Button>
+            <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("github")} />
+          </LoginMethodBox>
         </Stack>
         <Typography variant="caption" color="text.secondary" align="center">
           A Passkey lets you sign in without a password. If you don&apos;t have one yet, create it.
@@ -240,4 +228,10 @@ export default function LoginPageClient() {
       )}
     </>
   );
+}
+
+function LoginMethodBox({ children }: { children: React.ReactNode }) {
+    return <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2}}>
+        {children}
+    </Box>
 }

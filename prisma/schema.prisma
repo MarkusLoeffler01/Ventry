@@ -28,9 +28,8 @@ model ProfilePicture {
   updatedAt   DateTime  @updatedAt
 }
 
-/**
- * There will be many users and multiple admins
- */
+// There will be many users and multiple admins
+
 model User {
   id                   String               @id @default(cuid(2))
   name                 String?              @unique
@@ -54,9 +53,14 @@ model User {
   sessions             Session[]
   passkeys             Passkey[] // Changed from Authenticator to Passkey for better-auth
   pendingAccountLinks  PendingAccountLink[]
+  image                String?
+  twofactors           TwoFactor[]
+
+  @@map("user")
 }
 
 // Better-auth Account model
+
 model Account {
   id                    String    @id @default(cuid(2))
   userId                String
@@ -80,6 +84,7 @@ model Account {
 }
 
 // Better-auth Session model
+
 model Session {
   id        String   @id @default(cuid())
   userId    String
@@ -96,6 +101,7 @@ model Session {
 }
 
 // Better-auth Verification model
+
 model Verification {
   id         String   @id @default(cuid())
   identifier String // The identifier for the verification request
@@ -107,10 +113,11 @@ model Verification {
   @@map("verification")
 }
 
-/**
- * Event-Singleton - In OSS, there will be only be one event at a time
- * With @default(1) for the id, we can have only one event at a time
- */
+//
+// Event-Singleton - In OSS, there will be only be one event at a time
+// With @default(1) for the id, we can have only one event at a time
+//
+
 model Event {
   id          Int         @id @default(autoincrement())
   name        String
@@ -130,11 +137,10 @@ model Event {
   // registrations Registration[]
 }
 
-/**
- * Location model to store event locations. As 1:1 relationship with event
- * This will be a venue, most likely a hotel or a conference center
- * This will be a children of the event model and act as a datatype instead of an independent table
- */
+// Location model to store event locations. As 1:1 relationship with event
+// This will be a venue, most likely a hotel or a conference center
+// This will be a children of the event model and act as a datatype instead of an independent table
+
 model Location {
   id         Int      @id @default(1) // 1:1 relationship with event for singleton pattern
   name       String
@@ -149,11 +155,10 @@ model Location {
   eventId    Int      @unique // For 1:1 relationship with event
 }
 
-/**
- * Registration model to store user registrations for the event
- * Normally, there will be only one registration per user
- * And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
- */
+// Registration model to store user registrations for the event
+// Normally, there will be only one registration per user
+// And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
+
 model Registration {
   id        String             @id @default(cuid())
   ticketId  Int                @unique @default(autoincrement())
@@ -182,10 +187,9 @@ model Payment {
   registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 }
 
-/**
- * Product model to store products for the event
- * For example, badges, t-shirts, sponsorships, etc etc.
- */
+// Product model to store products for the event
+// For example, badges, t-shirts, sponsorships, etc etc.
+
 model Product {
   id          String   @id @default(cuid())
   name        String
@@ -218,6 +222,7 @@ enum EventStatus {
 }
 
 // Better-auth Passkey model (replaces Authenticator)
+
 model Passkey {
   id           String   @id @default(cuid())
   name         String? // The name of the passkey
@@ -268,4 +273,14 @@ model PendingAccountLink {
   @@unique([userId, provider])
   @@index([emailToken])
   @@map("pending_account_links")
+}
+
+model TwoFactor {
+  id          String @id
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("twoFactor")
 }
