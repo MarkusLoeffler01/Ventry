@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
 import { Container, Box, Typography, Paper } from "@mui/material";
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import { redirect } from "next/navigation";
 
 /**

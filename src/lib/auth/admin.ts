@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import { headers } from "next/headers";
 
 // Helper function to check admin authorization using better-auth
