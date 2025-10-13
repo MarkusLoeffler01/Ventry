@@ -88,7 +88,7 @@ export async function PUT(req: NextRequest) {
         // For singleton event pattern, if no id is supplied, assume first (only) event
         let parsedId: number | undefined;
         if (id) {
-            parsedId = Number.parseInt(id);
+            parsedId = Number.parseInt(id, 10);
             if (Number.isNaN(parsedId)) return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
         } else {
             const existing = await prisma.event.findFirst({ select: { id: true } });

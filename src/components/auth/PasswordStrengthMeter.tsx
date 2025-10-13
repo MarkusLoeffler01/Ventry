@@ -1,23 +1,35 @@
 "use client";
 
-import { useMemo } from 'react';
+import type React from "react";
+import { useMemo, useEffect } from 'react';
 import { Box, Typography, LinearProgress } from '@mui/material';
 import zxcvbn from 'zxcvbn';
 
 interface PasswordStrengthMeterProps {
   password: string;
+  setWarning: React.Dispatch<React.SetStateAction<{ message: string | null; suggestions: string[] } | null>>;
   userInputs?: string[];
 }
 
 export default function PasswordStrengthMeter({ 
   password, 
-  userInputs = [] 
+  userInputs = [],
+  setWarning
 }: PasswordStrengthMeterProps) {
   // const [result, setResult] = useState<any>(null);
   const result = useMemo(() => {
     if(!password) return null;
     return zxcvbn(password, userInputs);
   }, [password, userInputs]);
+
+  // Update warning in useEffect to avoid state updates during render
+  useEffect(() => {
+    if (result && result.score < 3) {
+      setWarning({ message: result.feedback.warning, suggestions: result.feedback.suggestions });
+    } else {
+      setWarning(null);
+    }
+  }, [result, setWarning]);
 
 
   if (!password || !result) {
@@ -85,14 +97,20 @@ export default function PasswordStrengthMeter({
           Assuming an offline attacker with 10,000 guesses per second
         </Typography>
       </Box>
-      
-      {result.feedback.suggestions.length > 0 && (
-        <Box sx={{ mt: 1 }}>
+      <PasswordFeedback suggestions={result.feedback.suggestions} />
+    </Box>
+  );
+}
+
+function PasswordFeedback({ suggestions }: { suggestions: string[] }) {
+  if (suggestions.length === 0) return null;
+
+  return <Box sx={{ mt: 1 }}>
           <Typography variant="caption" color="text.secondary">
             Suggestions:
           </Typography>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
-            {result.feedback.suggestions.map((suggestion: string) => (
+            {suggestions.map((suggestion: string) => (
               <li key={`suggestion-${suggestion}`}>
                 <Typography variant="caption" color="text.secondary">
                   {suggestion}
@@ -101,7 +119,4 @@ export default function PasswordStrengthMeter({
             ))}
           </ul>
         </Box>
-      )}
-    </Box>
-  );
 }

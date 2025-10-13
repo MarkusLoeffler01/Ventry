@@ -4,9 +4,9 @@
         "includes": [
             "biome.json",
             "src/**/*",
-            "!**/dist/**",
+            "!**/dist/",
             "!src/generated/**/*",
-            "!/node_modules/**"
+            "!/node_modules/"
             
         ]
     },
