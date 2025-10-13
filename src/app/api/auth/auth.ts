@@ -14,6 +14,11 @@ import EmailVerificationMail from "@/components/emails/EmailVerificationMail";
 const cookiePrefix = "VENTRY";
 
 export const auth = betterAuth({
+    rateLimit: {
+        enabled: true,
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        maxRequests: 100, // limit each IP to 100 requests per windowMs
+    },
     advanced: {
         // better-auth uses default cookie settings
         // Cookies are prefixed with __Secure- and automatically use:
