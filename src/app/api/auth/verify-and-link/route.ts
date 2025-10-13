@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from '@/lib/prisma/prisma';
 import { comparePassword } from '@/lib/bcrypt';
 import { cookies } from 'next/headers';
 
