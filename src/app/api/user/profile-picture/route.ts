@@ -3,7 +3,7 @@ import { USER_CONFIG } from "@/lib/config";
 import { getUserIdFromRequest } from "@/lib/helpers/user";
 import { uploadProfilePicture, getSignedUrl } from "@/lib/supabase";
 import { add, remove, setPrimary } from "@/lib/user/profilePicture";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 
 // GET: Retrieve a user's profile pictures
 export async function GET(req: NextRequest) {
