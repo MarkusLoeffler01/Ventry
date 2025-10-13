@@ -5,7 +5,7 @@ import {
   CardContent,
   Stack
 } from "@mui/material";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma/prisma";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileBio from "@/components/profile/ProfileBio";
 import PersonalInfo from "@/components/profile/PersonalInfo";

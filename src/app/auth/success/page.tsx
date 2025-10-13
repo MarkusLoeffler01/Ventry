@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Paper, Box, Typography } from "@mui/material";
 import { Key, GitHub, Google } from "@mui/icons-material";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 
 interface SuccessPageProps {
     searchParams: Promise<{
