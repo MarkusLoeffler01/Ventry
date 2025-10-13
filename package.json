@@ -11,7 +11,7 @@
     "dev": "next dev -H local.dev -p 3443 --experimental-https --experimental-https-key=certs/local.dev+1-key.pem --experimental-https-cert=certs/local.dev+1.pem --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "check": "biome check",
     "test": "vitest --run",
     "test:watch": "vitest --watch"
