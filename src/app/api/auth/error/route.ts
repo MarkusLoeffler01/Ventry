@@ -113,6 +113,13 @@ export async function GET(request: NextRequest) {
         );
     }
 
+    if( error === "signup_disabled") {
+        // Redirect to a dedicated signup disabled page instead of trying to render MUI components in API route
+        return NextResponse.redirect(
+            createRedirectUrl('/auth/signup-disabled', request)
+        );
+    }
+
 
 
     // For other errors, show a generic error page
