@@ -1,7 +1,7 @@
 import { adminCreateEventSchema, adminUpdateEventSchema } from "@/types/schemas/event/admin";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 

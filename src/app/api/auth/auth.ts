@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 import { toNextJsHandler } from "better-auth/next-js";
 import { passkey } from "better-auth/plugins/passkey"
 import { lastLoginMethod, twoFactor, multiSession } from "better-auth/plugins";
