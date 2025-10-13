@@ -2,7 +2,7 @@
  * If no admin is found, this route will be enabled (most likely due to setup)
  */
 
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma/prisma";
 import { registerSchema, type registerType } from "@/types/schemas/auth";
 import { type NextRequest, NextResponse } from "next/server";
 

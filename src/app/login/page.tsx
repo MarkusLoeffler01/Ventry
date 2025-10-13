@@ -5,7 +5,7 @@ import Typography from "@mui/material/Typography";
 import LoginPageClient from "@/components/auth/LoginPageClient";
 import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma/prisma";
 
 export default async function LoginPage() {
   // Check if user is already logged in and has pending links
