@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import prisma from '../../../../lib/prisma';
+import prisma from '../../../../lib/prisma/prisma';
 import { createRedirectUrl } from '../../../../lib/auth/url';
 
 /**
@@ -110,6 +110,13 @@ export async function GET(request: NextRequest) {
         // Fallback redirect
         return NextResponse.redirect(
             createRedirectUrl(`/login?account_exists=true&provider=${provider}`, request)
+        );
+    }
+
+    if( error === "signup_disabled") {
+        // Redirect to a dedicated signup disabled page instead of trying to render MUI components in API route
+        return NextResponse.redirect(
+            createRedirectUrl('/auth/signup-disabled', request)
         );
     }
 

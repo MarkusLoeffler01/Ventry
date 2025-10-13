@@ -34,20 +34,19 @@ const eslintConfig = [
   }
 ];
 
-const config = [
-  ...eslintConfig,
-  {
-    ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/.next/**",
-      "**/out/**",
-      "**/build/**",
-      "**/coverage/**",
-      "**/public/**",
-      "**/src/generated/**"
-    ],
-  }
-]
+const config = [{
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"]
+}, ...eslintConfig, {
+  ignores: [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/public/**",
+    "**/src/generated/**"
+  ],
+}]
 
 export default config;

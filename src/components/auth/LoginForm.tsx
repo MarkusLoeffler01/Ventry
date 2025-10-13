@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import ky from "ky";
 import {
@@ -17,7 +17,8 @@ import { Visibility, VisibilityOff, CheckCircle } from "@mui/icons-material";
 import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
 import type { PendingAccountLink } from "@/generated/prisma";
-import authClient from "@/lib/auth/client";
+import authClient, { isLastUsedLoginMethod } from "@/lib/auth/client";
+import LastUsedIndicator from "./LastUsedIndicator";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [formData, setFormData] = useState({
@@ -29,6 +30,9 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, _setRememberMe] = useState(false);
+
+    const [passwordForgetOpen, setPasswordForgetOpen] = useState(false);
+    const handlePasswordForgetClose = () => setPasswordForgetOpen(false);
 
     const router = useRouter();
 
@@ -135,14 +139,14 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     };
 
     return (
-        <AuthTemplate form="login" error={error}>
+        <AuthTemplate form="login" error={error} onClose={handlePasswordForgetClose} resetPasswordOpen={passwordForgetOpen}>
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <Box component="form" onSubmit={handleSubmit} noValidate sx={{ width: '100%' }}>
                 <TextField
                     margin="normal"
                     required
                     fullWidth
-                    id="email"
+                    id={useId()}
                     label="E-Mail"
                     name="email"
                     autoComplete="email"
@@ -157,12 +161,13 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     name="password"
                     label="Password"
                     type={showPassword ? 'text' : 'password'}
-                    id="password"
+                    id={useId()}
                     autoComplete="current-password"
                     value={formData.password}
                     onChange={handleChange}
-                    InputProps={{
-                        endAdornment: (
+                    slotProps={{
+                        input: {
+                            endAdornment: (
                             <InputAdornment position="end">
                                 <IconButton
                                     aria-label="toggle password visibility"
@@ -173,9 +178,10 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                                 </IconButton>
                             </InputAdornment>
                         ),
+                        }
                     }}
                 />
-                
+                <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("email")} />
                 <Button
                     // type={(loading || success) ? "button" : "submit"}
                     type="submit"
@@ -195,15 +201,29 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     {success && <CheckCircle sx={{ ...progressSx, animation: "scale 0.3s"}} />}
                 </Button>
 
-                <Button onClick={() => {
-                    void doPasskeyLogin().catch(() => {
-                        console.error("Passkey login failed");
-                    });
-                }} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
-                    <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
-                    Login with Passkey
+                <Button onClick={() => setPasswordForgetOpen(true)}>
+                    Reset Password
                 </Button>
+
+                <LoginMethodBox>
+                    <Button onClick={() => {
+                        void doPasskeyLogin().catch(() => {
+                            console.error("Passkey login failed");
+                        });
+                    }} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
+                    <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
+                        Login with Passkey
+                    </Button>
+                    {!success && <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("passkey")} />}
+                </LoginMethodBox>
             </Box>
         </AuthTemplate>
     );
+}
+
+
+function LoginMethodBox({ children }: { children: React.ReactNode }) {
+    return <Box sx={{ mt: 2, display: "flex", flexDirection: "row", gap: 2}}>
+        {children}
+    </Box>
 }

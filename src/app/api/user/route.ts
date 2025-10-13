@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
 
 import { userSchema, createUserSchema } from "@/types/user";
 import { hashPassword } from "@/lib/bcrypt";
 import { checkPasswordStrength } from "@/lib/auth/password-strength";
+import { z } from "zod";
 
 // GET: Retrieve user(s)
 export async function GET(req: NextRequest) {
@@ -45,8 +46,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Return all users (with pagination)
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "10");
+    const page = parseInt(url.searchParams.get("page") || "1", 10);
+    const limit = parseInt(url.searchParams.get("limit") || "10", 10);
     const skip = (page - 1) * limit;
 
     const users = await prisma.user.findMany({
@@ -199,7 +200,7 @@ export async function PATCH(req: NextRequest) {
 
     const parsed = userSchema.safeParse(updateData);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
+      return NextResponse.json({ error: z.treeifyError(parsed.error) }, { status: 400 });
     }
 
     // Check if user exists

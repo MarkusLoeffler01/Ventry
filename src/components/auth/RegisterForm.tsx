@@ -1,222 +1,171 @@
 "use client";
-
-import type React from 'react';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+ 
+import { useState } from "react";
 import {
-    Box,
-    Button,
-    TextField,
-    InputAdornment,
-    IconButton,
-    CircularProgress
+  Box,
+  Button,
+  TextField,
+  InputAdornment,
+  IconButton,
+  CircularProgress,
+  Alert,
+  Typography,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import zxcvbn from 'zxcvbn';
-import authClient from '@/lib/auth/client';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 
-import type ValidationDetails from '@/types/apiResponses/register';
-import AuthTemplate from './template';
-import PasswordStrengthMeter from './PasswordStrengthMeter';
+import authClient from "@/lib/auth/client";
+import AuthTemplate from "./template";
+import PasswordStrengthMeter from "./PasswordStrengthMeter";
+import { registerSchema } from "@/types/schemas/client/register";
+import type { RegisterSchema } from "@/types/schemas/client/register";
 
-const RegisterForm = () => {
-    const [email, setEmail] = useState("");
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    
-    // Form validations states
-    const [emailError, setEmailError] = useState<string | null>(null);
-    const [usernameError, setUsernameError] = useState<string | null>(null);
-    const [passwordError, setPasswordError] = useState<string | null>(null);
-    const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
-    
-    const router = useRouter();
+export default function RegisterForm() {
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<{ message: string | null; suggestions: string[] } | null>(null);
+  const router = useRouter();
 
-    const handleRegister = async ({email, name, password}: {email: string, name: string, password: string}) => {
-      try {
-        const { error } = await authClient.signUp.email({
-          email,
-          name,
-          password,
-        });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterSchema>({
+    resolver: zodResolver(registerSchema),
+    mode: "onBlur",
+  });
 
-        if (error) {
-          const validationError: ValidationDetails = {
-            message: error.message || 'Registration failed',
-            details: {}
-          };
-          setError(validationError.message);
-          return;
-        }
+  const password = watch("password");
 
-        // Successful registration, redirect to login
-        router.push('/login?registered=true');
-      } catch (error) {
-        console.error('Registration error:', error);
-        throw error;
+  const onSubmit = async (data: RegisterSchema, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
+    try {
+      setError(null);
+      const { confirmPassword: _, ...payload } = data;
+
+      const { error } = await authClient.signUp.email({
+        email: payload.email,
+        name: payload.username,
+        password: payload.password,
+      });
+
+      if (error) {
+        setError(error.message || "Registrierung fehlgeschlagen");
+        return;
       }
-    };
 
-    const validateEmail = (email: string): boolean => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const isValid = emailRegex.test(email);
-        setEmailError(isValid ? null : "Invalid email address");
-        return isValid;
+      router.push("/login?registered=true");
+    } catch (err) {
+      console.error("Registration error:", err);
+      setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten");
     }
-    
-    const validateUsername = (username: string): boolean => {
-        const isValid = username.length >= 3;
-        setUsernameError(isValid ? null : 'Benutzername muss mindestens 3 Zeichen haben');
-        return isValid;
-    };
-    
-    const validatePassword = (password: string): boolean => {
-        // Use zxcvbn for enhanced password validation
-        if (!password) {
-            setPasswordError('Password is required');
-            return false;
-        }
-        
-        const result = zxcvbn(password, [email, username]);
-        const isStrong = result.score >= 2; // Require at least a "Fair" strength
-        
-        if (!isStrong) {
-            setPasswordError('Password is too weak. Please choose a stronger password.');
-            return false;
-        }
-        
-        setPasswordError(null);
-        return true;
-    };
-    
-    const validateConfirmPassword = (password: string, confirmPassword: string): boolean => {
-        const isValid = password === confirmPassword;
-        setConfirmPasswordError(isValid ? null : 'Passwörter stimmen nicht überein');
-        return isValid;
-    };
+  };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(null);
-        
-        // Validate all fields
-        const isEmailValid = validateEmail(email);
-        const isUsernameValid = validateUsername(username);
-        const isPasswordValid = validatePassword(password);
-        const isConfirmPasswordValid = validateConfirmPassword(password, confirmPassword);
-
-        if(!isEmailValid || !isUsernameValid || !isPasswordValid || !isConfirmPasswordValid) {
-            return;
-        }
-
-        try {
-            setLoading(true);
-            await handleRegister({email, password, name: username});
-            // Handle successful registration (e.g., redirect or show success message)
-        } catch (error) {
-            setError(error instanceof Error ? error.message : "An error occurred");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return  <AuthTemplate form="register" error={error} title="Registrieren">
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <Box component="form" onSubmit={handleSubmit} noValidate>
+  return (
+    <AuthTemplate form="register" error={error} title="Registrieren">
+      <Box
+        component="form"
+        onSubmit={(e) => void handleSubmit(onSubmit)(e)}
+        noValidate
+        autoComplete="off"
+      >
         <TextField
           margin="normal"
           required
           fullWidth
-          id="email"
           label="E-Mail"
-          name="email"
           autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onBlur={() => validateEmail(email)}
-          error={!!emailError}
-          helperText={emailError}
+          {...register("email")}
+          error={!!errors.email}
+          helperText={errors.email?.message || " "}
         />
-        
+
         <TextField
           margin="normal"
           required
           fullWidth
-          id="username"
           label="Username"
-          name="username"
           autoComplete="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          onBlur={() => validateUsername(username)}
-          error={!!usernameError}
-          helperText={usernameError}
+          {...register("username")}
+          error={!!errors.username}
+          helperText={errors.username?.message || " "}
         />
-        
+
         <TextField
           margin="normal"
           required
           fullWidth
-          name="password"
           label="Password"
-          type={showPassword ? 'text' : 'password'}
-          id="password"
+          type={showPassword ? "text" : "password"}
           autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onBlur={() => validatePassword(password)}
-          error={!!passwordError}
-          helperText={passwordError}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="toggle password visibility"
-                  onClick={() => setShowPassword(!showPassword)}
-                  edge="end"
-                >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
+          {...register("password")}
+          error={!!errors.password}
+          helperText={errors.password?.message || " "}
+          slotProps={
+            {
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={
+                        showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      }
+                      onClick={() => setShowPassword((s) => !s)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }
+            }
+          }
         />
-        
-        <PasswordStrengthMeter password={password} />
-        
+
+        <PasswordStrengthMeter password={password} setWarning={setWarning}/>
+
+        {warning?.message && (
+          <Alert severity="error" sx={{ mt: 2, mb: 1 }}>
+            <Typography variant="body2" gutterBottom>
+              {warning.message}
+            </Typography>
+            {warning.suggestions.length > 0 && (
+              <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
+                {warning.suggestions.map((suggestion) => (
+                  <Typography component="li" variant="body2" key={suggestion}>
+                    {suggestion}
+                  </Typography>
+                ))}
+              </Box>
+            )}
+          </Alert>
+        )}
+
         <TextField
           margin="normal"
           required
           fullWidth
-          name="confirmPassword"
           label="Confirm Password"
-          type={showPassword ? 'text' : 'password'}
-          id="confirmPassword"
+          type={showPassword ? "text" : "password"}
           autoComplete="new-password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          onBlur={() => validateConfirmPassword(password, confirmPassword)}
-          error={!!confirmPasswordError}
-          helperText={confirmPasswordError}
+          {...register("confirmPassword")}
+          error={!!errors.confirmPassword}
+          helperText={errors.confirmPassword?.message || " "}
         />
-        
+
         <Button
           type="submit"
           fullWidth
           variant="contained"
           sx={{ mt: 3, mb: 2, py: 1.5 }}
-          disabled={loading}
+          disabled={isSubmitting || warning !== null}
         >
-          {loading ? <CircularProgress size={24} /> : 'Sign up'}
+          {isSubmitting ? <CircularProgress size={24} /> : "Sign up"}
         </Button>
       </Box>
-  </AuthTemplate>
-    
+    </AuthTemplate>
+  );
 }
-
-export default RegisterForm;

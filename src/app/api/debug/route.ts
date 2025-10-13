@@ -1,5 +1,33 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { debugPostBodySchema, type PostBody } from "@/types/schemas/debug";
+import { sendMail } from "@/lib/mail";
+import { z } from "zod";
+
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+
+  const result = debugPostBodySchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json({
+      error: "Validation error",
+      details: z.treeifyError(result.error)
+    }, { status: 400 });
+  }
+
+  const data: PostBody = result.data;
+
+  if (data.type === "MAIL") {
+    const {success, error} = await sendMail(data.to, data.subject, data.message);
+    if (!success) {
+      return NextResponse.json({ error: "Failed to send mail", details: error }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: "Mail sent successfully" });
+  }
+
+  return NextResponse.json({ error: "Unknown type" }, { status: 400 });
+}
 
 export async function GET(req: NextRequest) {
   const cookieStore = await cookies();
