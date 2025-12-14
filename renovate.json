@@ -1,6 +1,72 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:base",
+    ":disableRateLimiting",
+    ":semanticCommits",
+    ":maintainLockFilesWeekly",
+    "group:allNonMajor",
+    "schedule:earlyMondays"
+  ],
+  "timezone": "Europe/Berlin",
+  "prHourlyLimit": 0,
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "description": "CRITICAL: Group Next.js, React, and React DOM together to prevent version mismatch",
+      "groupName": "Next.js Core",
+      "matchPackageNames": [
+        "next",
+        "react",
+        "react-dom",
+        "eslint-config-next"
+      ],
+      "matchPackagePrefixes": ["@types/react"]
+    },
+    {
+      "description": "CRITICAL: Prisma Client and CLI must be exact match",
+      "groupName": "Prisma Database",
+      "matchPackageNames": ["prisma", "@prisma/client"],
+      "matchUpdateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "description": "Group Material UI and Emotion",
+      "groupName": "MUI System",
+      "matchPackagePrefixes": ["@mui", "@emotion"]
+    },
+    {
+      "description": "Group DnD Kit packages",
+      "groupName": "DnD Kit",
+      "matchPackagePrefixes": ["@dnd-kit"]
+    },
+    {
+      "description": "Group Testing Tools (Vitest, Testing Library, etc.)",
+      "groupName": "Testing Suite",
+      "matchPackageNames": [
+        "vitest",
+        "jsdom",
+        "next-test-api-route-handler",
+        "@vitejs/plugin-react"
+      ],
+      "matchPackagePrefixes": ["@testing-library"]
+    },
+    {
+      "description": "Group Code Quality Tools (Biome, ESLint)",
+      "groupName": "Code Quality (Biome/ESLint)",
+      "matchPackageNames": ["eslint", "typescript"],
+      "matchPackagePrefixes": ["@biomejs", "@eslint", "eslint-"]
+    },
+    {
+      "description": "Group Tailwind ecosystem",
+      "groupName": "Tailwind CSS",
+      "matchPackageNames": ["tailwindcss"],
+      "matchPackagePrefixes": ["@tailwindcss"]
+    },
+    {
+      "description": "Group all simple Type definitions to reduce noise",
+      "groupName": "Type Definitions",
+      "matchPackagePrefixes": ["@types"],
+      "excludePackagePrefixes": ["@types/react"] 
+    }
   ]
 }
