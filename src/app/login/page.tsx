@@ -6,6 +6,10 @@ import LoginPageClient from "@/components/auth/LoginPageClient";
 import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/prisma";
+import { Suspense } from "react";
+import CircularProgress from "@mui/material/CircularProgress";
+
+export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   // Check if user is already logged in and has pending links
@@ -53,7 +57,9 @@ export default async function LoginPage() {
             Login
           </Typography>
           
-          <LoginPageClient />
+          <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}>
+            <LoginPageClient />
+          </Suspense>
         </Paper>
       </Box>
     </Container>

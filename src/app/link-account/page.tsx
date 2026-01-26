@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/prisma";
 import LinkAccountClient from "@/components/auth/LinkAccountClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function LinkAccountPage() {
   // Require authentication
   const session = await getSession();

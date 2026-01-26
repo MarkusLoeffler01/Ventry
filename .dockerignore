@@ -1,0 +1,11 @@
+.env
+.env*
+!.env.example
+*.key
+node_modules
+.git
+certs/
+.docker
+.github
+.next
+.vscode
