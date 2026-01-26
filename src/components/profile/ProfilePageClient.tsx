@@ -66,6 +66,7 @@ interface ProfileFormData {
   dateOfBirth: string;
   pronouns: string;
   showAge: boolean;
+  customPronouns?: string;
 }
 
 const PRONOUN_OPTIONS = [
@@ -76,7 +77,8 @@ const PRONOUN_OPTIONS = [
   'he/they',
   'any pronouns',
   'ask me',
-  'prefer not to say'
+  'prefer not to say',
+  'choose my own pronouns'
 ];
 
 export default function ProfilePageClient({ user }: ProfilePageClientProps) {
@@ -85,7 +87,8 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
-    showAge: user.showAge ?? true
+    showAge: user.showAge ?? true,
+    customPronouns: user.pronouns && !PRONOUN_OPTIONS.includes(user.pronouns) ? user.pronouns : undefined
   });
 
   // Manage profile pictures state locally
@@ -140,7 +143,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
           id: user.id,
           name: formData.name,
           bio: formData.bio,
-          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : null,
+          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
           pronouns: formData.pronouns,
           showAge: formData.showAge
         })
@@ -313,6 +316,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                 </MenuItem>
               ))}
             </TextField>
+            { formData.pronouns === "choose my own pronouns" && <Box sx={{ mt: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Custom Pronouns
+              </Typography>
+              <TextField type='text' value={formData.customPronouns} onChange={handleInputChange('customPronouns')} />
+            </Box> }
           </Stack>
         </Box>
 
@@ -387,7 +396,10 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                   Delete Account
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Permanently delete your account and all associated data. This action cannot be undone.
+                  Permanently delete your account and all associated data.
+                </Typography>
+                <Typography variant="h4" color="error" sx={{ mt: 1 }}>
+                  ⚠️This action cannot be undone⚠️
                 </Typography>
               </CardContent>
               <CardActions>

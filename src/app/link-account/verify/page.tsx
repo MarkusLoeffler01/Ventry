@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import VerifyLinkingClient from "@/app/link-account/verify/VerifyLinkingClient";
 
+export const dynamic = "force-dynamic";
+
 interface VerifyLinkingPageProps {
   searchParams: Promise<{
     provider?: string;
