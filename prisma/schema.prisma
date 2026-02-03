@@ -41,7 +41,7 @@ model User {
   showAge              Boolean              @default(true) // Privacy setting for showing age
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
-  registration         Registration?
+  registrations        Registration[]
   payments             Payment[]
   isAdmin              Boolean              @default(false)
   emailVerified        Boolean              @default(false) // Changed from isVerified to match better-auth
@@ -55,6 +55,7 @@ model User {
   pendingAccountLinks  PendingAccountLink[]
   image                String?
   twofactors           TwoFactor[]
+  stripeConnectId      String? // ID of the connected Stripe account (for admins/organizers)
 
   @@map("user")
 }
@@ -134,15 +135,14 @@ model Event {
   location    Location?
   products    Product[]
 
-  // registrations Registration[]
+  registrations Registration[]
 }
 
 // Location model to store event locations. As 1:1 relationship with event
 // This will be a venue, most likely a hotel or a conference center
-// This will be a children of the event model and act as a datatype instead of an independent table
 
 model Location {
-  id         Int      @id @default(1) // 1:1 relationship with event for singleton pattern
+  id         Int      @id @default(autoincrement())
   name       String
   address    String
   city       String
@@ -156,8 +156,7 @@ model Location {
 }
 
 // Registration model to store user registrations for the event
-// Normally, there will be only one registration per user
-// And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
+// Users can register for multiple different events, but only once per event
 
 model Registration {
   id        String             @id @default(cuid())
@@ -166,9 +165,15 @@ model Registration {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
-  userId   String    @unique
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  eventId Int
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
   payments Payment[]
+
+  @@unique([userId, eventId])
 }
 
 model Payment {
@@ -198,8 +203,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  eventId Int   @default(1)
-  event   Event @relation(fields: [eventId], references: [id])
+  eventId Int
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
 enum RegistrationStatus {

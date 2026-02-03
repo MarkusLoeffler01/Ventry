@@ -6,4 +6,6 @@
         "/src/app//layout.tsx": "(${dirname})/layout.${extname}",
         "/src/app//index.tsx": "(${dirname})/index.${extname}"
     },
+    "snyk.advanced.organization": "735d491f-2a13-4f3c-b10d-8d440e5da015",
+    "snyk.advanced.autoSelectOrganization": true,
 }

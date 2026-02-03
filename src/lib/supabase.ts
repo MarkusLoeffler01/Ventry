@@ -5,12 +5,31 @@ const supabase = createClient(
     process.env.SUPABASE_API_KEY
 );
 
-export async function uploadProfilePicture(file: File, userId: string) {
+export async function uploadProfilePicture(file: File | Buffer, userId: string, fileName?: string) {
+    const name = fileName || (file as File).name;
+    if (!name) {
+        throw new Error("File name is required when uploading a Buffer");
+    }
+
     const { data, error } = await supabase.storage
         .from(process.env.SUPABASE_BUCKET_ID)
-        .upload(`users/${userId}/${file.name}`, file, {
+        .upload(`users/${userId}/${name}`, file, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
+            contentType: 'image/jpeg'
+    });
+
+    if(error) throw error;
+    return data;
+}
+
+export async function uploadEventImage(file: Buffer, fileName: string) {
+    const { data, error } = await supabase.storage
+        .from(process.env.SUPABASE_BUCKET_ID)
+        .upload(`events/${fileName}`, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: 'image/jpeg'
     });
 
     if(error) throw error;

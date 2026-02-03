@@ -29,7 +29,7 @@ export const auth = betterAuth({
     },
     baseURL: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443",
     trustedOrigins: ["https://local.dev:3443", "http://localhost:3000"],
-    secret: process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
+    secret: process.env.BETTER_AUTH_SECRET,
     plugins: [
         passkey(),
         lastLoginMethod(),
