@@ -47,10 +47,6 @@ export default async function RegisterEventPage({
     }
   });
 
-  if (existingRegistration) {
-    redirect(`/profile?message=already_registered&eventId=${id}`);
-  }
-
   const serializedEvent: SerializedEventForWizard = {
     id: event.id,
     name: event.name,
@@ -67,14 +63,18 @@ export default async function RegisterEventPage({
     <Container maxWidth="lg" sx={{ py: 8 }}>
       <Box mb={4}>
         <Typography variant="h3" component="h1" gutterBottom fontWeight="bold">
-          Registration
+          {existingRegistration ? 'Edit Registration' : 'Registration'}
         </Typography>
         <Typography variant="h5" color="text.secondary">
           {event.name}
         </Typography>
       </Box>
 
-      <RegistrationWizard event={serializedEvent} userId={session.user.id} />
+      <RegistrationWizard 
+        event={serializedEvent} 
+        userId={session.user.id} 
+        initialRegistration={existingRegistration as unknown as { id: string; preferences: { productId?: string; needsHotel?: boolean; earlyArrival?: boolean; lateDeparture?: boolean }; status: string }}
+      />
     </Container>
   );
 }

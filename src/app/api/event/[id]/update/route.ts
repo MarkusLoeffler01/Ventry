@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
-import { type StayPolicy } from "@/types/schemas/event/base";
 import { Prisma } from "@/generated/prisma";
+import { type StayPolicy } from "@/types/schemas/event/base";
 
-export async function POST(
+export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -20,9 +20,9 @@ export async function POST(
         const body = await req.json();
         const { productId, preferences } = body;
 
-        // 1. Verify event exists and is published
+        // 1. Verify event exists
         const event = await prisma.event.findUnique({
-            where: { id: eventId, status: 'PUBLISHED' },
+            where: { id: eventId },
             include: { products: true }
         });
 
@@ -32,7 +32,7 @@ export async function POST(
         const product = event.products.find(p => p.id === productId);
         if (!product) return NextResponse.json({ error: "Invalid badge selection" }, { status: 400 });
 
-        // Calculate Total Amount
+        // Calculate New Total Amount
         let totalAmount = product.price;
         const stayPolicy = event.stayPolicy as unknown as StayPolicy;
 
@@ -43,56 +43,63 @@ export async function POST(
             totalAmount += Number(stayPolicy.lateDeparture.feePerNight);
         }
 
-        // 3. Create registration and payment record in a transaction
+        // 3. Update registration and payment in a transaction
         const result = await prisma.$transaction(async (tx) => {
-            // Check if already registered (prevent race conditions)
-            const existing = await tx.registration.findUnique({
+            const updatedReg = await tx.registration.update({
                 where: {
                     userId_eventId: {
                         userId: session.user.id,
                         eventId
                     }
-                }
-            });
-
-            if (existing) throw new Error("Already registered for this event");
-
-            const reg = await tx.registration.create({
+                },
                 data: {
-                    userId: session.user.id,
-                    eventId: eventId,
-                    status: 'PENDING',
                     preferences: {
                         ...preferences,
                         productId
                     } as Prisma.InputJsonValue
+                },
+                include: {
+                    payments: {
+                        where: { paymentStatus: 'PENDING' },
+                        orderBy: { createdAt: 'desc' },
+                        take: 1
+                    }
                 }
             });
 
-            const payment = await tx.payment.create({
-                data: {
-                    userId: session.user.id,
-                    registrationId: reg.id,
-                    amount: totalAmount,
-                    currency: 'EUR',
-                    paymentStatus: 'PENDING',
-                    paymentProvider: 'STRIPE'
-                }
-            });
-
-            return { reg, payment };
+            const payment = updatedReg.payments[0];
+            
+            if (payment) {
+                // Update existing pending payment
+                await tx.payment.update({
+                    where: { id: payment.id },
+                    data: { amount: totalAmount }
+                });
+                return { registration: updatedReg, paymentId: payment.id };
+            } else {
+                // Create new payment if none pending (e.g. price changed after successful payment - simplified for now)
+                // For this "basic" version, we assume we just update the pending one
+                const newPayment = await tx.payment.create({
+                    data: {
+                        userId: session.user.id,
+                        registrationId: updatedReg.id,
+                        amount: totalAmount,
+                        currency: 'EUR',
+                        paymentStatus: 'PENDING',
+                        paymentProvider: 'STRIPE'
+                    }
+                });
+                return { registration: updatedReg, paymentId: newPayment.id };
+            }
         });
 
         return NextResponse.json({ 
-            message: "Registration successful", 
-            registrationId: result.reg.id,
-            paymentId: result.payment.id
-        }, { status: 201 });
+            message: "Registration updated", 
+            paymentId: result.paymentId 
+        }, { status: 200 });
 
     } catch (error) {
-        console.error("Registration error:", error);
-        return NextResponse.json({ 
-            error: error instanceof Error ? error.message : "Internal Server Error" 
-        }, { status: 500 });
+        console.error("Update error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
