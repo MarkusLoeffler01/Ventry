@@ -33,14 +33,26 @@ interface RegistrationWizardProps {
     stayPolicy: SerializedStayPolicy | null;
   };
   userId: string;
+  initialRegistration?: {
+    id: string;
+    preferences: {
+      productId?: string;
+      needsHotel?: boolean;
+      earlyArrival?: boolean;
+      lateDeparture?: boolean;
+    };
+    status: string;
+  };
 }
 
-export default function RegistrationWizard({ event, userId }: RegistrationWizardProps) {
+export default function RegistrationWizard({ event, userId, initialRegistration }: RegistrationWizardProps) {
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
-  const [needsHotel, setNeedsHotel] = useState(false);
-  const [earlyArrival, setEarlyArrival] = useState(false);
-  const [lateDeparture, setLateDeparture] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string>(initialRegistration?.preferences?.productId || '');
+  
+  // Initialize from initialRegistration if editing
+  const [needsHotel, setNeedsHotel] = useState(initialRegistration?.preferences?.needsHotel || false);
+  const [earlyArrival, setEarlyArrival] = useState(initialRegistration?.preferences?.earlyArrival || false);
+  const [lateDeparture, setLateDeparture] = useState(initialRegistration?.preferences?.lateDeparture || false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -66,6 +78,46 @@ export default function RegistrationWizard({ event, userId }: RegistrationWizard
     setError(null);
 
     try {
+      if (initialRegistration) {
+        // Update case
+        const response = await fetch(`/api/event/${event.id}/update`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            productId: selectedProductId,
+            preferences: {
+              needsHotel,
+              earlyArrival,
+              lateDeparture
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Update failed');
+        }
+
+        const { paymentId } = await response.json();
+
+        // 2. Create Payment Intent
+        const intentResponse = await fetch('/api/payment/create-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentId }),
+        });
+
+        if (!intentResponse.ok) {
+          throw new Error('Failed to initialize payment');
+        }
+
+        const { clientSecret } = await intentResponse.json();
+        setClientSecret(clientSecret);
+        setActiveStep((prev) => prev + 1);
+        return;
+      }
+
       // 1. Create Registration & Payment Record
       const response = await fetch(`/api/event/${event.id}/attend`, {
         method: 'POST',

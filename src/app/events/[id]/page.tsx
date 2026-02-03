@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/prisma";
 import { notFound } from "next/navigation";
+import { getSession } from "@/lib/auth/session";
 import { 
   Container, 
   Box, 
@@ -9,16 +10,19 @@ import {
   Stack, 
   Button, 
   Divider,
-  Chip
+  Chip,
+  Alert
 } from "@mui/material";
 import { 
   CalendarMonth, 
   LocationOn, 
   AccessTime, 
-  ConfirmationNumber 
+  ConfirmationNumber
 } from "@mui/icons-material";
 import Image from "next/image";
 import Link from "next/link";
+import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
+import { type SerializedEvent } from "@/types/event";
 
 interface StayPolicy {
   earlyArrival?: { enabled: boolean };
@@ -28,11 +32,16 @@ export const dynamic = "force-dynamic";
 
 export default async function EventDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ message?: string }>;
 }) {
   const id = Number((await params).id);
   if (isNaN(id)) notFound();
+
+  const { message } = await searchParams;
+  const session = await getSession();
 
   const event = await prisma.event.findUnique({
     where: { id, status: 'PUBLISHED' },
@@ -44,12 +53,37 @@ export default async function EventDetailPage({
 
   if (!event) notFound();
 
+  // Check if user is registered
+  const registration = session?.user?.id ? await prisma.registration.findUnique({
+    where: {
+      userId_eventId: {
+        userId: session.user.id,
+        eventId: id
+      }
+    },
+    include: {
+      payments: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
+  }) : null;
+
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
   const stayPolicy = event.stayPolicy as unknown as StayPolicy;
 
   return (
     <Box>
+      {/* Success Alert */}
+      {message === 'update_success' && (
+        <Container maxWidth="lg" sx={{ mt: 2 }}>
+          <Alert severity="success" sx={{ borderRadius: 2 }}>
+            Your registration preferences have been updated successfully.
+          </Alert>
+        </Container>
+      )}
+
       {/* Hero Banner */}
       <Box sx={{ position: 'relative', height: { xs: 300, md: 500 }, width: '100%', bgcolor: 'grey.900' }}>
         {event.imageUrl ? (
@@ -158,16 +192,23 @@ export default async function EventDetailPage({
                   </Box>
                 </Stack>
 
-                <Button 
-                  fullWidth 
-                  variant="contained" 
-                  size="large" 
-                  sx={{ py: 2, fontSize: '1.1rem' }}
-                  component={Link}
-                  href={`/events/${event.id}/register`}
-                >
-                  Register Now
-                </Button>
+                {registration ? (
+                  <EventRegistrationStatus 
+                    registration={registration as unknown as { id: string; status: string; ticketId: number; payments: { id: string; amount: number; paymentStatus: string; paymentProvider: string }[] }} 
+                    event={event as unknown as SerializedEvent}
+                  />
+                ) : (
+                  <Button 
+                    fullWidth 
+                    variant="contained" 
+                    size="large" 
+                    sx={{ py: 2, fontSize: '1.1rem' }}
+                    component={Link}
+                    href={`/events/${event.id}/register`}
+                  >
+                    Register Now
+                  </Button>
+                )}
               </Paper>
 
               <Box sx={{ px: 2 }}>
