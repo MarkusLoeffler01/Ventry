@@ -76,7 +76,7 @@ function calculateAge(birthDate: Date): number {
   return age;
 }
 
-export default async function ProfileViewPage({ params }: { params: { id: string }}) {
+export default async function ProfileViewPage({ params }: { params: Promise<{ id: string }>}) {
     const { id } = await params;
     
     const user = await prisma.user.findUnique({

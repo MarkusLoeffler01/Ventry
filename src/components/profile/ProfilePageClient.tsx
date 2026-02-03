@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
+import MyRegistrations from './MyRegistrations';
 
 interface ProfilePicture {
   id: string;
@@ -339,6 +340,16 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               When enabled, your age will be visible to other users. When disabled, only you can see your age.
             </Typography>
           </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* My Registrations */}
+        <Box>
+          <Typography variant="h5" gutterBottom>
+            My Registrations
+          </Typography>
+          <MyRegistrations userId={user.id} />
         </Box>
 
         <Divider />

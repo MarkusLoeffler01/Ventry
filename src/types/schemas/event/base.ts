@@ -115,7 +115,7 @@ type StayPolicy = z.infer<typeof StayPolicySchema>;
  * Cross-Field-Check: endDate must be past startDate (only when both are present)
  * @internal Only as helper for Event-Base
  */
-const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: z.RefinementCtx) => {
+export const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: z.RefinementCtx) => {
   if(data.startDate && data.endDate && data.startDate > data.endDate) {
     cxt.addIssue({
       code: z.ZodIssueCode.custom,
@@ -129,7 +129,7 @@ const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: z.Refin
  * Base schema of an event, only the client-delivered, stable fields
  * Used as base for Admin-Create/Update
  */
-const EventBaseSchema = z.object({
+export const EventBaseObject = z.object({
   name: z.string().min(1, "Event name is required"),
   description: z.string().min(1, "Description is required"),
   startDate: z.coerce.date(),
@@ -140,7 +140,9 @@ const EventBaseSchema = z.object({
 
   /** Hotel/Stay-Policy: Main-Days + Early/Late-Options */
   stayPolicy: StayPolicySchema
-}).superRefine(checkDateOrder).strict();
+});
+
+export const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).strict();
 type EventBase = z.infer<typeof EventBaseSchema>;
 
 
@@ -150,7 +152,7 @@ type EventBase = z.infer<typeof EventBaseSchema>;
  *   - Server-Output for client (Read-Model)
  *   - Internal Domain-validation for persistence
  */
-const EventEntitySchema = EventBaseSchema.extend({
+const EventEntitySchema = EventBaseObject.extend({
   id: EventIdSchema,
   status: z.enum(["DRAFT", "PUBLISHED", "CANCELLED"]).default("DRAFT"),
   ownerId: z.string(),
@@ -186,7 +188,6 @@ const EventCreateBaseSchema = EventBaseSchema.superRefine((data, ctx) => {
 });
 
 export {
-    EventBaseSchema,
     EventCreateBaseSchema,
     EventIdSchema,
     EventEntitySchema,

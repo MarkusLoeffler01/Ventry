@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma/prisma";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
 import { Container, Box, Typography, Paper } from "@mui/material";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProfilePage() {
   const session = await getSession();
 

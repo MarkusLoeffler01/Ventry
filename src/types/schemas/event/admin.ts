@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventBaseSchema, type EventEntitySchema, EventIdSchema, LocationSchema, type StayPolicy } from "./base";
+import { type EventEntitySchema, EventIdSchema, LocationSchema, type StayPolicy, EventBaseObject, checkDateOrder } from "./base";
 
 
 /**
@@ -13,11 +13,11 @@ const AdminOnlySchema = z.object({
 
 /**
  * Admin create event
- * @endpoint POST /api/admin/event/:id
+ * @endpoint POST /api/admin/event
  * @body EventBase + AdminOnly (without id/createdAt/updatedAt)
  * @who server-side, to create a new event
  */
-const adminCreateEventSchema = EventBaseSchema.extend(AdminOnlySchema.shape).strict();
+const adminCreateEventSchema = EventBaseObject.extend(AdminOnlySchema.shape).superRefine(checkDateOrder).strict();
 type AdminCreateEventInput = z.input<typeof adminCreateEventSchema>;
 
 
@@ -41,7 +41,7 @@ type AdminGetEventInput = z.infer<typeof adminGetEventSchema>;
  *  - Stay-Policy adjustments
  * @who server-side for updates. All fields optional
  */
-const adminUpdateEventSchema = EventBaseSchema.extend(AdminOnlySchema.shape).partial().strict();
+const adminUpdateEventSchema = EventBaseObject.partial().extend(AdminOnlySchema.partial().shape).superRefine(checkDateOrder).strict();
 type AdminUpdateEventInput = z.input<typeof adminUpdateEventSchema>;
 
 

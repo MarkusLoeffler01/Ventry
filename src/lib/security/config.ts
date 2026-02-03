@@ -58,14 +58,11 @@ export const getSecurityHeaders = () => {
 
 // Validate environment variables on startup
 export const validateSecurityConfig = () => {
-  const required = ['AUTH_SECRET', 'BETTER_AUTH_URL'];
+  const required = ['BETTER_AUTH_URL'];
   const missing = required.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
-  
-  if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 32) {
-    throw new Error('AUTH_SECRET must be at least 32 characters long');
-  }
+
 };
