@@ -1,20 +1,32 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
-import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
 
+export const dynamic = "force-dynamic";
 
-export async function GET() {
+// GET /api/event - List all published events
+export async function GET(_req: NextRequest) {
     try {
-        const events = await prisma.event.findMany();
+        const events = await prisma.event.findMany({
+            where: { status: 'PUBLISHED' },
+            select: {
+                id: true,
+                name: true,
+                startDate: true,
+                endDate: true,
+                imageUrl: true,
+                location: {
+                    select: {
+                        city: true,
+                        country: true
+                    }
+                }
+            },
+            orderBy: { startDate: 'asc' }
+        });
 
-        if (!events) {
-            return NextResponse.json({ error: "Events not found" }, { status: 404 });
-        }
-        return NextResponse.json(events, { status: 200 });
+        return NextResponse.json({ events }, { status: 200 });
     } catch (error) {
-        const response = handlePrismaError(error);
-        const { statusCode: _, ...rest } = response;
-        return NextResponse.json(rest, { status: response.statusCode });
+        console.error("Error listing public events:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
-

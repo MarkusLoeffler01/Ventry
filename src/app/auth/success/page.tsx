@@ -6,6 +6,8 @@ import { Paper, Box, Typography } from "@mui/material";
 import { Key, GitHub, Google } from "@mui/icons-material";
 import { prisma } from "@/lib/prisma/prisma";
 
+export const dynamic = "force-dynamic";
+
 interface SuccessPageProps {
     searchParams: Promise<{
         provider?: string;

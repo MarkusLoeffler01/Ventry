@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
             { createdAt: 'desc' }
           ]
         },
-        registration: {
+        registrations: {
           include: {
             payments: true
           }
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
         createdAt: userData.createdAt,
         updatedAt: userData.updatedAt,
       },
-      registrations: userData.registration ? [userData.registration] : [],
+      registrations: userData.registrations,
       payments: userData.payments,
       events: userData.eventsOwned,
       exportedAt: new Date().toISOString(),

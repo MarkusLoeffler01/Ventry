@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma/prisma";
 import { headers } from "next/headers";
 
 // Helper function to check admin authorization using better-auth
-export async function checkAdminAuth(): Promise<{ 
+export async function checkAdminAuth(requestHeaders?: Headers): Promise<{ 
   authorized: boolean; 
   user?: { id: string; email: string }; 
   error?: string 
@@ -12,7 +12,7 @@ export async function checkAdminAuth(): Promise<{
   try {
     // Use better-auth session for all authentication
     const session = await auth.api.getSession({
-      headers: await headers()
+      headers: requestHeaders || await headers()
     });
     
     if (!session?.user?.id) {

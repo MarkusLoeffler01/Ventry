@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import {
     Container,
     Paper,
@@ -15,9 +15,9 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff, LockReset, CheckCircle } from "@mui/icons-material";
 import { useSearchParams, useRouter } from "next/navigation";
-import authClient from "@authclient";
+import authClient from "@/lib/auth/client";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -234,5 +234,19 @@ export default function ResetPasswordPage() {
                 </Paper>
             </Box>
         </Container>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={
+            <Container maxWidth="sm">
+                <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <CircularProgress />
+                </Box>
+            </Container>
+        }>
+            <ResetPasswordContent />
+        </Suspense>
     );
 }
