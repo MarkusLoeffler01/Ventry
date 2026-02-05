@@ -10,6 +10,7 @@ interface SerializedEventForWizard {
   name: string;
   products: Array<{ id: string; name: string; price: number; description: string | null }>;
   stayPolicy: SerializedStayPolicy | null;
+  customFields: { id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }[];
 }
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,8 @@ export default async function RegisterEventPage({
       price: p.price,
       description: p.description
     })),
-    stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy
+    stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
+    customFields: event.customFields as unknown as SerializedEventForWizard['customFields']
   };
 
   return (
@@ -73,7 +75,7 @@ export default async function RegisterEventPage({
       <RegistrationWizard 
         event={serializedEvent} 
         userId={session.user.id} 
-        initialRegistration={existingRegistration as unknown as { id: string; preferences: { productId?: string; needsHotel?: boolean; earlyArrival?: boolean; lateDeparture?: boolean }; status: string }}
+        initialRegistration={existingRegistration as unknown as { id: string; preferences: { productId?: string; needsHotel?: boolean; earlyArrival?: boolean; lateDeparture?: boolean; customFieldsData?: Record<string, string | number | boolean> }; status: string }}
       />
     </Container>
   );

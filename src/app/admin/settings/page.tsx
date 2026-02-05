@@ -18,13 +18,18 @@ export default async function AdminSettingsPage() {
 
     const user = await prisma.user.findUnique({
         where: { id: authResult.user.id },
-        select: { stripeConnectId: true }
+        select: { 
+            adminProfile: {
+                select: { stripeConnectId: true }
+            }
+        }
     });
 
     let isConnected = false;
-    if (user?.stripeConnectId) {
+    const stripeConnectId = user?.adminProfile?.stripeConnectId;
+    if (stripeConnectId) {
         try {
-            const account = await stripe.accounts.retrieve(user.stripeConnectId);
+            const account = await stripe.accounts.retrieve(stripeConnectId);
             isConnected = account.details_submitted;
         } catch (error) {
             console.error("Failed to retrieve Stripe account status:", error);

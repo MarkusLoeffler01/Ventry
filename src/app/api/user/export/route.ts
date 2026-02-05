@@ -38,7 +38,11 @@ export async function GET(req: NextRequest) {
           }
         },
         payments: true,
-        eventsOwned: true,
+        adminProfile: {
+          include: {
+            eventsOwned: true
+          }
+        },
         accounts: {
           select: {
             providerId: true,  // Changed from 'provider' for better-auth
@@ -77,7 +81,7 @@ export async function GET(req: NextRequest) {
       },
       registrations: userData.registrations,
       payments: userData.payments,
-      events: userData.eventsOwned,
+      events: userData.adminProfile?.eventsOwned || [],
       exportedAt: new Date().toISOString(),
     };
 

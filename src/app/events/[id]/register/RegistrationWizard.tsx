@@ -17,7 +17,9 @@ import {
   Alert,
   Checkbox,
   CircularProgress,
-  Grid
+  Grid,
+  TextField,
+  MenuItem
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { type SerializedStayPolicy } from '@/types/event';
@@ -25,12 +27,21 @@ import { Elements } from '@stripe/react-stripe-js';
 import { stripePromise } from '@/lib/stripeClient';
 import PaymentForm from '@/components/events/registration/PaymentForm';
 
+interface CustomField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'boolean' | 'select';
+  required: boolean;
+  options?: string[];
+}
+
 interface RegistrationWizardProps {
   event: {
     id: number;
     name: string;
     products: Array<{ id: string; name: string; price: number; description: string | null }>;
     stayPolicy: SerializedStayPolicy | null;
+    customFields: CustomField[];
   };
   userId: string;
   initialRegistration?: {
@@ -40,6 +51,7 @@ interface RegistrationWizardProps {
       needsHotel?: boolean;
       earlyArrival?: boolean;
       lateDeparture?: boolean;
+      customFieldsData?: Record<string, string | number | boolean>;
     };
     status: string;
   };
@@ -53,18 +65,35 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
   const [needsHotel, setNeedsHotel] = useState(initialRegistration?.preferences?.needsHotel || false);
   const [earlyArrival, setEarlyArrival] = useState(initialRegistration?.preferences?.earlyArrival || false);
   const [lateDeparture, setLateDeparture] = useState(initialRegistration?.preferences?.lateDeparture || false);
+  const [customFieldsData, setCustomFieldsData] = useState<Record<string, string | number | boolean>>(
+    initialRegistration?.preferences?.customFieldsData || {}
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const router = useRouter();
 
-  const steps = ['Choose Badge', 'Stay Preferences', 'Confirm', 'Payment'];
+  const baseSteps = ['Choose Badge', 'Stay Preferences'];
+  if (event.customFields?.length > 0) {
+    baseSteps.push('Additional Info');
+  }
+  const steps = [...baseSteps, 'Confirm', 'Payment'];
 
   const handleNext = () => {
     if (activeStep === 0 && !selectedProductId) {
       setError('Please select a badge type');
       return;
     }
+    
+    // Validate custom fields if we are on that step
+    if (steps[activeStep] === 'Additional Info') {
+      const missingRequired = event.customFields.find(f => f.required && !customFieldsData[f.id] && customFieldsData[f.id] !== 0);
+      if (missingRequired) {
+        setError(`"${missingRequired.label}" is required`);
+        return;
+      }
+    }
+
     setError(null);
     setActiveStep((prev) => prev + 1);
   };
@@ -89,7 +118,8 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
             preferences: {
               needsHotel,
               earlyArrival,
-              lateDeparture
+              lateDeparture,
+              customFieldsData
             }
           }),
         });
@@ -128,7 +158,8 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
           preferences: {
             needsHotel,
             earlyArrival,
-            lateDeparture
+            lateDeparture,
+            customFieldsData
           }
         }),
       });
@@ -285,48 +316,95 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
                     )}
                   </Paper>
                 </Stack>
-              </Box>
-            )}
-
-            {/* Step 2: Confirm */}
-            {activeStep === 2 && (
-              <Box>
-                <Typography variant="h6" gutterBottom>Review your registration</Typography>
-                <Box sx={{ mb: 4 }}>
-                  <Stack spacing={2}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography color="text.secondary">Badge Type:</Typography>
-                      <Typography fontWeight="bold">{selectedProduct?.name}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography color="text.secondary">Hotel Stay:</Typography>
-                      <Typography>{needsHotel ? 'Yes' : 'No'}</Typography>
-                    </Box>
-                    {needsHotel && (
-                      <>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Typography color="text.secondary">Early Arrival:</Typography>
-                          <Typography>{earlyArrival ? 'Yes' : 'No'}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Typography color="text.secondary">Late Departure:</Typography>
-                          <Typography>{lateDeparture ? 'Yes' : 'No'}</Typography>
-                        </Box>
-                      </>
-                    )}
-                    <Divider />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="h5">Total Amount:</Typography>
-                      <Typography variant="h5" fontWeight="bold" color="primary">{totalAmount}€</Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-                <Alert severity="info">Payment will be handled at the convention or via bank transfer instructions sent to your email.</Alert>
-              </Box>
-            )}
-            {/* Step 3: Payment */}
-            {activeStep === 3 && clientSecret && (
-              <Box>
+                          </Box>
+                        )}
+              
+                        {/* Step: Additional Info (Custom Fields) */}
+                        {steps[activeStep] === 'Additional Info' && (
+                          <Box>
+                            <Typography variant="h6" gutterBottom>Additional Questions</Typography>
+                            <Stack spacing={3}>
+                              {event.customFields.map((field) => (
+                                <Box key={field.id}>
+                                                      {field.type === 'boolean' ? (
+                                                        <FormControlLabel
+                                                          control={
+                                                            <Checkbox 
+                                                              checked={!!customFieldsData[field.id]} 
+                                                              onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.id]: e.target.checked }))} 
+                                                            />
+                                                          }
+                                                          label={`${field.label}${field.required ? ' *' : ''}`}
+                                                        />
+                                                      ) : field.type === 'select' ? (
+                                                        <TextField
+                                                          fullWidth
+                                                          select
+                                                          label={field.label}
+                                                          required={field.required}
+                                                          value={customFieldsData[field.id] || ''}
+                                                          onChange={(e) => setCustomFieldsData(prev => ({ ...prev, [field.id]: e.target.value }))}
+                                                        >
+                                                          {field.options?.map((option) => (
+                                                            <MenuItem key={option} value={option}>
+                                                              {option}
+                                                            </MenuItem>
+                                                          ))}
+                                                        </TextField>
+                                                      ) : (
+                                                        <TextField
+                                                          fullWidth
+                                                          label={field.label}
+                                                          type={field.type === 'number' ? 'number' : 'text'}
+                                                          required={field.required}
+                                                          value={customFieldsData[field.id] || ''}
+                                                          onChange={(e) => setCustomFieldsData(prev => ({ 
+                                                            ...prev, 
+                                                            [field.id]: field.type === 'number' ? Number(e.target.value) : e.target.value 
+                                                          }))}
+                                                        />
+                                                      )}                                </Box>
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+              
+                        {/* Step: Confirm */}
+                        {steps[activeStep] === 'Confirm' && (
+                          <Box>
+                            <Typography variant="h6" gutterBottom>Review your registration</Typography>
+                            <Box sx={{ mb: 4 }}>
+                              <Stack spacing={2}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <Typography color="text.secondary">Badge Type:</Typography>
+                                  <Typography fontWeight="bold">{selectedProduct?.name}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <Typography color="text.secondary">Hotel Stay:</Typography>
+                                  <Typography>{needsHotel ? 'Yes' : 'No'}</Typography>
+                                </Box>
+                                {event.customFields.map(field => (
+                                  <Box key={field.id} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography color="text.secondary">{field.label}:</Typography>
+                                    <Typography>
+                                      {field.type === 'boolean' 
+                                        ? (customFieldsData[field.id] ? 'Yes' : 'No') 
+                                        : String(customFieldsData[field.id] || '-')}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                                <Divider />
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <Typography variant="h5">Total Amount:</Typography>
+                                  <Typography variant="h5" fontWeight="bold" color="primary">{totalAmount}€</Typography>
+                                </Box>
+                              </Stack>
+                            </Box>
+                            <Alert severity="info">Payment will be handled at the convention or via bank transfer instructions sent to your email.</Alert>
+                          </Box>
+                        )}
+                        {/* Step: Payment */}
+                        {steps[activeStep] === 'Payment' && clientSecret && (              <Box>
                 <Typography variant="h6" gutterBottom>Complete Payment</Typography>
                 <Elements stripe={stripePromise} options={{ clientSecret }}>
                   <PaymentForm onSuccess={handlePaymentSuccess} />
@@ -336,21 +414,21 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
           </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 6, gap: 2 }}>
-            {activeStep !== 3 && (
+            {steps[activeStep] !== 'Payment' && (
               <Button disabled={activeStep === 0 || loading} onClick={handleBack}>
                 Back
               </Button>
             )}
-            {activeStep === steps.length - 2 ? (
+            {steps[activeStep] === 'Confirm' ? (
               <Button 
                 variant="contained" 
                 onClick={() => void handleSubmit()} 
                 disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} /> : null}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
               >
                 {loading ? 'Processing...' : 'Proceed to Payment'}
               </Button>
-            ) : activeStep < steps.length - 2 ? (
+            ) : activeStep < steps.length - 1 && steps[activeStep] !== 'Payment' ? (
               <Button variant="contained" onClick={handleNext}>
                 Next
               </Button>
