@@ -8,4 +8,5 @@
     },
     "snyk.advanced.organization": "735d491f-2a13-4f3c-b10d-8d440e5da015",
     "snyk.advanced.autoSelectOrganization": true,
+    "prisma.pinToPrisma6": true,
 }

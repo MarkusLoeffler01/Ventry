@@ -5,8 +5,17 @@ import {
   Paper
 } from '@mui/material';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { Suspense } from 'react';
 
-export default function RegisterPage() {
+export const dynamic = "force-dynamic";
+
+export default async function RegisterPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ callbackUrl?: string }> 
+}) {
+  const { callbackUrl } = await searchParams;
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ 
@@ -30,7 +39,9 @@ export default function RegisterPage() {
             Sign up
           </Typography>
           
-          <RegisterForm/>
+          <Suspense>
+            <RegisterForm callbackUrl={callbackUrl}/>
+          </Suspense>
         </Paper>
       </Box>
     </Container>

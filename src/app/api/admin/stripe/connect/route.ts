@@ -12,14 +12,15 @@ export async function POST(_req: NextRequest) {
         }
 
         const user = await prisma.user.findUnique({
-            where: { id: authResult.user.id }
+            where: { id: authResult.user.id },
+            include: { adminProfile: true }
         });
 
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        let accountId = user.stripeConnectId;
+        let accountId = user.adminProfile?.stripeConnectId;
 
         // 1. Create Stripe Account if not exists
         if (!accountId) {
@@ -58,9 +59,10 @@ export async function POST(_req: NextRequest) {
             const account = await stripe.accounts.create(accountParams);
             accountId = account.id;
 
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { stripeConnectId: accountId }
+            await prisma.admin.upsert({
+                where: { userId: user.id },
+                create: { userId: user.id, stripeConnectId: accountId },
+                update: { stripeConnectId: accountId }
             });
         }
 

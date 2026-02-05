@@ -33,6 +33,7 @@ interface EventRegistrationStatusProps {
     id: string;
     status: string;
     ticketId: number;
+    expiresAt?: string | Date | null;
     payments: Array<{
       id: string;
       amount: number;
@@ -53,8 +54,10 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
   const router = useRouter();
   const latestPayment = registration.payments[0];
 
+  const isExpired = registration.expiresAt && new Date(registration.expiresAt) < new Date() && registration.status === 'PENDING';
+
   const handleStartPayment = async () => {
-    if (!latestPayment) return;
+    if (!latestPayment || isExpired) return;
     
     setLoading(true);
     try {
@@ -104,6 +107,24 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
   };
 
   const getStatusDisplay = () => {
+    if (registration.status === 'CANCELLED') {
+      return {
+        label: 'Cancelled',
+        color: 'error' as const,
+        icon: <Cancel />,
+        message: 'This registration has been cancelled.'
+      };
+    }
+
+    if (isExpired) {
+      return {
+        label: 'Expired',
+        color: 'error' as const,
+        icon: <Cancel />,
+        message: 'Payment deadline exceeded. Registration is no longer valid.'
+      };
+    }
+
     if (registration.status === 'CONFIRMED') {
       return {
         label: 'Registered',
@@ -118,7 +139,9 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
         label: 'Awaiting Payment',
         color: 'warning' as const,
         icon: <PaymentIcon />,
-        message: 'Please complete your payment.'
+        message: registration.expiresAt 
+          ? `Please complete your payment by ${new Date(registration.expiresAt).toLocaleString()}.`
+          : 'Please complete your payment.'
       };
     }
 
@@ -153,9 +176,18 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
           <Chip label={`#${registration.ticketId}`} size="small" variant="outlined" />
         </Box>
         
+        {registration.expiresAt && registration.status === 'PENDING' && !isExpired && (
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">Pay by:</Typography>
+            <Typography variant="body2" fontWeight="bold">
+              {new Date(registration.expiresAt).toLocaleString()}
+            </Typography>
+          </Box>
+        )}
+        
         <Divider />
 
-        {latestPayment?.paymentStatus === 'PENDING' && (
+        {latestPayment?.paymentStatus === 'PENDING' && !isExpired && (
           <Button 
             fullWidth 
             variant="contained" 
@@ -167,26 +199,30 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
           </Button>
         )}
 
-        <Button 
-          fullWidth 
-          variant="outlined" 
-          startIcon={<Edit />}
-          component={Link}
-          href={`/events/${event.id}/register`} // Reusing the wizard for editing
-        >
-          Edit Attendance
-        </Button>
+        {!isExpired && registration.status !== 'CANCELLED' && (
+          <Button 
+            fullWidth 
+            variant="outlined" 
+            startIcon={<Edit />}
+            component={Link}
+            href={`/events/${event.id}/register`} // Reusing the wizard for editing
+          >
+            Edit Attendance
+          </Button>
+        )}
 
-        <Button 
-          fullWidth 
-          color="error" 
-          variant="text" 
-          startIcon={<Cancel />}
-          onClick={() => void handleCancel()}
-          disabled={loading}
-        >
-          Cancel Registration
-        </Button>
+        {registration.status !== 'CANCELLED' && (
+          <Button 
+            fullWidth 
+            color="error" 
+            variant="text" 
+            startIcon={<Cancel />}
+            onClick={() => void handleCancel()}
+            disabled={loading}
+          >
+            Cancel Registration
+          </Button>
+        )}
       </Stack>
 
       {/* Payment Dialog */}

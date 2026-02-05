@@ -43,6 +43,9 @@ export async function PATCH(
             totalAmount += Number(stayPolicy.lateDeparture.feePerNight);
         }
 
+        // Use fixed deadline from event record
+        const expiresAt = event.paymentDeadline;
+
         // 3. Update registration and payment in a transaction
         const result = await prisma.$transaction(async (tx) => {
             const updatedReg = await tx.registration.update({
@@ -53,6 +56,7 @@ export async function PATCH(
                     }
                 },
                 data: {
+                    expiresAt,
                     preferences: {
                         ...preferences,
                         productId
