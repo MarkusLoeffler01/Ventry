@@ -108,6 +108,8 @@ export default function RegistrationManager() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+
+  const [statusConfirmation, setStatusConfirmation] = useState<{ id: string; status: string } | null>(null);
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -180,7 +182,19 @@ export default function RegistrationManager() {
     void fetchRegistrations();
   }, [fetchRegistrations]);
 
-  const handleUpdateStatus = async (id: string, status: string) => {
+  const handleUpdateStatus = async (id: string, status: string, bypassWarning = false) => {
+    const reg = registrations.find(r => r.id === id);
+    if (!reg || reg.status === status) return;
+
+    // Warning if approving unpaid registration
+    if (status === 'APPROVED' && !bypassWarning) {
+      const latestPayment = reg.payments[0];
+      if (!latestPayment || latestPayment.paymentStatus !== 'COMPLETED') {
+        setStatusConfirmation({ id, status });
+        return;
+      }
+    }
+
     try {
       const response = await fetch(`/api/admin/registrations/${id}`, {
         method: 'PATCH',
@@ -189,6 +203,7 @@ export default function RegistrationManager() {
       });
       if (response.ok) {
         await fetchRegistrations();
+        setStatusConfirmation(null);
       }
     } catch (err) {
       console.error(err);
@@ -227,13 +242,13 @@ export default function RegistrationManager() {
     { 
       field: 'user', 
       headerName: 'Attendee', 
-      flex: 1,
+      minWidth: 250,
       renderCell: (params: GridRenderCellParams) => (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ height: '100%' }}>
-          <Avatar src={params.row.user.image} sx={{ width: 24, height: 24 }} />
-          <Box>
-            <Typography variant="body2">{params.row.user.name || 'Anonymous'}</Typography>
-            <Typography variant="caption" color="text.secondary">{params.row.user.email}</Typography>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Avatar src={params.row.user.image} sx={{ width: 32, height: 32 }} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '20px' }}>
+            <Typography variant="body2" sx={{ lineHeight: 1.2, fontWeight: 'bold' }}>{params.row.user.name || 'Anonymous'}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>{params.row.user.email}</Typography>
           </Box>
         </Stack>
       )
@@ -348,6 +363,7 @@ export default function RegistrationManager() {
           rows={registrations}
           columns={columns}
           loading={loading}
+          rowHeight={70}
           disableRowSelectionOnClick
           pageSizeOptions={[10, 25, 50]}
           initialState={{
@@ -674,6 +690,33 @@ export default function RegistrationManager() {
           <Button onClick={() => setPaymentDialogOpen(false)}>Close</Button>
           <Button startIcon={<Print />} variant="contained" onClick={handlePrintInvoice}>
             Print Invoice
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Approval Warning Dialog */}
+      <Dialog open={!!statusConfirmation} onClose={() => setStatusConfirmation(null)}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <HistoryIcon color="warning" />
+          Confirm Approval
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            This user <strong>has not completed their payment yet</strong>. 
+            Are you sure you want to approve this registration?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Approving will notify the user that their spot is secured, despite the missing payment.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStatusConfirmation(null)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            color="warning" 
+            onClick={() => statusConfirmation && void handleUpdateStatus(statusConfirmation.id, statusConfirmation.status, true)}
+          >
+            Yes, Approve Anyway
           </Button>
         </DialogActions>
       </Dialog>
