@@ -5,12 +5,21 @@ import LinkAccountClient from "@/components/auth/LinkAccountClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function LinkAccountPage() {
+export default async function LinkAccountPage({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
+
   // Require authentication
   const session = await getSession();
   
   if (!session?.user) {
-    redirect("/login?callbackUrl=/link-account");
+    const loginUrl = callbackUrl 
+      ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+      : "/login?callbackUrl=/link-account";
+    redirect(loginUrl);
   }
 
   // Get pending link requests
@@ -56,6 +65,7 @@ export default async function LinkAccountPage() {
       currentProviders={userAccounts.map(a => a.providerId)}
       hasPassword={hasPassword}
       hasOAuthProviders={hasOAuthProviders}
+      callbackUrl={callbackUrl}
     />
   );
 }

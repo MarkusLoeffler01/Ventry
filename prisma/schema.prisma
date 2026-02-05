@@ -44,20 +44,35 @@ model User {
   registrations        Registration[]
   payments             Payment[]
   isAdmin              Boolean              @default(false)
+  adminProfile         Admin?
   emailVerified        Boolean              @default(false) // Changed from isVerified to match better-auth
   twoFactorEnabled     Boolean              @default(false) // Required by better-auth twoFactor plugin
   twoFactorSecret      String? // TOTP secret for two-factor authentication
   twoFactorBackupCodes String? // Encrypted backup codes for account recovery
-  eventsOwned          Event[]
   accounts             Account[]
   sessions             Session[]
   passkeys             Passkey[] // Changed from Authenticator to Passkey for better-auth
   pendingAccountLinks  PendingAccountLink[]
   image                String?
   twofactors           TwoFactor[]
-  stripeConnectId      String? // ID of the connected Stripe account (for admins/organizers)
 
   @@map("user")
+}
+
+// Profile for Administrators/Organizers to keep the User model clean
+model Admin {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  stripeConnectId String?  // ID of the connected Stripe account
+  notes           String?  // Internal admin notes about this person
+  
+  eventsOwned     Event[]  // Events managed by this admin
+  history         RegistrationHistory[] // Changes performed by this admin
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // Better-auth Account model
@@ -120,22 +135,53 @@ model Verification {
 //
 
 model Event {
+
   id          Int         @id @default(autoincrement())
+
   name        String
+
   description String
+
   startDate   DateTime
+
   endDate     DateTime
+
   imageUrl    String?
+
   status      EventStatus @default(DRAFT)
+
+  publishAt   DateTime?   // Scheduled time for automatic status change to PUBLISHED
+
+  registrationOpensAt DateTime? // When users can start registering
+
+  maxRegistrations Int?    // Capacity limit
+
+  paymentDeadline DateTime? // Fixed deadline for all payments
+
   stayPolicy  Json        @default("{}")
-  ownerId     String? // temporary nullable for migration; will backfill and make required
-  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  customFields Json       @default("[]")
+
+  
+
+  ownerId     String? // ID of the Admin profile that owns this event
+
+  owner       Admin?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  
+
   createdAt   DateTime    @default(now())
+
   updatedAt   DateTime    @updatedAt
+
   location    Location?
+
   products    Product[]
 
+
+
   registrations Registration[]
+
 }
 
 // Location model to store event locations. As 1:1 relationship with event
@@ -159,22 +205,71 @@ model Location {
 // Users can register for multiple different events, but only once per event
 
 model Registration {
+
   id        String             @id @default(cuid())
+
   ticketId  Int                @unique @default(autoincrement())
+
   status    RegistrationStatus @default(PENDING)
+
   preferences Json             @default("{}")
+
+  customFieldData Json         @default("{}")
+
+  expiresAt DateTime?          // Deadline for payment
+
+  notes     String?            // Admin notes for communication
+
   createdAt DateTime           @default(now())
+
   updatedAt DateTime           @updatedAt
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+  userId  String
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   eventId Int
-  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+
 
   payments Payment[]
 
+  history  RegistrationHistory[]
+
+
+
   @@unique([userId, eventId])
+
+}
+
+
+
+// History log for registration changes
+
+model RegistrationHistory {
+
+  id             String       @id @default(cuid())
+
+  registrationId String
+
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  changedByAdminId String?
+
+  changedBy      Admin?       @relation(fields: [changedByAdminId], references: [id], onDelete: SetNull)
+
+  action         String       // e.g., "CREATED", "UPDATED", "STATUS_CHANGE"
+
+  changes        Json         // Recorded diff
+
+  notes          String?      // Reason for change
+
+  createdAt      DateTime     @default(now())
+
 }
 
 model Payment {
@@ -210,6 +305,7 @@ model Product {
 
 enum RegistrationStatus {
   PENDING
+  APPROVED
   CONFIRMED
   CANCELLED
 }

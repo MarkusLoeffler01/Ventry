@@ -32,11 +32,16 @@ export interface InitialData {
   description?: string;
   startDate?: string | Date;
   endDate?: string | Date;
+  publishAt?: string | Date | null;
+  registrationOpensAt?: string | Date | null;
+  maxRegistrations?: number | null;
+  paymentDeadline?: string | Date | null;
   status?: 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
   imageUrl?: string | null;
   location?: unknown;
   stayPolicy?: unknown;
   products?: unknown[];
+  customFields?: unknown[];
 }
 
 interface EventFormProps {
@@ -66,6 +71,10 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       description: initialData?.description || '',
       startDate: initialData?.startDate ? new Date(initialData.startDate) : new Date(),
       endDate: initialData?.endDate ? new Date(initialData.endDate) : new Date(),
+      publishAt: initialData?.publishAt ? new Date(initialData.publishAt) : null,
+      registrationOpensAt: initialData?.registrationOpensAt ? new Date(initialData.registrationOpensAt) : null,
+      maxRegistrations: initialData?.maxRegistrations || null,
+      paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || 'DRAFT',
       imageUrl: initialData?.imageUrl || null,
       location: {
@@ -82,12 +91,18 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
         lateDeparture: { enabled: false },
       },
       products: (initialData?.products as AdminCreateEventInput['products']) || [],
+      customFields: (initialData?.customFields as AdminCreateEventInput['customFields']) || [],
     }
   });
 
   const { fields: productFields, append: addProduct, remove: removeProduct } = useFieldArray({
     control,
     name: "products"
+  });
+
+  const { fields: customFields, append: addCustomField, remove: removeCustomField } = useFieldArray({
+    control,
+    name: "customFields"
   });
 
   const watchStayPolicy = watch("stayPolicy");
@@ -100,13 +115,15 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
   const hasTabError = (index: number) => {
     switch (index) {
       case 0: // General
-        return !!(errors.name || errors.description || errors.startDate || errors.endDate || errors.status || errors.imageUrl);
+        return !!(errors.name || errors.description || errors.startDate || errors.endDate || errors.status || errors.imageUrl || errors.publishAt || errors.registrationOpensAt || errors.maxRegistrations || errors.paymentDeadline);
       case 1: // Location
         return !!errors.location;
       case 2: // Stay Policy
         return !!errors.stayPolicy;
       case 3: // Products
         return !!errors.products;
+      case 4: // Custom Fields
+        return !!errors.customFields;
       default:
         return false;
     }
@@ -221,6 +238,12 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
               {hasTabError(3) && <ErrorIcon color="error" fontSize="small" />}
             </Stack>
           } />
+          <Tab label={
+            <Stack direction="row" alignItems="center" gap={1}>
+              Custom Fields
+              {hasTabError(4) && <ErrorIcon color="error" fontSize="small" />}
+            </Stack>
+          } />
         </Tabs>
 
         <Box sx={{ p: 3 }}>
@@ -295,6 +318,80 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                         onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
                         error={!!errors.endDate}
                         helperText={errors.endDate?.message}
+                      />
+                    )}
+                  />
+                </Grid>
+              </Grid>
+
+              <Divider />
+              <Typography variant="h6">Publishing & Registration</Typography>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Controller
+                    control={control}
+                    name="publishAt"
+                    render={({ field }) => (
+                      <TextField
+                        fullWidth
+                        type="datetime-local"
+                        label="Auto-Publish At"
+                        helperText="Schedule when this event becomes visible to everyone."
+                        InputLabelProps={{ shrink: true }}
+                        value={formatDateForInput(field.value as Date | string | undefined, 'datetime-local')}
+                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        error={!!errors.publishAt}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Controller
+                    control={control}
+                    name="registrationOpensAt"
+                    render={({ field }) => (
+                      <TextField
+                        fullWidth
+                        type="datetime-local"
+                        label="Registration Opens At"
+                        helperText="When users can start creating registrations."
+                        InputLabelProps={{ shrink: true }}
+                        value={formatDateForInput(field.value as Date | string | undefined, 'datetime-local')}
+                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        error={!!errors.registrationOpensAt}
+                      />
+                    )}
+                  />
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Registration Limit"
+                    placeholder="Unlimited"
+                    {...register('maxRegistrations', { valueAsNumber: true })}
+                    error={!!errors.maxRegistrations}
+                    helperText={errors.maxRegistrations?.message || "Max number of participants."}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Controller
+                    control={control}
+                    name="paymentDeadline"
+                    render={({ field }) => (
+                      <TextField
+                        fullWidth
+                        type="datetime-local"
+                        label="Payment Deadline"
+                        helperText="Final deadline for all payments."
+                        InputLabelProps={{ shrink: true }}
+                        value={formatDateForInput(field.value as Date | string | undefined, 'datetime-local')}
+                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        error={!!errors.paymentDeadline}
                       />
                     )}
                   />
@@ -579,6 +676,112 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
               
               {productFields.length === 0 && (
                 <Alert severity="info">No products added yet. Add at least one ticket tier.</Alert>
+              )}
+            </Stack>
+          )}
+
+          {/* Tab 4: Custom Fields */}
+          {tabValue === 4 && (
+            <Stack spacing={3}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">Additional Registration Questions</Typography>
+                <Button 
+                  startIcon={<Add />} 
+                  onClick={() => addCustomField({ id: Math.random().toString(36).substring(7), label: '', type: 'text', required: false })}
+                >
+                  Add Field
+                </Button>
+              </Stack>
+
+              {customFields.map((field, index) => (
+                <Paper key={field.id} variant="outlined" sx={{ p: 2, position: 'relative' }}>
+                  <IconButton 
+                    size="small" 
+                    color="error" 
+                    sx={{ position: 'absolute', top: 8, right: 8 }}
+                    onClick={() => removeCustomField(index)}
+                  >
+                    <Delete />
+                  </IconButton>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 5 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Question Label"
+                        {...register(`customFields.${index}.label` as const)}
+                        error={!!(errors.customFields as unknown as Record<string, { label?: object }> | undefined)?.[index]?.label}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        select
+                        label="Input Type"
+                        {...register(`customFields.${index}.type` as const)}
+                      >
+                        <MenuItem value="text">Text</MenuItem>
+                        <MenuItem value="number">Number</MenuItem>
+                        <MenuItem value="boolean">Checkbox (Yes/No)</MenuItem>
+                        <MenuItem value="select">Dropdown (Select)</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <FormControlLabel
+                        control={<Switch {...register(`customFields.${index}.required` as const)} />}
+                        label="Required"
+                      />
+                    </Grid>
+
+                    {/* Options for Select type */}
+                    {watch(`customFields.${index}.type`) === 'select' && (
+                      <Grid size={{ xs: 12 }}>
+                        <Box sx={{ mt: 2, pl: 2, borderLeft: '2px solid', borderColor: 'primary.light' }}>
+                          <Typography variant="subtitle2" gutterBottom>Dropdown Options</Typography>
+                          <Stack spacing={1}>
+                            {(watch(`customFields.${index}.options`) || []).map((opt: string, optIndex: number) => (
+                              <Stack key={optIndex} direction="row" spacing={1} alignItems="center">
+                                <TextField
+                                  size="small"
+                                  placeholder={`Option ${optIndex + 1}`}
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
+                                    currentOptions[optIndex] = e.target.value;
+                                    setValue(`customFields.${index}.options`, currentOptions);
+                                  }}
+                                />
+                                <IconButton size="small" color="error" onClick={() => {
+                                  const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
+                                  currentOptions.splice(optIndex, 1);
+                                  setValue(`customFields.${index}.options`, currentOptions);
+                                }}>
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Stack>
+                            ))}
+                            <Button 
+                              size="small" 
+                              startIcon={<Add />} 
+                              onClick={() => {
+                                const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
+                                setValue(`customFields.${index}.options`, [...currentOptions, '']);
+                              }}
+                              sx={{ alignSelf: 'flex-start' }}
+                            >
+                              Add Option
+                            </Button>
+                          </Stack>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              ))}
+
+              {customFields.length === 0 && (
+                <Alert severity="info">No custom questions added yet.</Alert>
               )}
             </Stack>
           )}

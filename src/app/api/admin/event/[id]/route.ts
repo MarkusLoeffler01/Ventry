@@ -63,6 +63,7 @@ export async function PATCH(
             data: {
                 ...scalarFields,
                 stayPolicy: validatedData.stayPolicy as Prisma.InputJsonValue,
+                customFields: validatedData.customFields as Prisma.InputJsonValue,
                 // Handle location update
                 ...(location && {
                     location: {

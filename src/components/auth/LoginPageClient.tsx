@@ -16,6 +16,7 @@ import LastUsedIndicator from "./LastUsedIndicator";
 
 export default function LoginPageClient() {
   const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
   const registered = searchParams.get("registered");
   const passwordReset = searchParams.get("message") === "Password reset successful";
   const error = searchParams.get("error");
@@ -33,14 +34,14 @@ export default function LoginPageClient() {
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL: callbackUrl,
     });
   }
 
   const handleGitHubSignIn = async () => {
     await authClient.signIn.social({
       provider: "github",
-      callbackURL: "/dashboard",
+      callbackURL: callbackUrl,
     });
   }
 
@@ -80,7 +81,7 @@ export default function LoginPageClient() {
       // Password verified! Now initiate OAuth flow which will auto-link
       await authClient.signIn.social({
         provider: linkProvider,
-        callbackURL: "/dashboard",
+        callbackURL: callbackUrl,
       });
     } catch (err) {
       console.error("Linking login error:", err);
@@ -195,7 +196,7 @@ export default function LoginPageClient() {
 
       {!linkRequired && (
         <Stack spacing={3}>
-          <LoginForm />
+          <LoginForm callbackUrl={callbackUrl} />
         <Typography variant="subtitle2" color="text.secondary" align="center">
           Or
         </Typography>

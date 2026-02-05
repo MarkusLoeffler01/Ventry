@@ -1,96 +1,150 @@
 import { PrismaClient } from "../src/generated/prisma";
+import fs from "fs";
+import path from "path";
+
+const prismaExportDir = process.env.PRISMA_EXPORT_DIR || path.join(__dirname, "exports");
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding database...");
+  console.log("Restoring data from export...");
 
-  // 1. Create a test admin user if it doesn't exist
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@example.com" },
-    update: {},
-    create: {
-      email: "admin@example.com",
-      name: "Super Admin",
-      isAdmin: true,
-      emailVerified: true,
-    },
-  });
+  const dataPath = path.join(prismaExportDir, "exported_data.json");
+  if (!fs.existsSync(dataPath)) {
+    console.log("No export file found. Running standard seed.");
+    return;
+  }
 
-  console.log(`Admin user: ${admin.email}`);
+  const data = JSON.parse(fs.readFileSync(dataPath, "utf-8"));
 
-  // 2. Create a Convention Event
-  const convention = await prisma.event.create({
-    data: {
-      name: "Mega Furry Con 2026",
-      description: "A large convention for enthusiasts of anthropomorphic art and culture.",
-      startDate: new Date("2026-06-01T10:00:00Z"),
-      endDate: new Date("2026-06-04T18:00:00Z"),
-      status: "PUBLISHED",
-      ownerId: admin.id,
-      stayPolicy: {
-        main: {
-          checkIn: "2026-06-01",
-          checkOut: "2026-06-04",
-        },
-        earlyArrival: {
-          enabled: true,
-          from: "2026-05-31",
-          feePerNight: 50,
-        },
-        lateDeparture: {
-          enabled: true,
-          until: "2026-06-05",
-          feePerNight: 50,
-        },
-      },
-      location: {
-        create: {
-          name: "Grand Hotel & Convention Center",
-          address: "123 Event Ave",
-          city: "Berlin",
-          state: "Berlin",
-          country: "Germany",
-          postalCode: "10115",
-        },
-      },
-      products: {
-        create: [
-          { name: "Standard Badge", description: "Full access to the convention", price: 60 },
-          { name: "Sponsor Badge", description: "Standard badge + exclusive t-shirt and goodie bag", price: 120 },
-          { name: "Super Sponsor Badge", description: "Sponsor badge + dinner with guests of honor", price: 250 },
-        ],
-      },
-    },
-  });
+  // 1. Restore Users and create Admin profiles
+  console.log("Restoring users and admin profiles...");
+  for (const u of data.users) {
+    const user = await prisma.user.create({
+      data: {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        bio: u.bio,
+        dateOfBirth: u.dateOfBirth ? new Date(u.dateOfBirth) : null,
+        pronouns: u.pronouns,
+        showAge: u.showAge,
+        isAdmin: u.isAdmin,
+        emailVerified: u.emailVerified,
+        image: u.image,
+        createdAt: new Date(u.createdAt),
+        updatedAt: new Date(u.updatedAt),
+      }
+    });
 
-  console.log(`Created event: ${convention.name}`);
+    if (u.isAdmin) {
+      await prisma.admin.create({
+        data: {
+          userId: user.id,
+          stripeConnectId: u.stripeConnectId,
+        }
+      });
+    }
 
-  // 3. Create a simple Meetup Event
-  const meetup = await prisma.event.create({
-    data: {
-      name: "Spring Park Walk",
-      description: "A casual walk through the park. Everyone is welcome!",
-      startDate: new Date("2026-04-15T14:00:00Z"),
-      endDate: new Date("2026-04-15T17:00:00Z"),
-      status: "DRAFT",
-      ownerId: admin.id,
-      location: {
-        create: {
-          name: "Tiergarten",
-          address: "Str. des 17. Juni",
-          city: "Berlin",
-          state: "Berlin",
-          country: "Germany",
-          postalCode: "10785",
-        },
-      },
-    },
-  });
+    // Restore Accounts
+    for (const acc of u.accounts) {
+      await prisma.account.create({
+        data: {
+          ...acc,
+          accessTokenExpiresAt: acc.accessTokenExpiresAt ? new Date(acc.accessTokenExpiresAt) : null,
+          refreshTokenExpiresAt: acc.refreshTokenExpiresAt ? new Date(acc.refreshTokenExpiresAt) : null,
+          createdAt: new Date(acc.createdAt),
+          updatedAt: new Date(acc.updatedAt),
+        }
+      });
+    }
+  }
 
-  console.log(`Created event: ${meetup.name} (Draft)`);
+  // 2. Restore Events
+  console.log("Restoring events...");
+  for (const e of data.events) {
+    // Map the ownerId from User to Admin
+    let adminProfileId = null;
+    if (e.ownerId) {
+      const adminProfile = await prisma.admin.findUnique({
+        where: { userId: e.ownerId }
+      });
+      adminProfileId = adminProfile?.id;
+    }
 
-  console.log("Seeding completed!");
+    await prisma.event.create({
+      data: {
+        id: e.id,
+        name: e.name,
+        description: e.description,
+        startDate: new Date(e.startDate),
+        endDate: new Date(e.endDate),
+        imageUrl: e.imageUrl,
+        status: e.status,
+        publishAt: e.publishAt ? new Date(e.publishAt) : null,
+        registrationOpensAt: e.registrationOpensAt ? new Date(e.registrationOpensAt) : null,
+        maxRegistrations: e.maxRegistrations,
+        paymentDeadline: e.paymentDeadline ? new Date(e.paymentDeadline) : null,
+        stayPolicy: e.stayPolicy,
+        customFields: e.customFields,
+        ownerId: adminProfileId,
+        createdAt: new Date(e.createdAt),
+        updatedAt: new Date(e.updatedAt),
+        location: e.location ? {
+          create: {
+            name: e.location.name,
+            address: e.location.address,
+            city: e.location.city,
+            state: e.location.state,
+            country: e.location.country,
+            postalCode: e.location.postalCode,
+          }
+        } : undefined,
+        products: {
+          create: e.products.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            price: p.price,
+          }))
+        }
+      }
+    });
+  }
+
+  // 3. Restore Registrations and Payments
+  console.log("Restoring registrations...");
+  for (const r of data.registrations) {
+    await prisma.registration.create({
+      data: {
+        id: r.id,
+        ticketId: r.ticketId,
+        userId: r.userId,
+        eventId: r.eventId,
+        status: r.status,
+        preferences: r.preferences,
+        customFieldData: r.customFieldData,
+        expiresAt: r.expiresAt ? new Date(r.expiresAt) : null,
+        notes: r.notes,
+        createdAt: new Date(r.createdAt),
+        updatedAt: new Date(r.updatedAt),
+        payments: {
+          create: r.payments.map((p: any) => ({
+            id: p.id,
+            userId: p.userId,
+            amount: p.amount,
+            currency: p.currency,
+            paymentStatus: p.paymentStatus,
+            paymentProvider: p.paymentProvider,
+            createdAt: new Date(p.createdAt),
+            updatedAt: new Date(p.updatedAt),
+          }))
+        }
+      }
+    });
+  }
+
+  console.log("Data restoration complete!");
 }
 
 main()

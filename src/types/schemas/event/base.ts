@@ -125,6 +125,15 @@ export const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: 
   }
 }
 
+const CustomFieldType = z.enum(["text", "number", "boolean", "select"]);
+const CustomFieldSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1, "Label is required"),
+  type: CustomFieldType,
+  required: z.boolean().default(false),
+  options: z.array(z.string()).optional(), // For 'select' type
+}).strict();
+
 /**
  * Base schema of an event, only the client-delivered, stable fields
  * Used as base for Admin-Create/Update
@@ -138,8 +147,20 @@ export const EventBaseObject = z.object({
   imageUrl: z.url().nullable().optional(),
   products: z.array(ProductSchema).default([]),
 
+  /** Scheduled time for automatic status change to PUBLISHED */
+  publishAt: z.coerce.date().nullable().optional(),
+  /** When users can start registering */
+  registrationOpensAt: z.coerce.date().nullable().optional(),
+  /** Capacity limit */
+  maxRegistrations: z.coerce.number().int().positive().nullable().optional(),
+  /** Fixed deadline for all payments */
+  paymentDeadline: z.coerce.date().nullable().optional(),
+
   /** Hotel/Stay-Policy: Main-Days + Early/Late-Options */
-  stayPolicy: StayPolicySchema
+  stayPolicy: StayPolicySchema,
+
+  /** Custom admin-defined fields for registration */
+  customFields: z.array(CustomFieldSchema).default([])
 });
 
 export const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).strict();
@@ -171,8 +192,9 @@ const ParticipationBaseSchema = z.object({
   needsHotel: z.boolean().default(false),
   wantsEarlyArrival: z.boolean().default(false),
   wantsLateDeparture: z.boolean().default(false),
-  notes: z.string().max(1000).optional()
-
+  notes: z.string().max(1000).optional(),
+  /** Values for custom fields defined in the event */
+  customFieldsData: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({})
 }).strict();
 type ParticipationBase = z.infer<typeof ParticipationBaseSchema>;
 

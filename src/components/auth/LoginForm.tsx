@@ -101,8 +101,8 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                 console.error("Error checking pending links:", fetchError);
             }
 
-            // No pending links, go to home
-            router.push("/");
+            // No pending links, go to home or callback URL
+            router.push(callbackUrl || "/");
 
         } catch(err: unknown) {
             if(err instanceof Error) {
