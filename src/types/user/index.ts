@@ -7,7 +7,7 @@ const userSchema = z.object({
   password: z.string().min(8).optional(),
   profilePicture: z.url().nullable().optional(),
   bio: z.string().max(500).optional(),
-  dateOfBirth: z.string().optional(),
+  dateOfBirth: z.string().nullable().optional(),
   pronouns: z.string().max(50).optional(),
   showAge: z.boolean().optional(),
 });
