@@ -287,7 +287,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               InputLabelProps={{ shrink: true }}
             />
 
-            {formData.dateOfBirth && (
+            {formData.dateOfBirth && !isNaN(new Date(formData.dateOfBirth).getTime()) && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Chip 
                   label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
