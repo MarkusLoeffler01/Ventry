@@ -48,6 +48,7 @@ import {
   rectSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import ImageCropper from './ImageCropper';
 
 interface ProfilePicture {
   id: string;
@@ -210,6 +211,10 @@ export default function ProfilePictureGallery({
   const [deleting, setDeleting] = useState(false);
   const [settingPrimary, setSettingPrimary] = useState(false);
   
+  // Cropping state
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  
   // Overlay gallery state
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -340,7 +345,7 @@ export default function ProfilePictureGallery({
     };
   }, [overlayOpen, handleNext, handlePrevious, handleOverlayClose]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -356,12 +361,24 @@ export default function ProfilePictureGallery({
       return;
     }
 
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result?.toString() || null);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    
+    // Clear input so same file can be selected again
+    event.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
     setUploading(true);
     setError(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', croppedBlob, 'profile.jpg');
       formData.append('isPrimary', profilePictures.length === 0 ? 'true' : 'false');
 
       const response = await fetch('/api/user/profile-picture', {
@@ -379,6 +396,8 @@ export default function ProfilePictureGallery({
       }
 
       await onPicturesUpdate();
+      setCropOpen(false);
+      setCropImageSrc(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
@@ -586,7 +605,7 @@ export default function ProfilePictureGallery({
               variant="contained"
               component="label"
               startIcon={<CloudUpload />}
-              disabled={uploading}
+              disabled={uploading || cropOpen}
               sx={{ flex: 1 }}
             >
               {uploading ? 'Uploading...' : 'Upload New'}
@@ -594,7 +613,7 @@ export default function ProfilePictureGallery({
                 type="file"
                 hidden
                 accept="image/*"
-                onChange={(e) => { void handleFileUpload(e); }}
+                onChange={handleFileUpload}
               />
             </Button>
 
@@ -633,6 +652,17 @@ export default function ProfilePictureGallery({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Image Cropper */}
+      <ImageCropper
+        open={cropOpen}
+        imageSrc={cropImageSrc}
+        onCancel={() => {
+          setCropOpen(false);
+          setCropImageSrc(null);
+        }}
+        onCropComplete={handleCropComplete}
+      />
 
       {/* Full-Screen Overlay Gallery */}
       <Dialog
