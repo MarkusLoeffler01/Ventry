@@ -17,15 +17,18 @@ import {
   CalendarMonth, 
   LocationOn, 
   AccessTime, 
-  ConfirmationNumber
+  ConfirmationNumber,
+  Edit
 } from "@mui/icons-material";
 import Image from "next/image";
 import Link from "next/link";
 import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
+import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import { type SerializedEvent } from "@/types/event";
 
 interface StayPolicy {
-  earlyArrival?: { enabled: boolean };
+  earlyArrival?: { enabled: boolean; feePerNight?: number };
+  lateDeparture?: { enabled: boolean; feePerNight?: number };
 }
 
 export const dynamic = "force-dynamic";
@@ -43,15 +46,49 @@ export default async function EventDetailPage({
   const { message } = await searchParams;
   const session = await getSession();
 
-  const event = await prisma.event.findUnique({
-    where: { id, status: 'PUBLISHED' },
+  const event = await prisma.event.findFirst({
+    where: { 
+      id,
+      OR: [
+        { status: 'PUBLISHED' },
+        { 
+          status: 'DRAFT',
+          publishAt: { lte: new Date() } // Auto-publish check
+        },
+        // Allow admins to view drafts
+        ...(session?.user?.id ? [{ 
+          ownerId: session.user.id
+        }] : [])
+      ]
+    },
     include: {
       location: true,
       products: true,
+      _count: {
+        select: { registrations: true }
+      }
     }
   });
 
   if (!event) notFound();
+
+  // Check if user is admin or owner
+  let canEdit = false;
+  if (session?.user?.id) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { isAdmin: true }
+    });
+    canEdit = !!dbUser?.isAdmin || event.ownerId === session.user.id;
+  }
+
+  // If it was a scheduled draft, update its status to PUBLISHED proactively
+  if (event.status === 'DRAFT' && event.publishAt && new Date(event.publishAt) <= new Date()) {
+    await prisma.event.update({
+      where: { id: event.id },
+      data: { status: 'PUBLISHED' }
+    });
+  }
 
   // Check if user is registered
   const registration = session?.user?.id ? await prisma.registration.findUnique({
@@ -68,6 +105,10 @@ export default async function EventDetailPage({
       }
     }
   }) : null;
+
+  // Add expiresAt to the cast/serialization if needed, 
+  // but Prisma already includes it in the object since we updated the schema.
+  // I'll make sure the props passed to EventRegistrationStatus are correct.
 
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
@@ -184,7 +225,16 @@ export default async function EventDetailPage({
                       <Typography variant="subtitle2">Price Range</Typography>
                       <Typography variant="body2" color="text.secondary">
                         {event.products.length > 0 
-                          ? `${Math.min(...event.products.map(p => p.price))}€ - ${Math.max(...event.products.map(p => p.price))}€`
+                          ? (
+                            <>
+                              {`${Math.min(...event.products.map(p => p.price))}€ - ${Math.max(...event.products.map(p => p.price))}€`}
+                              {(stayPolicy?.earlyArrival?.feePerNight || stayPolicy?.lateDeparture?.feePerNight) && (
+                                <Typography component="span" variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
+                                  + Optional Extras (up to {((stayPolicy?.earlyArrival?.feePerNight || 0) + (stayPolicy?.lateDeparture?.feePerNight || 0))}€)
+                                </Typography>
+                              )}
+                            </>
+                          )
                           : 'Free / TBD'
                         }
                       </Typography>
@@ -194,20 +244,67 @@ export default async function EventDetailPage({
 
                 {registration ? (
                   <EventRegistrationStatus 
-                    registration={registration as unknown as { id: string; status: string; ticketId: number; payments: { id: string; amount: number; paymentStatus: string; paymentProvider: string }[] }} 
+                    registration={{
+                      ...registration,
+                      expiresAt: registration.expiresAt?.toISOString()
+                    } as unknown as { id: string; status: string; ticketId: number; expiresAt?: string; payments: { id: string; amount: number; paymentStatus: string; paymentProvider: string }[] }} 
                     event={event as unknown as SerializedEvent}
                   />
                 ) : (
-                  <Button 
-                    fullWidth 
-                    variant="contained" 
-                    size="large" 
-                    sx={{ py: 2, fontSize: '1.1rem' }}
+                  <>
+                    <Button 
+                      fullWidth 
+                      variant="contained" 
+                      size="large" 
+                      sx={{ py: 2, fontSize: '1.1rem' }}
+                      component={Link}
+                      href={`/events/${event.id}/register`}
+                      disabled={!!(event.registrationOpensAt && new Date(event.registrationOpensAt) > new Date()) || !!(event.maxRegistrations && event._count.registrations >= event.maxRegistrations)}
+                    >
+                      {event.maxRegistrations && event._count.registrations >= event.maxRegistrations 
+                        ? 'Registration Full' 
+                        : 'Register Now'}
+                    </Button>
+
+                    {event.registrationOpensAt && new Date(event.registrationOpensAt) > new Date() && (
+                      <Box sx={{ mt: 3 }}>
+                        {new Date(event.registrationOpensAt).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000 ? (
+                          <RegistrationCountdown opensAt={event.registrationOpensAt.toISOString()} />
+                        ) : (
+                          <Alert severity="info" icon={false} sx={{ textAlign: 'center' }}>
+                            <Typography variant="body2" fontWeight="bold">
+                              Registration opens on:
+                            </Typography>
+                            <Typography variant="h6">
+                              {new Date(event.registrationOpensAt).toLocaleDateString()}
+                            </Typography>
+                          </Alert>
+                        )}
+                      </Box>
+                    )}
+                  </>
+                )}
+
+                {canEdit && (
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<Edit />}
                     component={Link}
-                    href={`/events/${event.id}/register`}
+                    href={`/admin/events/${event.id}`}
+                    sx={{ mt: 2 }}
                   >
-                    Register Now
+                    Edit Event (Admin)
                   </Button>
+                )}
+
+                {event.maxRegistrations && (
+                  <Box sx={{ mt: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {event._count.registrations} / {event.maxRegistrations} spots taken
+                    </Typography>
+                  </Box>
                 )}
               </Paper>
 

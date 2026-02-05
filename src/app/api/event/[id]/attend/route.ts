@@ -23,10 +23,25 @@ export async function POST(
         // 1. Verify event exists and is published
         const event = await prisma.event.findUnique({
             where: { id: eventId, status: 'PUBLISHED' },
-            include: { products: true }
+            include: { 
+                products: true,
+                _count: {
+                    select: { registrations: true }
+                }
+            }
         });
 
         if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+        // Check if registration is open
+        if (event.registrationOpensAt && new Date() < new Date(event.registrationOpensAt)) {
+            return NextResponse.json({ error: "Registration is not yet open" }, { status: 403 });
+        }
+
+        // Check registration limit
+        if (event.maxRegistrations && event._count.registrations >= event.maxRegistrations) {
+            return NextResponse.json({ error: "Registration is full" }, { status: 403 });
+        }
 
         // 2. Verify product belongs to event
         const product = event.products.find(p => p.id === productId);
@@ -42,6 +57,9 @@ export async function POST(
         if (preferences?.lateDeparture && stayPolicy?.lateDeparture?.enabled && stayPolicy.lateDeparture.feePerNight) {
             totalAmount += Number(stayPolicy.lateDeparture.feePerNight);
         }
+
+        // Use fixed deadline from event record
+        const expiresAt = event.paymentDeadline;
 
         // 3. Create registration and payment record in a transaction
         const result = await prisma.$transaction(async (tx) => {
@@ -62,6 +80,7 @@ export async function POST(
                     userId: session.user.id,
                     eventId: eventId,
                     status: 'PENDING',
+                    expiresAt,
                     preferences: {
                         ...preferences,
                         productId

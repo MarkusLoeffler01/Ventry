@@ -6,10 +6,12 @@ import {
   ConnectAccountOnboarding,
   ConnectPayouts,
   ConnectAccountManagement,
-  ConnectNotificationBanner
+  ConnectNotificationBanner,
+  ConnectPayments,
+  ConnectBalances
 } from "@stripe/react-connect-js";
 import { loadConnectAndInitialize, type StripeConnectInstance } from "@stripe/connect-js";
-import { Box, Button, CircularProgress, Alert, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Alert, Typography, Tabs, Tab } from '@mui/material';
 
 interface StripeEmbeddedConnectProps {
   isConnected: boolean;
@@ -19,6 +21,7 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
   const [stripeConnectInstance, setStripeConnectInstance] = useState<StripeConnectInstance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardTab, setDashboardTab] = useState(0);
 
   const handleStartOnboarding = async () => {
     setLoading(true);
@@ -67,17 +70,51 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
         {isConnected ? (
           <Box>
             <ConnectNotificationBanner />
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>Payouts & Balance</Typography>
-              <ConnectPayouts />
-            </Box>
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" gutterBottom>Account Management</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Update your business details, personal information, and payout methods here.
-              </Typography>
-              <ConnectAccountManagement />
-            </Box>
+            
+            <Tabs 
+              value={dashboardTab} 
+              onChange={(_, v) => setDashboardTab(v)} 
+              sx={{ borderBottom: 1, borderColor: 'divider', mb: 3, mt: 2 }}
+            >
+              <Tab label="Overview" />
+              <Tab label="Transactions" />
+              <Tab label="Payouts" />
+              <Tab label="Account Settings" />
+            </Tabs>
+
+            {dashboardTab === 0 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>Balance Summary</Typography>
+                <ConnectBalances />
+              </Box>
+            )}
+
+            {dashboardTab === 1 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>Payments & Transactions</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  View all incoming payments, fees, and manage refunds.
+                </Typography>
+                <ConnectPayments />
+              </Box>
+            )}
+
+            {dashboardTab === 2 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>Payout History</Typography>
+                <ConnectPayouts />
+              </Box>
+            )}
+
+            {dashboardTab === 3 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>Account Management</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Update your business details and payout methods.
+                </Typography>
+                <ConnectAccountManagement />
+              </Box>
+            )}
           </Box>
         ) : (
           <ConnectAccountOnboarding onExit={handleOnExit} />
