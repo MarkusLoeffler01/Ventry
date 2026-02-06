@@ -42,6 +42,7 @@ export interface InitialData {
   stayPolicy?: unknown;
   products?: unknown[];
   customFields?: unknown[];
+  schedule?: unknown[];
 }
 
 interface EventFormProps {
@@ -92,6 +93,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       },
       products: (initialData?.products as AdminCreateEventInput['products']) || [],
       customFields: (initialData?.customFields as AdminCreateEventInput['customFields']) || [],
+      schedule: (initialData?.schedule as AdminCreateEventInput['schedule']) || [],
     }
   });
 
@@ -103,6 +105,11 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
   const { fields: customFields, append: addCustomField, remove: removeCustomField } = useFieldArray({
     control,
     name: "customFields"
+  });
+
+  const { fields: scheduleItems, append: addScheduleItem, remove: removeScheduleItem } = useFieldArray({
+    control,
+    name: "schedule"
   });
 
   const watchStayPolicy = watch("stayPolicy");
@@ -124,6 +131,8 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
         return !!errors.products;
       case 4: // Custom Fields
         return !!errors.customFields;
+      case 5: // Schedule
+        return !!errors.schedule;
       default:
         return false;
     }
@@ -140,6 +149,29 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
     const iso = localDate.toISOString();
     
     return type === 'datetime-local' ? iso.slice(0, 16) : iso.slice(0, 10);
+  };
+
+  const getProductErrorSummary = () => {
+    const productErrors = errors.products as
+      | Array<{ name?: { message?: string }; price?: { message?: string }; description?: { message?: string } } | undefined>
+      | { message?: string }
+      | undefined;
+
+    if (!productErrors) return null;
+
+    if (!Array.isArray(productErrors)) {
+      return productErrors.message ? [productErrors.message] : ["Products contain invalid values."];
+    }
+
+    const messages: string[] = [];
+    productErrors.forEach((err, index) => {
+      if (!err) return;
+      if (err.name?.message) messages.push(`Product ${index + 1} name: ${err.name.message}`);
+      if (err.price?.message) messages.push(`Product ${index + 1} price: ${err.price.message}`);
+      if (err.description?.message) messages.push(`Product ${index + 1} description: ${err.description.message}`);
+    });
+
+    return messages.length > 0 ? messages : ["Products contain invalid values."];
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,6 +274,12 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
             <Stack direction="row" alignItems="center" gap={1}>
               Custom Fields
               {hasTabError(4) && <ErrorIcon color="error" fontSize="small" />}
+            </Stack>
+          } />
+          <Tab label={
+            <Stack direction="row" alignItems="center" gap={1}>
+              Schedule
+              {hasTabError(5) && <ErrorIcon color="error" fontSize="small" />}
             </Stack>
           } />
         </Tabs>
@@ -625,6 +663,16 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
           {/* Tab 3: Products */}
           {tabValue === 3 && (
             <Stack spacing={3}>
+              {errors.products && (
+                <Alert severity="error">
+                  <Stack spacing={0.5}>
+                    <Typography variant="subtitle2">Please fix the highlighted product fields.</Typography>
+                    {getProductErrorSummary()?.map((message, index) => (
+                      <Typography key={index} variant="body2">{message}</Typography>
+                    ))}
+                  </Stack>
+                </Alert>
+              )}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6">Tickets & Add-ons</Typography>
                 <Button startIcon={<Add />} onClick={() => addProduct({ name: '', price: 0 })}>
@@ -649,6 +697,8 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                         size="small"
                         label="Product Name"
                         {...register(`products.${index}.name` as const)}
+                        error={!!(errors.products as unknown as Record<string, { name?: { message?: string } }> | undefined)?.[index]?.name}
+                        helperText={(errors.products as unknown as Record<string, { name?: { message?: string } }> | undefined)?.[index]?.name?.message}
                       />
                     </Grid>
                     <Grid size={{ xs: 12, md: 3 }}>
@@ -658,6 +708,8 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                         type="number"
                         label="Price"
                         {...register(`products.${index}.price` as const, { valueAsNumber: true })}
+                        error={!!(errors.products as unknown as Record<string, { price?: { message?: string } }> | undefined)?.[index]?.price}
+                        helperText={(errors.products as unknown as Record<string, { price?: { message?: string } }> | undefined)?.[index]?.price?.message}
                       />
                     </Grid>
                     <Grid size={{ xs: 12, md: 12 }}>
@@ -668,6 +720,8 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                         rows={2}
                         label="Description"
                         {...register(`products.${index}.description` as const)}
+                        error={!!(errors.products as unknown as Record<string, { description?: { message?: string } }> | undefined)?.[index]?.description}
+                        helperText={(errors.products as unknown as Record<string, { description?: { message?: string } }> | undefined)?.[index]?.description?.message}
                       />
                     </Grid>
                   </Grid>
@@ -782,6 +836,88 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
 
               {customFields.length === 0 && (
                 <Alert severity="info">No custom questions added yet.</Alert>
+              )}
+            </Stack>
+          )}
+
+          {/* Tab 5: Schedule */}
+          {tabValue === 5 && (
+            <Stack spacing={3}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">Schedule Builder</Typography>
+                <Button
+                  startIcon={<Add />}
+                  onClick={() => addScheduleItem({ title: '', startTime: '', endTime: '', location: '', description: '' })}
+                >
+                  Add Session
+                </Button>
+              </Stack>
+
+              {scheduleItems.map((field, index) => (
+                <Paper key={field.id} variant="outlined" sx={{ p: 2, position: 'relative' }}>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    sx={{ position: 'absolute', top: 8, right: 8 }}
+                    onClick={() => removeScheduleItem(index)}
+                  >
+                    <Delete />
+                  </IconButton>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Session Title"
+                        {...register(`schedule.${index}.title` as const)}
+                        error={!!(errors.schedule as unknown as Record<string, { title?: object }> | undefined)?.[index]?.title}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="datetime-local"
+                        label="Start"
+                        InputLabelProps={{ shrink: true }}
+                        {...register(`schedule.${index}.startTime` as const)}
+                        error={!!(errors.schedule as unknown as Record<string, { startTime?: object }> | undefined)?.[index]?.startTime}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="datetime-local"
+                        label="End"
+                        InputLabelProps={{ shrink: true }}
+                        {...register(`schedule.${index}.endTime` as const)}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Location"
+                        {...register(`schedule.${index}.location` as const)}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 12 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        multiline
+                        rows={2}
+                        label="Description"
+                        {...register(`schedule.${index}.description` as const)}
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
+              ))}
+
+              {scheduleItems.length === 0 && (
+                <Alert severity="info">No schedule items added yet. You can add this later when editing the event.</Alert>
               )}
             </Stack>
           )}

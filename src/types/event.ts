@@ -31,6 +31,15 @@ export interface SerializedStayPolicy {
   };
 }
 
+export interface SerializedScheduleItem {
+  id?: string;
+  title: string;
+  startTime: string;
+  endTime?: string;
+  location?: string;
+  description?: string;
+}
+
 export interface SerializedEvent {
   id: number;
   name: string;
@@ -40,6 +49,7 @@ export interface SerializedEvent {
   imageUrl: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
   stayPolicy: SerializedStayPolicy;
+  schedule: SerializedScheduleItem[];
   location?: SerializedLocation | null;
   products: SerializedProduct[];
   _count?: {
