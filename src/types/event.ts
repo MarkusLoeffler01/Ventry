@@ -12,6 +12,9 @@ export interface SerializedProduct {
   name: string;
   price: number;
   description: string | null;
+  type?: 'TICKET' | 'ACCOMMODATION' | 'ADDON';
+  capacity?: number | null;
+  soldCount?: number;
 }
 
 export interface SerializedStayPolicy {

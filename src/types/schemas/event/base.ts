@@ -22,11 +22,14 @@ type Location = z.infer<typeof LocationSchema>;
 /**
  * Product, which can be associated with an event ( Merch, Tickets, etc. )
  */
+const ProductTypeSchema = z.enum(["TICKET", "ACCOMMODATION", "ADDON"]);
 const ProductSchema = z.object({
   id: z.string().cuid().optional(), // Prisma uses cuid for Product IDs
   name: z.string().min(1, "Product name is required"),
   description: z.string().nullable().optional(),
-  price: z.coerce.number().positive("Price must be positive")
+  price: z.coerce.number().positive("Price must be positive"),
+  type: ProductTypeSchema.default("TICKET"),
+  capacity: z.coerce.number().int().positive().nullable().optional()
 }).passthrough();
 type Product = z.infer<typeof ProductSchema>;
 
@@ -162,6 +165,8 @@ export const EventBaseObject = z.object({
   registrationOpensAt: z.coerce.date().nullable().optional(),
   /** Capacity limit */
   maxRegistrations: z.coerce.number().int().positive().nullable().optional(),
+  /** Force user to select a room (ACCOMMODATION product) */
+  requiresHotel: z.boolean().default(false),
   /** Fixed deadline for all payments */
   paymentDeadline: z.coerce.date().nullable().optional(),
 

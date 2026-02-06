@@ -35,6 +35,7 @@ export interface InitialData {
   publishAt?: string | Date | null;
   registrationOpensAt?: string | Date | null;
   maxRegistrations?: number | null;
+  requiresHotel?: boolean;
   paymentDeadline?: string | Date | null;
   status?: 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
   imageUrl?: string | null;
@@ -75,6 +76,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       publishAt: initialData?.publishAt ? new Date(initialData.publishAt) : null,
       registrationOpensAt: initialData?.registrationOpensAt ? new Date(initialData.registrationOpensAt) : null,
       maxRegistrations: initialData?.maxRegistrations || null,
+      requiresHotel: (initialData as AdminCreateEventInput).requiresHotel || false,
       paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || 'DRAFT',
       imageUrl: initialData?.imageUrl || null,
@@ -437,6 +439,27 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
               </Grid>
 
               <Box>
+                <FormControlLabel
+                  control={
+                    <Controller
+                      name="requiresHotel"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      )}
+                    />
+                  }
+                  label="Require Hotel Booking (Mandatory Accommodation)"
+                />
+                <Typography variant="caption" display="block" color="text.secondary">
+                  If enabled, users must select an 'Accommodation' product to complete registration.
+                </Typography>
+              </Box>
+
+              <Box>
                 <Typography variant="subtitle2" gutterBottom>Event Banner</Typography>
                 {watchImageUrl && (
                   <Box sx={{ mb: 2, position: 'relative', width: '100%', height: 200 }}>
@@ -675,7 +698,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
               )}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6">Tickets & Add-ons</Typography>
-                <Button startIcon={<Add />} onClick={() => addProduct({ name: '', price: 0 })}>
+                <Button startIcon={<Add />} onClick={() => addProduct({ name: '', price: 0, type: 'TICKET', capacity: null })}>
                   Add Product
                 </Button>
               </Stack>
@@ -691,7 +714,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                     <Delete />
                   </IconButton>
                   <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 6 }}>
+                    <Grid size={{ xs: 12, md: 5 }}>
                       <TextField
                         fullWidth
                         size="small"
@@ -701,7 +724,31 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                         helperText={(errors.products as unknown as Record<string, { name?: { message?: string } }> | undefined)?.[index]?.name?.message}
                       />
                     </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
+                    <Grid size={{ xs: 12, md: 2 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        select
+                        label="Type"
+                        {...register(`products.${index}.type` as const)}
+                        defaultValue="TICKET"
+                      >
+                         <MenuItem value="TICKET">Ticket</MenuItem>
+                         <MenuItem value="ACCOMMODATION">Room/Bed</MenuItem>
+                         <MenuItem value="ADDON">Add-on</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 2 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Capacity"
+                        placeholder="∞"
+                        {...register(`products.${index}.capacity` as const, { valueAsNumber: true })}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 2 }}>
                       <TextField
                         fullWidth
                         size="small"
