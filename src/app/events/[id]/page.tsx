@@ -24,6 +24,7 @@ import Image from "next/image";
 import Link from "next/link";
 import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
 import RegistrationCountdown from "@/components/events/RegistrationCountdown";
+import EventSchedule from "@/components/events/EventSchedule";
 import { type SerializedEvent } from "@/types/event";
 
 interface StayPolicy {
@@ -186,6 +187,13 @@ export default async function EventDetailPage({
                 {event.description}
               </Typography>
             </Box>
+
+            {/* Schedule */}
+            {event.schedule && Array.isArray(event.schedule) && event.schedule.length > 0 && (
+              <Box mb={6}>
+                <EventSchedule schedule={event.schedule} />
+              </Box>
+            )}
 
             {event.location && (
               <Box mb={6}>

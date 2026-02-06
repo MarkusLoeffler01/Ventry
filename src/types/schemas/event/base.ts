@@ -23,11 +23,11 @@ type Location = z.infer<typeof LocationSchema>;
  * Product, which can be associated with an event ( Merch, Tickets, etc. )
  */
 const ProductSchema = z.object({
-  id: z.uuid().optional(), // server should decide on the ID
+  id: z.string().cuid().optional(), // Prisma uses cuid for Product IDs
   name: z.string().min(1, "Product name is required"),
   description: z.string().nullable().optional(),
   price: z.coerce.number().positive("Price must be positive")
-}).strict();
+}).passthrough();
 type Product = z.infer<typeof ProductSchema>;
 
 /**
@@ -134,6 +134,15 @@ const CustomFieldSchema = z.object({
   options: z.array(z.string()).optional(), // For 'select' type
 }).strict();
 
+const ScheduleItemSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(1, "Session title is required"),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().optional(),
+  location: z.string().optional(),
+  description: z.string().optional(),
+}).strict();
+
 /**
  * Base schema of an event, only the client-delivered, stable fields
  * Used as base for Admin-Create/Update
@@ -160,7 +169,10 @@ export const EventBaseObject = z.object({
   stayPolicy: StayPolicySchema,
 
   /** Custom admin-defined fields for registration */
-  customFields: z.array(CustomFieldSchema).default([])
+  customFields: z.array(CustomFieldSchema).default([]),
+
+  /** Optional schedule/agenda items for the event */
+  schedule: z.array(ScheduleItemSchema).default([])
 });
 
 export const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).strict();
