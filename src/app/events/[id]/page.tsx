@@ -115,6 +115,24 @@ export default async function EventDetailPage({
   const endDate = new Date(event.endDate);
   const stayPolicy = event.stayPolicy as unknown as StayPolicy;
 
+  // Serialize event for client components
+  const serializedEvent: SerializedEvent = {
+    ...event,
+    startDate: event.startDate.toISOString(),
+    endDate: event.endDate.toISOString(),
+    stayPolicy: event.stayPolicy as unknown as SerializedEvent['stayPolicy'],
+    schedule: (event.schedule as unknown as SerializedEvent['schedule']) || [],
+    products: event.products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      description: p.description,
+      type: p.type as SerializedEvent['products'][0]['type'],
+      capacity: p.capacity,
+      soldCount: p.soldCount
+    }))
+  };
+
   return (
     <Box>
       {/* Success Alert */}
@@ -189,9 +207,9 @@ export default async function EventDetailPage({
             </Box>
 
             {/* Schedule */}
-            {event.schedule && Array.isArray(event.schedule) && event.schedule.length > 0 && (
+            {serializedEvent.schedule && serializedEvent.schedule.length > 0 && (
               <Box mb={6}>
-                <EventSchedule schedule={event.schedule} />
+                <EventSchedule schedule={serializedEvent.schedule} />
               </Box>
             )}
 
@@ -256,7 +274,7 @@ export default async function EventDetailPage({
                       ...registration,
                       expiresAt: registration.expiresAt?.toISOString()
                     } as unknown as { id: string; status: string; ticketId: number; expiresAt?: string; payments: { id: string; amount: number; paymentStatus: string; paymentProvider: string }[] }} 
-                    event={event as unknown as SerializedEvent}
+                    event={serializedEvent}
                   />
                 ) : (
                   <>

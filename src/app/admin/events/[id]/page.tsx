@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth } from "@/lib/auth/admin";
 import { redirect, notFound } from "next/navigation";
 import EditEventClient from "./EditEventClient";
-import { type SerializedEvent, type SerializedStayPolicy } from "@/types/event";
+import { type SerializedEvent, type SerializedStayPolicy, type SerializedProduct } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +34,16 @@ export default async function EditEventPage({
     ...event,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate.toISOString(),
-    stayPolicy: event.stayPolicy as object as SerializedStayPolicy,
-    schedule: (event.schedule as object as SerializedEvent["schedule"]) || [],
+    stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
+    schedule: (event.schedule as unknown as SerializedEvent["schedule"]) || [],
     products: event.products.map(p => ({
-        ...p,
-        createdAt: p.createdAt.toISOString(),
-        updatedAt: p.updatedAt.toISOString(),
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        description: p.description,
+        type: p.type as SerializedProduct['type'],
+        capacity: p.capacity,
+        soldCount: p.soldCount
     }))
   };
 

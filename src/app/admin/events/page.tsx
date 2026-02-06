@@ -36,7 +36,7 @@ export default async function AdminEventsPage() {
         startDate: event.startDate.toISOString(),
         endDate: event.endDate.toISOString(),
         stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
-        schedule: (event.schedule as SerializedEvent["schedule"]) || [],
+        schedule: (event.schedule as unknown as SerializedEvent["schedule"]) || [],
         products: [] // Not needed for the list view but required by type
     }));
 

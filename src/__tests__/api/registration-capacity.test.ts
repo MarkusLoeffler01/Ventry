@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { POST, GET } from '@/app/api/event/[id]/attend/route';
 import { NextRequest } from 'next/server';
-import { type Event, type Product, type Registration, type Payment, type Prisma, type WaitlistEntry } from '@/generated/prisma';
+import { type Event, type Product, type Registration, type Payment, type Prisma } from '@/generated/prisma';
 
 // ------------------------------------------------------------------
 // Type Definitions
@@ -10,7 +10,7 @@ import { type Event, type Product, type Registration, type Payment, type Prisma,
 interface MockEvent extends Partial<Event> {
   products: Partial<Product>[];
   _count: { registrations: number };
-  stayPolicy: any;
+  stayPolicy: unknown;
   requiresHotel: boolean;
 }
 
@@ -18,9 +18,9 @@ interface MockDbState {
   event: MockEvent | null;
   registration: Partial<Registration>[];
   product: Partial<Product> | null;
-  registrationItem: any[];
+  registrationItem: Record<string, unknown>[];
   payment: Partial<Payment>[];
-  waitlist: Partial<WaitlistEntry>[];
+  waitlist: Record<string, unknown>[];
 }
 
 // ------------------------------------------------------------------
@@ -56,7 +56,7 @@ vi.mock('@/lib/prisma/prisma', () => {
   // Self-reference for transaction callback
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
-  prismaMock.$transaction.mockImplementation(async (callback) => await callback(prismaMock));
+  prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => await callback(prismaMock));
 
   return { prisma: prismaMock };
 });
@@ -117,7 +117,7 @@ let mockDb: MockDbState = {
 // ------------------------------------------------------------------
 // Helper to create requests
 // ------------------------------------------------------------------
-function createRegisterRequest(eventId: string, body: any) {
+function createRegisterRequest(eventId: string, body: unknown) {
   return new NextRequest(`http://localhost:3000/api/event/${eventId}/attend`, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -190,7 +190,7 @@ describe('Capacity Limit Integration Test', () => {
       return newReg;
     });
 
-    prismaMock.registrationItem.create.mockImplementation(async ({ data }: { data: any }) => {
+    prismaMock.registrationItem.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
       mockDb.registrationItem.push(data);
       return data;
     });
@@ -200,7 +200,7 @@ describe('Capacity Limit Integration Test', () => {
         return mockDb.event.products.find(p => p.id === where.id) || null;
     });
 
-    prismaMock.product.update.mockImplementation(async ({ where, data }: { where: { id: string }, data: any }) => {
+    prismaMock.product.update.mockImplementation(async ({ where, data }: { where: { id: string }, data: { soldCount?: { increment: number } } }) => {
        // Simulate atomic increment
        if (!mockDb.event) return null;
        
@@ -212,7 +212,7 @@ describe('Capacity Limit Integration Test', () => {
     });
     
     // Mock updateMany for atomic check
-    prismaMock.product.updateMany.mockImplementation(async ({ where, data }) => {
+    prismaMock.product.updateMany.mockImplementation(async ({ where, data: _data }) => {
         if (!mockDb.event) return { count: 0 };
         
         const product = mockDb.event.products.find((p) => p.id === where.id);
@@ -238,7 +238,7 @@ describe('Capacity Limit Integration Test', () => {
       return newPayment;
     });
 
-    prismaMock.waitlistEntry.create.mockImplementation(async ({ data }: { data: any }) => {
+    prismaMock.waitlistEntry.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
         mockDb.waitlist.push(data);
         return data;
     });
