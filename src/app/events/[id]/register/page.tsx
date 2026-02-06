@@ -8,8 +8,10 @@ import { type SerializedStayPolicy } from "@/types/event";
 interface SerializedEventForWizard {
   id: number;
   name: string;
-  products: Array<{ id: string; name: string; price: number; description: string | null }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  products: Array<{ id: string; name: string; price: number; description: string | null; type: any; capacity: number | null }>;
   stayPolicy: SerializedStayPolicy | null;
+  requiresHotel?: boolean;
   customFields: { id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }[];
 }
 
@@ -55,9 +57,12 @@ export default async function RegisterEventPage({
       id: p.id,
       name: p.name,
       price: p.price,
-      description: p.description
+      description: p.description,
+      type: p.type,
+      capacity: p.capacity
     })),
     stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
+    requiresHotel: event.requiresHotel,
     customFields: event.customFields as unknown as SerializedEventForWizard['customFields']
   };
 
