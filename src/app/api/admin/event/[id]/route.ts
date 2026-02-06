@@ -64,6 +64,7 @@ export async function PATCH(
                 ...scalarFields,
                 stayPolicy: validatedData.stayPolicy as Prisma.InputJsonValue,
                 customFields: validatedData.customFields as Prisma.InputJsonValue,
+                schedule: validatedData.schedule as Prisma.InputJsonValue,
                 // Handle location update
                 ...(location && {
                     location: {
@@ -78,7 +79,12 @@ export async function PATCH(
                 ...(products && {
                     products: {
                         deleteMany: {},
-                        create: products
+                        create: products.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            description: p.description,
+                            price: p.price
+                        }))
                     }
                 })
             },

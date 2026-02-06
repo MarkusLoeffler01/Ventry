@@ -162,6 +162,8 @@ model Event {
 
   customFields Json       @default("[]")
 
+  schedule    Json        @default("[]")
+
   
 
   ownerId     String? // ID of the Admin profile that owns this event

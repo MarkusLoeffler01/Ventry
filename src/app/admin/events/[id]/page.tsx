@@ -34,7 +34,8 @@ export default async function EditEventPage({
     ...event,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate.toISOString(),
-    stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
+    stayPolicy: event.stayPolicy as object as SerializedStayPolicy,
+    schedule: (event.schedule as object as SerializedEvent["schedule"]) || [],
     products: event.products.map(p => ({
         ...p,
         createdAt: p.createdAt.toISOString(),
