@@ -156,6 +156,8 @@ model Event {
 
   maxRegistrations Int?    // Capacity limit
 
+  requiresHotel Boolean   @default(false) // Force user to select a room
+
   paymentDeadline DateTime? // Fixed deadline for all payments
 
   stayPolicy  Json        @default("{}")
@@ -242,10 +244,26 @@ model Registration {
 
   history  RegistrationHistory[]
 
+  waitlistEntries WaitlistEntry[]
 
+  registrationItems RegistrationItem[]
 
   @@unique([userId, eventId])
 
+}
+
+model RegistrationItem {
+  id             String       @id @default(cuid())
+  registrationId String
+  productId      String
+  priceAtBooking Float
+  
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime     @default(now())
+
+  @@index([registrationId])
 }
 
 
@@ -298,11 +316,26 @@ model Product {
   name        String
   description String?
   price       Float
+  
+  type        ProductType @default(TICKET)
+  capacity    Int?     // Maximum available quantity. Null = unlimited
+  soldCount   Int      @default(0) // Track sold quantity
+  allowWaitlist Boolean @default(true) // Whether to allow waitlisting when full
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   eventId Int
   event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  waitlistEntries WaitlistEntry[]
+  registrationItems RegistrationItem[]
+}
+
+enum ProductType {
+  TICKET
+  ACCOMMODATION
+  ADDON
 }
 
 enum RegistrationStatus {
@@ -310,6 +343,20 @@ enum RegistrationStatus {
   APPROVED
   CONFIRMED
   CANCELLED
+  WAITLISTED
+}
+
+// Item-specific waitlist (e.g., specific room type)
+model WaitlistEntry {
+  id             String   @id @default(cuid())
+  registrationId String
+  productId      String
+  createdAt      DateTime @default(now())
+  
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([registrationId, productId])
 }
 
 enum PaymentStatus {
