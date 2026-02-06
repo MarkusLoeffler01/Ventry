@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
                 status: validatedData.status,
                 stayPolicy: validatedData.stayPolicy as Prisma.InputJsonValue,
                 customFields: validatedData.customFields as Prisma.InputJsonValue,
+                schedule: validatedData.schedule as Prisma.InputJsonValue,
                 ownerId: authResult.user!.id,
                 location: {
                     create: validatedData.location
