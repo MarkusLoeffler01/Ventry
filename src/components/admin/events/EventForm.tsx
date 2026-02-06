@@ -76,7 +76,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       publishAt: initialData?.publishAt ? new Date(initialData.publishAt) : null,
       registrationOpensAt: initialData?.registrationOpensAt ? new Date(initialData.registrationOpensAt) : null,
       maxRegistrations: initialData?.maxRegistrations || null,
-      requiresHotel: (initialData as AdminCreateEventInput).requiresHotel || false,
+      requiresHotel: initialData?.requiresHotel || false,
       paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || 'DRAFT',
       imageUrl: initialData?.imageUrl || null,
@@ -455,7 +455,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                   label="Require Hotel Booking (Mandatory Accommodation)"
                 />
                 <Typography variant="caption" display="block" color="text.secondary">
-                  If enabled, users must select an 'Accommodation' product to complete registration.
+                  If enabled, users must select an &apos;Accommodation&apos; product to complete registration.
                 </Typography>
               </Box>
 
