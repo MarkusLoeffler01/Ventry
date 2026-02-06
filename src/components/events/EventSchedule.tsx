@@ -3,8 +3,7 @@ import {
   Typography, 
   Paper, 
   Stack, 
-  Divider, 
-  Chip,
+  Chip, 
   Grid
 } from "@mui/material";
 import { AccessTime, LocationOn } from "@mui/icons-material";
