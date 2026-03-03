@@ -80,7 +80,7 @@ export default async function RegisterEventPage({
       <RegistrationWizard 
         event={serializedEvent} 
         userId={session.user.id} 
-        initialRegistration={existingRegistration as unknown as { id: string; preferences: { productId?: string; needsHotel?: boolean; earlyArrival?: boolean; lateDeparture?: boolean; customFieldsData?: Record<string, string | number | boolean> }; status: string }}
+        initialRegistration={existingRegistration as unknown as { id: string; preferences: { productId?: string; needsHotel?: boolean; earlyArrival?: boolean; lateDeparture?: boolean; customFieldsData?: Record<string, string | number | boolean>; showOnAttendees?: boolean }; status: string }}
       />
     </Container>
   );

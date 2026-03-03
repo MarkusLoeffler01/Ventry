@@ -11,6 +11,9 @@ import {
   Button, 
   Divider,
   Chip,
+  Avatar,
+  Card,
+  CardContent,
   Alert
 } from "@mui/material";
 import { 
@@ -65,6 +68,13 @@ export default async function EventDetailPage({
     include: {
       location: true,
       products: true,
+      registrations: {
+        where: { status: { not: 'CANCELLED' } },
+        select: {
+          userId: true,
+          preferences: true
+        }
+      },
       _count: {
         select: { registrations: true }
       }
@@ -114,6 +124,58 @@ export default async function EventDetailPage({
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
   const stayPolicy = event.stayPolicy as unknown as StayPolicy;
+  const visibleUserIds = event.registrations
+    .filter((registration) => {
+      const preferences = registration.preferences as { showOnAttendees?: boolean } | null;
+      return !!preferences?.showOnAttendees;
+    })
+    .map((registration) => registration.userId);
+  const uniqueVisibleUserIds = Array.from(new Set(visibleUserIds));
+  const visibleUsers = uniqueVisibleUserIds.length > 0
+    ? await prisma.user.findMany({
+        where: { id: { in: uniqueVisibleUserIds } },
+        select: {
+          id: true,
+          name: true,
+          country: true,
+          profilePictures: {
+            orderBy: [
+              { order: 'asc' },
+              { isPrimary: 'desc' },
+              { createdAt: 'desc' }
+            ],
+            select: {
+              signedUrl: true,
+              isPrimary: true,
+              order: true,
+              createdAt: true
+            }
+          }
+        }
+      })
+    : [];
+  const visibleUsersById = new Map(visibleUsers.map(user => [user.id, user]));
+  const attendees = event.registrations.map((registration, index) => {
+    const preferences = registration.preferences as { showOnAttendees?: boolean } | null;
+    if (!preferences?.showOnAttendees) {
+      return {
+        id: `anonymous-${index}`,
+        name: "Anonymous",
+        country: null,
+        imageUrl: null
+      };
+    }
+
+    const user = visibleUsersById.get(registration.userId);
+    const primaryPicture = user?.profilePictures.find(p => p.isPrimary) || user?.profilePictures[0];
+
+    return {
+      id: user?.id || `anonymous-${index}`,
+      name: user?.name || "Anonymous",
+      country: user?.country || null,
+      imageUrl: primaryPicture?.signedUrl || null
+    };
+  });
 
   // Serialize event for client components
   const serializedEvent: SerializedEvent = {
@@ -226,6 +288,23 @@ export default async function EventDetailPage({
                 </Paper>
               </Box>
             )}
+
+            <Box mb={6}>
+              <Typography variant="h4" gutterBottom fontWeight="bold">Attendees</Typography>
+              <Paper variant="outlined" sx={{ p: 3 }}>
+                {attendees.length === 0 ? (
+                  <Typography color="text.secondary">No attendees yet.</Typography>
+                ) : (
+                  <Grid container spacing={2}>
+                    {attendees.map((attendee) => (
+                      <Grid key={attendee.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                        <AttendeeCard attendee={attendee} />
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </Paper>
+            </Box>
           </Grid>
 
           {/* Registration Sidebar */}
@@ -350,5 +429,57 @@ export default async function EventDetailPage({
         </Grid>
       </Container>
     </Box>
+  );
+}
+
+interface AttendeeCardProps {
+  attendee: {
+    id: string;
+    name: string;
+    country: string | null;
+    imageUrl: string | null;
+  };
+}
+
+/**
+ * Attendee card for the event attendees list.
+ */
+function AttendeeCard({ attendee }: AttendeeCardProps) {
+  const initials = attendee.name
+    .split(' ')
+    .filter(Boolean)
+    .map(part => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  return (
+    <Card variant="outlined" sx={{ height: '100%' }}>
+      <CardContent>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Avatar
+            src={attendee.imageUrl || undefined}
+            alt={attendee.name}
+            sx={{ width: 56, height: 56 }}
+          >
+            {attendee.imageUrl ? null : initials || "?"}
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle1" fontWeight="bold">
+              {attendee.name}
+            </Typography>
+            {attendee.country ? (
+              <Typography variant="body2" color="text.secondary">
+                {attendee.country}
+              </Typography>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Country not shared
+              </Typography>
+            )}
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }

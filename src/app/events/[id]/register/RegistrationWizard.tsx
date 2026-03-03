@@ -52,6 +52,7 @@ interface RegistrationWizardProps {
       earlyArrival?: boolean;
       lateDeparture?: boolean;
       customFieldsData?: Record<string, string | number | boolean>;
+      showOnAttendees?: boolean;
     };
     status: string;
   };
@@ -65,6 +66,9 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
   const [needsHotel, setNeedsHotel] = useState(initialRegistration?.preferences?.needsHotel || false);
   const [earlyArrival, setEarlyArrival] = useState(initialRegistration?.preferences?.earlyArrival || false);
   const [lateDeparture, setLateDeparture] = useState(initialRegistration?.preferences?.lateDeparture || false);
+  const [showOnAttendees, setShowOnAttendees] = useState(
+    initialRegistration?.preferences?.showOnAttendees || false
+  );
   const [customFieldsData, setCustomFieldsData] = useState<Record<string, string | number | boolean>>(
     initialRegistration?.preferences?.customFieldsData || {}
   );
@@ -119,7 +123,8 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
               needsHotel,
               earlyArrival,
               lateDeparture,
-              customFieldsData
+              customFieldsData,
+              showOnAttendees
             }
           }),
         });
@@ -159,7 +164,8 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
             needsHotel,
             earlyArrival,
             lateDeparture,
-            customFieldsData
+            customFieldsData,
+            showOnAttendees
           }
         }),
       });
@@ -315,6 +321,20 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
                       </Box>
                     )}
                   </Paper>
+                  <Paper variant="outlined" sx={{ p: 3 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={showOnAttendees}
+                          onChange={(e) => setShowOnAttendees(e.target.checked)}
+                        />
+                      }
+                      label="Show my name on the attendees page"
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ pl: 4 }}>
+                      If unchecked, you will appear as &quot;Anonymous&quot;.
+                    </Typography>
+                  </Paper>
                 </Stack>
                           </Box>
                         )}
@@ -382,6 +402,10 @@ export default function RegistrationWizard({ event, userId, initialRegistration 
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <Typography color="text.secondary">Hotel Stay:</Typography>
                                   <Typography>{needsHotel ? 'Yes' : 'No'}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <Typography color="text.secondary">Attendee List:</Typography>
+                                  <Typography>{showOnAttendees ? 'Show my name' : 'Anonymous'}</Typography>
                                 </Box>
                                 {event.customFields.map(field => (
                                   <Box key={field.id} sx={{ display: 'flex', justifyContent: 'space-between' }}>
