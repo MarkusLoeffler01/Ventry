@@ -50,4 +50,10 @@ yarn-error.log*
 next-env.d.ts
 
 
-.github/instructions/backups/
+
+
+/backups/
+
+
+
+.github/instructions/
