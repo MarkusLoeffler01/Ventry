@@ -29,6 +29,7 @@ import Link from "next/link";
 import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
 import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
+import EventLocationMap from "@/components/events/EventLocationMap";
 import { type SerializedEvent, type SerializedProduct } from "@/types/event";
 
 export const dynamic = "force-dynamic";
@@ -304,6 +305,7 @@ export default async function EventDetailPage({
                     {event.location.postalCode} {event.location.city}
                   </Typography>
                   <Typography color="text.secondary">{event.location.state}, {event.location.country}</Typography>
+                  <EventLocationMap location={event.location} />
                 </Paper>
               </Box>
             )}
