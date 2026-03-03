@@ -44,6 +44,7 @@ interface User {
   id: string;
   name?: string | null;
   email: string;
+  country?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
     providerId: string;  // Changed from 'provider' for better-auth
@@ -63,6 +64,7 @@ interface ProfilePageClientProps {
 
 interface ProfileFormData {
   name: string;
+  country: string;
   bio: string;
   dateOfBirth: string;
   pronouns: string;
@@ -83,6 +85,7 @@ const PRONOUN_OPTIONS = [
 export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
+    country: user.country || '',
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
@@ -140,6 +143,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         body: JSON.stringify({
           id: user.id,
           name: formData.name,
+          country: formData.country || null,
           bio: formData.bio,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : null,
           pronouns: formData.pronouns,
@@ -263,6 +267,14 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               onChange={handleInputChange('name')}
               fullWidth
               helperText="This is how others will see you on the platform"
+            />
+
+            <TextField
+              label="Country"
+              value={formData.country}
+              onChange={handleInputChange('country')}
+              fullWidth
+              helperText="Optional, shown on attendee cards if enabled"
             />
 
             <TextField
