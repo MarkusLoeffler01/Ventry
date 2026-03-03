@@ -66,6 +66,7 @@ export const userSelfSchema = z.object({
     email: z.string().email("Invalid email address"),
     password: z.string().min(8, "Password must be at least 8 characters long"),
     profilePicture: z.string().url("Invalid URL").optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
     isAdmin: z.boolean().optional(),
     emailVerified: z.boolean().optional(),
 });
