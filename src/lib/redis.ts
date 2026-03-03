@@ -38,3 +38,8 @@ export async function incrementProductStock(productId: string): Promise<void> {
     const key = `product:${productId}:stock`;
     await redis.incr(key);
 }
+
+export async function clearProductStock(productId: string): Promise<void> {
+    const key = `product:${productId}:stock`;
+    await redis.del(key);
+}

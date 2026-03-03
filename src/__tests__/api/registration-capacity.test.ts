@@ -35,10 +35,14 @@ vi.mock('@/lib/prisma/prisma', () => {
     $transaction: vi.fn(),
     registration: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     registrationItem: {
       create: vi.fn(),
+      deleteMany: vi.fn(),
     },
     product: {
       findUnique: vi.fn(),
@@ -47,9 +51,11 @@ vi.mock('@/lib/prisma/prisma', () => {
     },
     payment: {
       create: vi.fn(),
+      updateMany: vi.fn(),
     },
     waitlistEntry: {
       create: vi.fn(),
+      deleteMany: vi.fn(),
     }
   };
   
@@ -67,11 +73,17 @@ import { prisma } from '@/lib/prisma/prisma';
 type MockPrismaClient = {
   event: { findUnique: ReturnType<typeof vi.fn> };
   $transaction: ReturnType<typeof vi.fn>;
-  registration: { findUnique: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
-  registrationItem: { create: ReturnType<typeof vi.fn> };
+  registration: {
+    findUnique: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    count: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+  registrationItem: { create: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> };
   product: { findUnique: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
-  payment: { create: ReturnType<typeof vi.fn> };
-  waitlistEntry: { create: ReturnType<typeof vi.fn> };
+  payment: { create: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
+  waitlistEntry: { create: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> };
 };
 
 const prismaMock = prisma as unknown as MockPrismaClient;
@@ -102,6 +114,9 @@ vi.mock('@/lib/redis', () => ({
   incrementProductStock: vi.fn(async (id: string) => {
       const current = redisStore.get(id) ?? 0;
       redisStore.set(id, current + 1);
+  }),
+  clearProductStock: vi.fn(async (id: string) => {
+      redisStore.delete(id);
   })
 }));
 
@@ -176,10 +191,28 @@ describe('Capacity Limit Integration Test', () => {
     });
 
     prismaMock.registration.findUnique.mockImplementation(async ({ where }: { where: { userId_eventId: { userId: string, eventId: number } } }) => {
-      return mockDb.registration.find(r => 
+      const found = mockDb.registration.find(r => 
         r.userId === where.userId_eventId.userId && 
         r.eventId === where.userId_eventId.eventId
       ) || null;
+
+      if (!found) {
+        return null;
+      }
+
+      return {
+        payments: [],
+        ...found
+      };
+    });
+
+    prismaMock.registration.findMany.mockResolvedValue([]);
+
+    prismaMock.registration.count.mockImplementation(async ({ where }: { where: { eventId: number; status: { in: string[] } } }) => {
+      return mockDb.registration.filter((registration) =>
+        registration.eventId === where.eventId &&
+        where.status.in.includes(String(registration.status))
+      ).length;
     });
 
     prismaMock.registration.create.mockImplementation(async ({ data }: { data: Prisma.RegistrationCreateInput }) => {
@@ -191,10 +224,19 @@ describe('Capacity Limit Integration Test', () => {
       return newReg;
     });
 
+    prismaMock.registration.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+      const existing = mockDb.registration.find((registration) => registration.id === where.id);
+      if (!existing) return null;
+      Object.assign(existing, data);
+      return existing;
+    });
+
     prismaMock.registrationItem.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
       mockDb.registrationItem.push(data);
       return data;
     });
+
+    prismaMock.registrationItem.deleteMany.mockResolvedValue({ count: 0 });
     
     prismaMock.product.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
         if (!mockDb.event) return null;
@@ -238,6 +280,10 @@ describe('Capacity Limit Integration Test', () => {
       mockDb.payment.push(newPayment as unknown as Payment);
       return newPayment;
     });
+
+    prismaMock.payment.updateMany.mockResolvedValue({ count: 0 });
+
+    prismaMock.waitlistEntry.deleteMany.mockResolvedValue({ count: 0 });
 
     prismaMock.waitlistEntry.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
         mockDb.waitlist.push(data);
