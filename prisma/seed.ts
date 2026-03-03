@@ -1,4 +1,5 @@
 import { PrismaClient } from "../src/generated/prisma";
+import { hashPassword } from "../src/lib/bcrypt";
 import fs from "fs";
 import path from "path";
 
@@ -140,7 +141,7 @@ async function main() {
           accounts: {
             create: {
               providerId: "credential",
-              password
+              password: await hashPassword(password),
             }
           }, 
           adminProfile: type === "ADMIN" ? { create: {} } : undefined
