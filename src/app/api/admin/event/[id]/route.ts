@@ -23,7 +23,9 @@ export async function GET(
             where: { id },
             include: {
                 location: true,
-                products: true,
+                products: {
+                    orderBy: { createdAt: "asc" }
+                },
                 _count: {
                     select: { registrations: true }
                 }
@@ -92,7 +94,9 @@ export async function PATCH(
             },
             include: {
                 location: true,
-                products: true
+                products: {
+                    orderBy: { createdAt: "asc" }
+                }
             }
         });
 

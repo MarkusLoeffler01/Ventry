@@ -24,22 +24,24 @@ type Location = z.infer<typeof LocationSchema>;
  */
 const ProductTypeSchema = z.enum(["TICKET", "ACCOMMODATION", "ADDON"]);
 const ProductSchema = z.object({
-  id: z.string().cuid().optional(), // Prisma uses cuid for Product IDs
+  id: z.string().min(1).optional(),
   name: z.string().min(1, "Product name is required"),
   description: z.string().nullable().optional(),
-  price: z.coerce.number().positive("Price must be positive"),
+  price: z.coerce.number().nonnegative("Price cannot be negative"),
   type: ProductTypeSchema.default("TICKET"),
-  capacity: z.coerce.number().int().positive().nullable().optional()
+  capacity: z.coerce.number().int().positive().nullable().optional(),
+  order: z.coerce.number().int().default(0)
 }).passthrough();
 type Product = z.infer<typeof ProductSchema>;
 
 /**
- * Hotel/Stay policy of the event:
- *  - Main-Days: Standard Check-in/Check-out
- *  - Early-Arrival: optional early check-in
- *  - Late-Departure: optional late check-out
+ * Hotel/Stay policy of the event.
+ * Policies are now scoped per hotel so the registration flow can calculate
+ * early/late fees from the selected room price while still allowing overrides.
  */
-const StayPolicySchema = z.object({
+const StayFeeModeSchema = z.enum(["AUTO", "CUSTOM"]);
+
+const HotelStayPolicySchema = z.object({
   main: z.object({
     /** First regular Check-in date */
     checkIn: z.coerce.date(),
@@ -52,6 +54,8 @@ const StayPolicySchema = z.object({
     enabled: z.boolean().default(false),
     /** Optional early check-in date */
     from: z.coerce.date().optional(),
+    /** Auto = use the selected room price; Custom = explicit fee */
+    pricingMode: StayFeeModeSchema.default("AUTO"),
     /** costs per extra-night (if relevant) */
     feePerNight: z.coerce.number().nonnegative().optional(),
   }).strict(),
@@ -61,6 +65,8 @@ const StayPolicySchema = z.object({
     enabled: z.boolean().default(false),
     /** Optional late check-out date */
     until: z.coerce.date().optional(),
+    /** Auto = use the selected room price; Custom = explicit fee */
+    pricingMode: StayFeeModeSchema.default("AUTO"),
     /** costs per extra-night (if relevant) */
     feePerNight: z.coerce.number().nonnegative().optional(),
   }).strict()
@@ -109,6 +115,51 @@ const StayPolicySchema = z.object({
     }
   }
 }).strict();
+
+const HotelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1, "Hotel name is required"),
+  isPrimary: z.boolean().default(false),
+  roomTypeProductIds: z.array(z.string().min(1)).default([]),
+  stayPolicy: HotelStayPolicySchema,
+}).strict();
+
+const StayPolicySchema = z.object({
+  version: z.literal(2).default(2),
+  mainLocationIsAccommodation: z.boolean().default(false),
+  allowOverflowHotels: z.boolean().default(false),
+  samePolicyAcrossHotels: z.boolean().default(false),
+  hotels: z.array(HotelSchema).default([]),
+}).superRefine((data, ctx) => {
+  if ((data.mainLocationIsAccommodation || data.allowOverflowHotels) && data.hotels.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hotels"],
+      message: "Add at least one hotel when accommodation is enabled.",
+    });
+  }
+
+  if (data.hotels.length > 0) {
+    const primaryHotelCount = data.hotels.filter(hotel => hotel.isPrimary).length;
+    if (primaryHotelCount !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["hotels"],
+        message: "Exactly one hotel must be marked as primary.",
+      });
+    }
+  }
+
+  data.hotels.forEach((hotel, index) => {
+    if (hotel.roomTypeProductIds.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["hotels", index, "roomTypeProductIds"],
+        message: "Add at least one room type for each hotel.",
+      });
+    }
+  });
+}).strict();
 type StayPolicy = z.infer<typeof StayPolicySchema>;
 
 
@@ -124,6 +175,20 @@ export const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: 
       code: z.ZodIssueCode.custom,
       message: "Start date must be before end date",
       path: ["startDate"],
+    });
+  }
+}
+
+export const checkCapacityLimits = (data: { maxRegistrations?: number | null; products?: any[] }, cxt: z.RefinementCtx) => {
+  if (data.maxRegistrations && data.products) {
+    data.products.forEach((p, index) => {
+      if (p.type === 'TICKET' && p.capacity && p.capacity > data.maxRegistrations!) {
+        cxt.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Ticket capacity (${p.capacity}) cannot exceed total event capacity (${data.maxRegistrations})`,
+          path: ["products", index, "capacity"],
+        });
+      }
     });
   }
 }
@@ -180,7 +245,7 @@ export const EventBaseObject = z.object({
   schedule: z.array(ScheduleItemSchema).default([])
 });
 
-export const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).strict();
+export const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).superRefine(checkCapacityLimits).strict();
 type EventBase = z.infer<typeof EventBaseSchema>;
 
 

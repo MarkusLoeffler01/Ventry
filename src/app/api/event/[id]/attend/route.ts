@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
-import { type StayPolicy } from "@/types/schemas/event/base";
+import { findHotelByRoomProductId, normalizeStayPolicy, resolveStayFee } from "@/lib/events/accommodation";
 import { Prisma } from "@/generated/prisma";
 import { decrementProductStock, getOrInitProductStock, incrementProductStock } from "@/lib/redis";
 
@@ -24,6 +24,9 @@ export async function GET(
                         capacity: true,
                         soldCount: true,
                         price: true
+                    },
+                    orderBy: {
+                        createdAt: "asc"
                     }
                 }
             }
@@ -71,7 +74,7 @@ export async function POST(
 
         const body = await req.json();
         // Support both old format (single productId) and new format (productIds array)
-        const productIds: string[] = body.productIds || (body.productId ? [body.productId] : []);
+        const productIds: string[] = Array.from(new Set((body.productIds || (body.productId ? [body.productId] : [])).filter(Boolean)));
         const { preferences } = body;
 
         if (productIds.length === 0) {
@@ -82,7 +85,9 @@ export async function POST(
         const event = await prisma.event.findUnique({
             where: { id: eventId, status: 'PUBLISHED' },
             include: { 
-                products: true,
+                products: {
+                    orderBy: { createdAt: "asc" }
+                },
                 _count: {
                     select: { registrations: true }
                 }
@@ -132,12 +137,40 @@ export async function POST(
             }
         }
 
-        const stayPolicy = event.stayPolicy as unknown as StayPolicy;
-        if (preferences?.earlyArrival && stayPolicy?.earlyArrival?.enabled && stayPolicy.earlyArrival.feePerNight) {
-            totalAmount += Number(stayPolicy.earlyArrival.feePerNight);
+        const serializedProducts = event.products.map(product => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            description: product.description,
+            type: product.type,
+            capacity: product.capacity,
+            soldCount: product.soldCount
+        }));
+        const stayPolicy = normalizeStayPolicy(
+            event.stayPolicy,
+            serializedProducts,
+            event.name,
+            event.startDate,
+            event.endDate
+        );
+        const selectedAccommodationId =
+            preferences?.accommodationId ||
+            validProducts.find(product => product.type === "ACCOMMODATION")?.id;
+        const selectedRoom = validProducts.find(product => product.id === selectedAccommodationId);
+        const selectedHotel = findHotelByRoomProductId(
+            stayPolicy,
+            selectedAccommodationId,
+            serializedProducts,
+            event.name,
+            event.startDate,
+            event.endDate
+        );
+
+        if (preferences?.earlyArrival && selectedHotel?.stayPolicy.earlyArrival.enabled) {
+            totalAmount += resolveStayFee(selectedHotel.stayPolicy.earlyArrival, selectedRoom?.price || 0);
         }
-        if (preferences?.lateDeparture && stayPolicy?.lateDeparture?.enabled && stayPolicy.lateDeparture.feePerNight) {
-            totalAmount += Number(stayPolicy.lateDeparture.feePerNight);
+        if (preferences?.lateDeparture && selectedHotel?.stayPolicy.lateDeparture.enabled) {
+            totalAmount += resolveStayFee(selectedHotel.stayPolicy.lateDeparture, selectedRoom?.price || 0);
         }
 
         const expiresAt = event.paymentDeadline;
@@ -164,6 +197,7 @@ export async function POST(
                     expiresAt,
                     preferences: {
                         ...preferences,
+                        productId: body.productId,
                         productIds
                     } as Prisma.InputJsonValue
                 }
@@ -172,6 +206,14 @@ export async function POST(
             // Process Confirmed Items
             for (const pid of confirmedProductIds) {
                 const p = validProducts.find(vp => vp.id === pid)!;
+
+                await tx.registrationItem.create({
+                    data: {
+                        registrationId: reg.id,
+                        productId: pid,
+                        priceAtBooking: p.price
+                    }
+                });
                 
                 // Increment DB Counter
                 if (p.capacity !== null) {

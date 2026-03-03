@@ -86,6 +86,7 @@ type ParticipationUpdateInput = z.infer<typeof participationUpdateSchema>;
 const makeParticipationUpdateWithPolicySchema = (policy: StayPolicy) =>
     participationUpdateRawSchema.superRefine((data, ctx) => {
         const u = data.updates ?? {};
+        const activePolicy = policy.hotels.find(hotel => hotel.isPrimary)?.stayPolicy || policy.hotels[0]?.stayPolicy;
         // if not hotel needed, user should not request early/late arrival
         if(!u.needsHotel) {
             if(u.early?.status === "REQUESTED") {
@@ -105,14 +106,14 @@ const makeParticipationUpdateWithPolicySchema = (policy: StayPolicy) =>
         }
 
         // Policy checks
-        if(u.early?.status === "REQUESTED" && !policy.earlyArrival.enabled) {
+        if(u.early?.status === "REQUESTED" && !activePolicy?.earlyArrival.enabled) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["updates", "early", "status"],
                 message: "Early arrival not available for this event"
             });
         }
-        if (u.late?.status === "REQUESTED" && !policy.lateDeparture.enabled) {
+        if (u.late?.status === "REQUESTED" && !activePolicy?.lateDeparture.enabled) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["updates", "late", "status"],

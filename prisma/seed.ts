@@ -151,8 +151,12 @@ async function main() {
       console.log(`Created ${type} user: ${email}`);
     }
 
-
     const randomAdmin = await prisma.admin.findFirst();
+    if (!randomAdmin) {
+      console.warn("⚠️ No admin found after seeding users! Events will have no owner.");
+    } else {
+      console.log(`Found admin: ${randomAdmin.id}`);
+    }
     const randomAdminId = randomAdmin?.id;
 
     // Create Sample Event
