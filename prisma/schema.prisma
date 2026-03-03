@@ -322,6 +322,7 @@ model Product {
   capacity    Int?     // Maximum available quantity. Null = unlimited
   soldCount   Int      @default(0) // Track sold quantity
   allowWaitlist Boolean @default(true) // Whether to allow waitlisting when full
+  order       Int      @default(0) // Display order in the registration wizard
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

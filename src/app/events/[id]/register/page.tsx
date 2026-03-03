@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
+import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import { Container, Box, Typography } from "@mui/material";
 import RegistrationWizard from "./RegistrationWizard";
-import { type SerializedStayPolicy } from "@/types/event";
+import { type SerializedProduct, type SerializedStayPolicy } from "@/types/event";
 
 interface SerializedEventForWizard {
   id: number;
   name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  products: Array<{ id: string; name: string; price: number; description: string | null; type: any; capacity: number | null }>;
+  products: SerializedProduct[];
   stayPolicy: SerializedStayPolicy | null;
   requiresHotel?: boolean;
   customFields: { id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }[];
@@ -19,8 +19,10 @@ export const dynamic = "force-dynamic";
 
 export default async function RegisterEventPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ mode?: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) {
@@ -30,11 +32,14 @@ export default async function RegisterEventPage({
 
   const id = Number((await params).id);
   if (isNaN(id)) notFound();
+  const { mode } = await searchParams;
 
   const event = await prisma.event.findUnique({
     where: { id, status: 'PUBLISHED' },
     include: {
-      products: true,
+      products: {
+        orderBy: { createdAt: "asc" }
+      },
     }
   });
 
@@ -47,8 +52,25 @@ export default async function RegisterEventPage({
         userId: session.user.id,
         eventId: id
       }
-    }
+    },
+    include: {
+      registrationItems: {
+        include: {
+          product: true
+        }
+      },
+      payments: {
+        orderBy: { createdAt: "desc" }
+      }
+    },
   });
+  const hasCompletedPayment = existingRegistration?.payments.some(payment => payment.paymentStatus === "COMPLETED") || false;
+  const resolvedEditMode =
+    existingRegistration
+      ? hasCompletedPayment
+        ? "extras"
+        : "full"
+      : "create";
 
   const serializedEvent: SerializedEventForWizard = {
     id: event.id,
@@ -61,7 +83,20 @@ export default async function RegisterEventPage({
       type: p.type,
       capacity: p.capacity
     })),
-    stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
+    stayPolicy: normalizeStayPolicy(
+      event.stayPolicy,
+      event.products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        description: p.description,
+        type: p.type as SerializedProduct["type"],
+        capacity: p.capacity
+      })),
+      event.name,
+      event.startDate,
+      event.endDate
+    ) as SerializedStayPolicy,
     requiresHotel: event.requiresHotel,
     customFields: event.customFields as unknown as SerializedEventForWizard['customFields']
   };
@@ -80,7 +115,30 @@ export default async function RegisterEventPage({
       <RegistrationWizard 
         event={serializedEvent} 
         userId={session.user.id} 
-        initialRegistration={existingRegistration as unknown as { id: string; preferences: { productId?: string; needsHotel?: boolean; earlyArrival?: boolean; lateDeparture?: boolean; customFieldsData?: Record<string, string | number | boolean>; showOnAttendees?: boolean }; status: string }}
+        editMode={resolvedEditMode}
+        initialRegistration={existingRegistration as unknown as {
+          id: string;
+          preferences: {
+            productId?: string;
+            accommodationId?: string;
+            productIds?: string[];
+            needsHotel?: boolean;
+            earlyArrival?: boolean;
+            lateDeparture?: boolean;
+            customFieldsData?: Record<string, string | number | boolean>;
+            showOnAttendees?: boolean;
+          };
+          status: string;
+          registrationItems: {
+            productId: string;
+            product: SerializedProduct;
+          }[];
+          payments: {
+            id: string;
+            amount: number;
+            paymentStatus: string;
+          }[];
+        }}
       />
     </Container>
   );

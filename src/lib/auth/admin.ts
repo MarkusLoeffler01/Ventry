@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 export async function checkAdminAuth(requestHeaders?: Headers): Promise<{ 
   authorized: boolean; 
   user?: { id: string; email: string }; 
+  adminId?: string;
   error?: string 
 }> {
   try {
@@ -22,7 +23,12 @@ export async function checkAdminAuth(requestHeaders?: Headers): Promise<{
     // Check if user is admin in database
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, email: true, isAdmin: true }
+      select: { 
+        id: true, 
+        email: true, 
+        isAdmin: true,
+        adminProfile: { select: { id: true } }
+      }
     });
     
     if (!user) {
@@ -35,7 +41,8 @@ export async function checkAdminAuth(requestHeaders?: Headers): Promise<{
 
     return { 
       authorized: true, 
-      user: { id: user.id, email: user.email } 
+      user: { id: user.id, email: user.email },
+      adminId: user.adminProfile?.id
     };
     
   } catch (error) {

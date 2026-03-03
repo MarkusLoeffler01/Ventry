@@ -53,6 +53,7 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const router = useRouter();
   const latestPayment = registration.payments[0];
+  const hasCompletedPayment = registration.payments.some((payment) => payment.paymentStatus === 'COMPLETED');
 
   const isExpired = registration.expiresAt && new Date(registration.expiresAt) < new Date() && registration.status === 'PENDING';
 
@@ -125,15 +126,6 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
       };
     }
 
-    if (registration.status === 'CONFIRMED') {
-      return {
-        label: 'Registered',
-        color: 'success' as const,
-        icon: <CheckCircle />,
-        message: 'Your spot is secured!'
-      };
-    }
-    
     if (latestPayment?.paymentStatus === 'PENDING') {
       return {
         label: 'Awaiting Payment',
@@ -142,6 +134,15 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
         message: registration.expiresAt 
           ? `Please complete your payment by ${new Date(registration.expiresAt).toLocaleString()}.`
           : 'Please complete your payment.'
+      };
+    }
+
+    if (registration.status === 'CONFIRMED') {
+      return {
+        label: 'Registered',
+        color: 'success' as const,
+        icon: <CheckCircle />,
+        message: 'Your spot is secured!'
       };
     }
 
@@ -200,15 +201,32 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
         )}
 
         {!isExpired && registration.status !== 'CANCELLED' && (
-          <Button 
-            fullWidth 
-            variant="outlined" 
-            startIcon={<Edit />}
-            component={Link}
-            href={`/events/${event.id}/register`} // Reusing the wizard for editing
-          >
-            Edit Attendance
-          </Button>
+          hasCompletedPayment ? (
+            <>
+              <Button 
+                fullWidth 
+                variant="outlined" 
+                startIcon={<Edit />}
+                component={Link}
+                href={`/events/${event.id}/register?mode=extras`}
+              >
+                Add Extras / Update Details
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Ticket and hotel changes after payment require organizer support.
+              </Typography>
+            </>
+          ) : (
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              startIcon={<Edit />}
+              component={Link}
+              href={`/events/${event.id}/register`}
+            >
+              Edit Attendance
+            </Button>
+          )
         )}
 
         {registration.status !== 'CANCELLED' && (
