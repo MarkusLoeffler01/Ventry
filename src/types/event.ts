@@ -17,7 +17,9 @@ export interface SerializedProduct {
   soldCount?: number;
 }
 
-export interface SerializedStayPolicy {
+export type SerializedStayFeeMode = 'AUTO' | 'CUSTOM';
+
+export interface SerializedHotelStayPolicy {
   main: {
     checkIn: string | Date;
     checkOut: string | Date;
@@ -25,13 +27,31 @@ export interface SerializedStayPolicy {
   earlyArrival: {
     enabled: boolean;
     from?: string | Date;
+    pricingMode: SerializedStayFeeMode;
     feePerNight?: number;
   };
   lateDeparture: {
     enabled: boolean;
     until?: string | Date;
+    pricingMode: SerializedStayFeeMode;
     feePerNight?: number;
   };
+}
+
+export interface SerializedHotel {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  roomTypeProductIds: string[];
+  stayPolicy: SerializedHotelStayPolicy;
+}
+
+export interface SerializedStayPolicy {
+  version: 2;
+  mainLocationIsAccommodation: boolean;
+  allowOverflowHotels: boolean;
+  samePolicyAcrossHotels: boolean;
+  hotels: SerializedHotel[];
 }
 
 export interface SerializedScheduleItem {

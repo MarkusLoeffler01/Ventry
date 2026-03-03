@@ -5,6 +5,17 @@ import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 import { adminCreateEventSchema } from "@/types/schemas/event/admin";
 import { z } from "zod";
 
+function toPersistedProducts(products: z.infer<typeof adminCreateEventSchema>["products"]) {
+    return products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        type: product.type as "TICKET" | "ACCOMMODATION" | "ADDON" | undefined,
+        capacity: product.capacity,
+    }));
+}
+
 // GET /api/admin/event - List all events for admins
 export async function GET(_req: NextRequest) {
     try {
@@ -38,6 +49,10 @@ export async function POST(req: NextRequest) {
             return forbiddenResponse(authResult.error);
         }
 
+        if (!authResult.adminId) {
+            return NextResponse.json({ error: "Admin profile incomplete" }, { status: 403 });
+        }
+
         const body = await req.json();
         const validatedData = adminCreateEventSchema.parse(body);
 
@@ -52,17 +67,19 @@ export async function POST(req: NextRequest) {
                 stayPolicy: validatedData.stayPolicy as Prisma.InputJsonValue,
                 customFields: validatedData.customFields as Prisma.InputJsonValue,
                 schedule: validatedData.schedule as Prisma.InputJsonValue,
-                ownerId: authResult.user!.id,
+                ownerId: authResult.adminId,
                 location: {
                     create: validatedData.location
                 },
                 products: {
-                    create: validatedData.products
+                    create: toPersistedProducts(validatedData.products)
                 }
             },
             include: {
                 location: true,
-                products: true
+                products: {
+                    orderBy: { createdAt: "asc" }
+                }
             }
         });
 

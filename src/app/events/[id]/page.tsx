@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma/prisma";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
+import { calculateMaximumStaySurcharge, normalizeStayPolicy, resolveAccommodationHotels } from "@/lib/events/accommodation";
 import { 
   Container, 
   Box, 
@@ -28,12 +29,7 @@ import Link from "next/link";
 import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
 import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
-import { type SerializedEvent } from "@/types/event";
-
-interface StayPolicy {
-  earlyArrival?: { enabled: boolean; feePerNight?: number };
-  lateDeparture?: { enabled: boolean; feePerNight?: number };
-}
+import { type SerializedEvent, type SerializedProduct } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +63,9 @@ export default async function EventDetailPage({
     },
     include: {
       location: true,
-      products: true,
+      products: {
+        orderBy: { createdAt: "asc" }
+      },
       registrations: {
         where: { status: { not: 'CANCELLED' } },
         select: {
@@ -123,7 +121,36 @@ export default async function EventDetailPage({
 
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
-  const stayPolicy = event.stayPolicy as unknown as StayPolicy;
+  const serializedProducts = event.products.map(p => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    description: p.description,
+    type: p.type as SerializedProduct['type'],
+    capacity: p.capacity,
+    soldCount: p.soldCount
+  }));
+  const stayPolicy = normalizeStayPolicy(
+    event.stayPolicy,
+    serializedProducts,
+    event.location?.name || event.name,
+    event.startDate,
+    event.endDate
+  );
+  const accommodationHotels = resolveAccommodationHotels(
+    stayPolicy,
+    serializedProducts,
+    event.location?.name || event.name,
+    event.startDate,
+    event.endDate
+  );
+  const maximumStaySurcharge = calculateMaximumStaySurcharge(
+    stayPolicy,
+    serializedProducts,
+    event.location?.name || event.name,
+    event.startDate,
+    event.endDate
+  );
   const visibleUserIds = event.registrations
     .filter((registration) => {
       const preferences = registration.preferences as { showOnAttendees?: boolean } | null;
@@ -182,17 +209,9 @@ export default async function EventDetailPage({
     ...event,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate.toISOString(),
-    stayPolicy: event.stayPolicy as unknown as SerializedEvent['stayPolicy'],
+    stayPolicy,
     schedule: (event.schedule as unknown as SerializedEvent['schedule']) || [],
-    products: event.products.map(p => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      description: p.description,
-      type: p.type as SerializedEvent['products'][0]['type'],
-      capacity: p.capacity,
-      soldCount: p.soldCount
-    }))
+    products: serializedProducts
   };
 
   return (
@@ -333,9 +352,9 @@ export default async function EventDetailPage({
                           ? (
                             <>
                               {`${Math.min(...event.products.map(p => p.price))}€ - ${Math.max(...event.products.map(p => p.price))}€`}
-                              {(stayPolicy?.earlyArrival?.feePerNight || stayPolicy?.lateDeparture?.feePerNight) && (
+                              {maximumStaySurcharge > 0 && (
                                 <Typography component="span" variant="caption" display="block" color="primary.main" sx={{ mt: 0.5 }}>
-                                  + Optional Extras (up to {((stayPolicy?.earlyArrival?.feePerNight || 0) + (stayPolicy?.lateDeparture?.feePerNight || 0))}€)
+                                  + Optional Hotel Extras (up to {maximumStaySurcharge}€)
                                 </Typography>
                               )}
                             </>
@@ -419,7 +438,7 @@ export default async function EventDetailPage({
                   <Chip label="Badge" variant="outlined" />
                   <Chip label="Convention Access" variant="outlined" />
                   <Chip label="Workshops" variant="outlined" />
-                  {stayPolicy?.earlyArrival?.enabled && (
+                  {accommodationHotels.length > 0 && (
                     <Chip label="Hotel Support" variant="outlined" />
                   )}
                 </Stack>

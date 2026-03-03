@@ -10,7 +10,7 @@ import { type Event, type Product, type Registration, type Payment, type Prisma 
 interface MockEvent extends Partial<Event> {
   products: Partial<Product>[];
   _count: { registrations: number };
-  stayPolicy: unknown;
+  stayPolicy: Prisma.JsonValue;
   requiresHotel: boolean;
 }
 
@@ -110,6 +110,7 @@ let mockDb: MockDbState = {
   event: null,
   registration: [],
   product: null,
+  registrationItem: [],
   payment: [],
   waitlist: []
 };
