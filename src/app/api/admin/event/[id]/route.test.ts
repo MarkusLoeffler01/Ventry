@@ -1,182 +1,237 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { testApiHandler } from "next-test-api-route-handler";
 
-// Mocks
-
-vi.mock('@/types/schemas/event/admin', () => ({
-  createEventSchema: { parse: vi.fn() },
-  updateEventSchema: { parse: vi.fn() },
+vi.mock("@/types/schemas/event/admin", () => ({
+    adminUpdateEventSchema: {
+        parse: vi.fn()
+    }
 }));
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock("@/lib/prisma/prisma", () => ({
     prisma: {
         event: {
-            create: vi.fn(),
-            update: vi.fn()
+            findUnique: vi.fn(),
+            update: vi.fn(),
+            delete: vi.fn()
+        },
+        registration: {
+            count: vi.fn()
         }
     }
 }));
 
-vi.mock('@/lib/helpers/prismaErrorHandler', () => ({
-  handlePrismaError: vi.fn(),
+vi.mock("@/lib/auth/admin", () => ({
+    checkAdminAuth: vi.fn(),
+    forbiddenResponse: vi.fn((error?: string) =>
+        new Response(JSON.stringify({ error: error ?? "Forbidden" }), {
+            status: 403,
+            headers: {
+                "content-type": "application/json"
+            }
+        })
+    )
 }));
 
-// Import AFTER mocks so the route picks up the mocked deps
 import * as adminRoute from "@/app/api/admin/event/[id]/route";
 import { prisma } from "@/lib/prisma/prisma";
-import { adminCreateEventSchema, adminUpdateEventSchema } from "@/types/schemas/event/admin";
-import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
+import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { adminUpdateEventSchema } from "@/types/schemas/event/admin";
 
-
-const mockedCreateParse = adminCreateEventSchema.parse as unknown as ReturnType<typeof vi.fn>;
-const mockedUpdateParse = adminUpdateEventSchema.parse as unknown as ReturnType<typeof vi.fn>;
-const mockedCreate = prisma.event.create as unknown as ReturnType<typeof vi.fn>;
+const mockedCheckAdminAuth = checkAdminAuth as unknown as ReturnType<typeof vi.fn>;
+const mockedForbiddenResponse = forbiddenResponse as unknown as ReturnType<typeof vi.fn>;
+const mockedFindUnique = prisma.event.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockedUpdate = prisma.event.update as unknown as ReturnType<typeof vi.fn>;
-const mockedHandle = handlePrismaError as unknown as ReturnType<typeof vi.fn>;
+const mockedDelete = prisma.event.delete as unknown as ReturnType<typeof vi.fn>;
+const mockedRegistrationCount = prisma.registration.count as unknown as ReturnType<typeof vi.fn>;
+const mockedUpdateParse = adminUpdateEventSchema.parse as unknown as ReturnType<typeof vi.fn>;
 
-describe('App Router: /api/events (route.ts)', () => {
-  beforeEach(() => vi.clearAllMocks());
+function getRequest(url: string) {
+    return new NextRequest(url, { method: "GET" });
+}
 
-  describe('POST', () => {
-    it('201: creates event', async () => {
-      const event = { id: 'e1', title: 'Conf', startsAt: '2025-08-10T10:00:00Z' };
-  mockedCreateParse.mockReturnValue(event);
-      mockedCreate.mockResolvedValue({ id: event.id });
+function patchRequest(url: string, body: unknown) {
+    return new NextRequest(url, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+    });
+}
 
-      await testApiHandler({
-        // point to your exported handler
-        appHandler: adminRoute,
-        // exercise via fetch-like API
-        test: async ({ fetch }) => {
-          const res = await fetch({
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(event),
-          });
-          expect(res.status).toBe(201);
-          expect(await res.json()).toEqual({ message: 'Event created successfully' });
+function deleteRequest(url: string) {
+    return new NextRequest(url, { method: "DELETE" });
+}
 
-          expect(mockedCreateParse).toHaveBeenCalledWith(event);
-          expect(mockedCreate).toHaveBeenCalledWith({ data: event });
-        },
-      });
+describe("App Router: /api/admin/event/[id]", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockedCheckAdminAuth.mockResolvedValue({ authorized: true });
     });
 
-    it('422: zod validation error', async () => {
-      const zerr = new z.ZodError([
-        { code: 'invalid_type', expected: 'string', path: ['title'], message: 'Required' },
-      ]);
-  mockedCreateParse.mockImplementation(() => { throw zerr; });
+    describe("GET", () => {
+        it("returns 403 for unauthorized admins", async () => {
+            mockedCheckAdminAuth.mockResolvedValue({ authorized: false, error: "Forbidden" });
 
-      await testApiHandler({
-        appHandler: adminRoute,
-        test: async ({ fetch }) => {
-          const res = await fetch({
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({}), // invalid
-          });
-          expect(res.status).toBe(422);
-          expect(await res.json()).toEqual({ error: zerr.cause });
-          expect(mockedCreate).not.toHaveBeenCalled();
-        },
-      });
+            const response = await adminRoute.GET(
+                getRequest("http://localhost/api/admin/event/7"),
+                { params: Promise.resolve({ id: "7" }) }
+            );
+
+            expect(response.status).toBe(403);
+            expect(mockedForbiddenResponse).toHaveBeenCalledWith("Forbidden");
+        });
+
+        it("returns 200 with the event", async () => {
+            mockedFindUnique.mockResolvedValue({
+                id: 7,
+                name: "Furavia",
+                location: null,
+                products: [],
+                _count: { registrations: 3 }
+            });
+
+            const response = await adminRoute.GET(
+                getRequest("http://localhost/api/admin/event/7"),
+                { params: Promise.resolve({ id: "7" }) }
+            );
+
+            expect(response.status).toBe(200);
+            expect(await response.json()).toEqual({
+                event: {
+                    id: 7,
+                    name: "Furavia",
+                    location: null,
+                    products: [],
+                    _count: { registrations: 3 }
+                }
+            });
+            expect(mockedFindUnique).toHaveBeenCalled();
+        });
     });
 
-    it('409: prisma error handled', async () => {
-      const event = { id: 'e1', title: 'Conf', startsAt: '2025-08-10T10:00:00Z' };
-  mockedCreateParse.mockReturnValue(event);
-      const prismaErr = new Error('Unique constraint failed');
-      mockedCreate.mockRejectedValue(prismaErr);
-      mockedHandle.mockReturnValue({ statusCode: 409, error: 'Event already exists' });
+    describe("PATCH", () => {
+        it("returns 200 and updates the event", async () => {
+            const input = {
+                name: "Updated Event",
+                description: "Desc",
+                startDate: "2026-05-01T10:00:00.000Z",
+                endDate: "2026-05-02T10:00:00.000Z",
+                stayPolicy: {},
+                customFields: [],
+                schedule: [],
+                location: {
+                    name: "Venue",
+                    address: "Street 1",
+                    city: "Town",
+                    state: "State",
+                    country: "Germany",
+                    postalCode: "12345"
+                },
+                products: [
+                    {
+                        id: "ticket-basic",
+                        name: "Basic",
+                        description: "Basic ticket",
+                        price: 100,
+                        type: "TICKET",
+                        capacity: 50
+                    }
+                ]
+            };
 
-      await testApiHandler({
-        appHandler: adminRoute,
-        test: async ({ fetch }) => {
-          const res = await fetch({
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(event),
-          });
-          expect(res.status).toBe(409);
-          expect(await res.json()).toEqual({ error: 'Event already exists' });
-          expect(mockedHandle).toHaveBeenCalledWith(prismaErr);
-        },
-      });
+            mockedUpdateParse.mockReturnValue(input);
+            mockedUpdate.mockResolvedValue({ id: 7, name: "Updated Event" });
+
+            const response = await adminRoute.PATCH(
+                patchRequest("http://localhost/api/admin/event/7", input),
+                { params: Promise.resolve({ id: "7" }) }
+            );
+
+            expect(response.status).toBe(200);
+            expect(await response.json()).toEqual({
+                message: "Event updated successfully",
+                event: { id: 7, name: "Updated Event" }
+            });
+            expect(mockedUpdateParse).toHaveBeenCalledWith(input);
+            expect(mockedUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 7 },
+                    data: expect.objectContaining({
+                        name: "Updated Event",
+                        location: {
+                            upsert: {
+                                create: input.location,
+                                update: input.location
+                            }
+                        },
+                        products: {
+                            deleteMany: {},
+                            create: [
+                                {
+                                    id: "ticket-basic",
+                                    name: "Basic",
+                                    description: "Basic ticket",
+                                    price: 100,
+                                    type: "TICKET",
+                                    capacity: 50
+                                }
+                            ]
+                        }
+                    })
+                })
+            );
+        });
+
+        it("returns 422 for schema errors", async () => {
+            const zerr = new z.ZodError([
+                {
+                    code: "invalid_type",
+                    expected: "string",
+                    path: ["name"],
+                    message: "Required",
+                    input: undefined
+                }
+            ]);
+            mockedUpdateParse.mockImplementation(() => {
+                throw zerr;
+            });
+
+            const response = await adminRoute.PATCH(
+                patchRequest("http://localhost/api/admin/event/7", {}),
+                { params: Promise.resolve({ id: "7" }) }
+            );
+
+            expect(response.status).toBe(422);
+            expect(await response.json()).toEqual({ error: zerr.issues });
+            expect(mockedUpdate).not.toHaveBeenCalled();
+        });
     });
-  });
 
-  describe('PUT', () => {
-    it('200: updates event', async () => {
-      const event = { id: 'e1', title: 'Updated', startsAt: '2025-08-11T10:00:00Z' };
-  mockedUpdateParse.mockReturnValue(event);
-      mockedUpdate.mockResolvedValue({ id: event.id });
+    describe("DELETE", () => {
+        it("returns 409 when registrations exist", async () => {
+            mockedRegistrationCount.mockResolvedValue(2);
 
-      await testApiHandler({
-        appHandler: adminRoute,
-        test: async ({ fetch }) => {
-          const res = await fetch({
-            method: 'PUT',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(event),
-          });
-          expect(res.status).toBe(200);
-          expect(await res.json()).toEqual({ message: 'Event updated successfully' });
+            const response = await adminRoute.DELETE(
+                deleteRequest("http://localhost/api/admin/event/7"),
+                { params: Promise.resolve({ id: "7" }) }
+            );
 
-          expect(mockedUpdateParse).toHaveBeenCalledWith(event);
-          expect(mockedUpdate).toHaveBeenCalledWith({
-            where: { id: event.id },
-            data: {
-              title: event.title,
-              startsAt: event.startsAt,
-            },
-          });
-        },
-      });
+            expect(response.status).toBe(409);
+            expect(mockedDelete).not.toHaveBeenCalled();
+        });
+
+        it("returns 200 and deletes when no registrations exist", async () => {
+            mockedRegistrationCount.mockResolvedValue(0);
+            mockedDelete.mockResolvedValue({ id: 7 });
+
+            const response = await adminRoute.DELETE(
+                deleteRequest("http://localhost/api/admin/event/7"),
+                { params: Promise.resolve({ id: "7" }) }
+            );
+
+            expect(response.status).toBe(200);
+            expect(await response.json()).toEqual({ message: "Event deleted successfully" });
+            expect(mockedDelete).toHaveBeenCalledWith({ where: { id: 7 } });
+        });
     });
-
-    it('422: zod error on PUT', async () => {
-      const zerr = new z.ZodError([
-        { code: 'invalid_type', expected: 'string', path: ['id'], message: 'Required' },
-      ]);
-  mockedUpdateParse.mockImplementation(() => { throw zerr; });
-
-      await testApiHandler({
-        appHandler: adminRoute,
-        test: async ({ fetch }) => {
-          const res = await fetch({
-            method: 'PUT',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ title: 'No ID' }),
-          });
-          expect(res.status).toBe(422);
-          expect(await res.json()).toEqual({ error: zerr.cause });
-          expect(mockedUpdate).not.toHaveBeenCalled();
-        },
-      });
-    });
-
-    it('404: prisma error handled on PUT', async () => {
-      const event = { id: 'missing', title: 'x', startsAt: '2025-08-10T10:00:00Z' };
-  mockedUpdateParse.mockReturnValue(event);
-      const prismaErr = new Error('Record not found');
-      mockedUpdate.mockRejectedValue(prismaErr);
-      mockedHandle.mockReturnValue({ statusCode: 404, error: 'Event not found' });
-
-      await testApiHandler({
-        appHandler: adminRoute,
-        test: async ({ fetch }) => {
-          const res = await fetch({
-            method: 'PUT',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(event),
-          });
-          expect(res.status).toBe(404);
-          expect(await res.json()).toEqual({ error: 'Event not found' });
-          expect(mockedHandle).toHaveBeenCalledWith(prismaErr);
-        },
-      });
-    });
-  });
 });

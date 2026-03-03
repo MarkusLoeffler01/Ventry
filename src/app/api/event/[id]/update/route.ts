@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
 import { Prisma } from "@/generated/prisma";
 import { findHotelByRoomProductId, normalizeStayPolicy, resolveStayFee } from "@/lib/events/accommodation";
+import { countActiveRegistrations, releaseExpiredPendingRegistrations } from "@/lib/events/registration-capacity";
 
 type UpdateMode = "full" | "extras";
 
@@ -42,6 +43,8 @@ export async function PATCH(
 
         const eventId = Number((await params).id);
         if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+        await releaseExpiredPendingRegistrations(eventId);
 
         const body = await req.json();
         const mode: UpdateMode = body.mode === "extras" ? "extras" : "full";
@@ -272,6 +275,18 @@ export async function PATCH(
                 ...addedWaitlistIds
             ]);
 
+            const wasActiveBeforeUpdate =
+                existingRegistration.status !== "CANCELLED" &&
+                existingRegistration.status !== "WAITLISTED";
+            const willBeActiveAfterUpdate = finalConfirmedIds.length > 0;
+
+            if (event.maxRegistrations && willBeActiveAfterUpdate && !wasActiveBeforeUpdate) {
+                const activeRegistrationCount = await countActiveRegistrations(tx, eventId);
+                if (activeRegistrationCount >= event.maxRegistrations) {
+                    throw new Error("Registration is full");
+                }
+            }
+
             const finalConfirmedProducts = finalConfirmedIds
                 .map((id) => productById.get(id))
                 .filter((product): product is NonNullable<typeof event.products[number]> => Boolean(product));
@@ -388,18 +403,26 @@ export async function PATCH(
                 message: "Registration updated",
                 paymentId
             }, { status: 200 });
+        }, {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable
         });
 
         return result;
     } catch (error) {
         console.error("Update error:", error);
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+            return NextResponse.json({
+                error: "Registration is busy right now. Please try again."
+            }, { status: 409 });
+        }
+
         const message = error instanceof Error ? error.message : "Internal Server Error";
 
         if (message === "Registration not found") {
             return NextResponse.json({ error: message }, { status: 404 });
         }
 
-        if (message.includes("sold out")) {
+        if (message.includes("sold out") || message === "Registration is full") {
             return NextResponse.json({ error: message }, { status: 409 });
         }
 
