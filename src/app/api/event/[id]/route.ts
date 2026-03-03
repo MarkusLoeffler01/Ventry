@@ -19,7 +19,9 @@ export async function GET(
             },
             include: {
                 location: true,
-                products: true,
+                products: {
+                    orderBy: { createdAt: "asc" }
+                },
             }
         });
 

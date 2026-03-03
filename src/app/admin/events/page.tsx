@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma/prisma";
 import EventList from "@/components/admin/events/EventList";
 import { checkAdminAuth } from "@/lib/auth/admin";
+import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect } from "next/navigation";
-import { type SerializedEvent, type SerializedStayPolicy } from "@/types/event";
+import { type SerializedEvent } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function AdminEventsPage() {
         ...event,
         startDate: event.startDate.toISOString(),
         endDate: event.endDate.toISOString(),
-        stayPolicy: event.stayPolicy as unknown as SerializedStayPolicy,
+        stayPolicy: normalizeStayPolicy(event.stayPolicy, [], event.name, event.startDate, event.endDate),
         schedule: (event.schedule as unknown as SerializedEvent["schedule"]) || [],
         products: [] // Not needed for the list view but required by type
     }));
