@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { findHotelByRoomProductId, normalizeStayPolicy, resolveStayFee } from "@/lib/events/accommodation";
 import { Prisma } from "@/generated/prisma";
 import { decrementProductStock, getOrInitProductStock, incrementProductStock } from "@/lib/redis";
+import { countActiveRegistrations, releaseExpiredPendingRegistrations } from "@/lib/events/registration-capacity";
 
 export async function GET(
     req: NextRequest,
@@ -12,6 +13,8 @@ export async function GET(
     try {
         const eventId = Number((await params).id);
         if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+        await releaseExpiredPendingRegistrations(eventId);
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -72,6 +75,8 @@ export async function POST(
         const eventId = Number((await params).id);
         if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
+        await releaseExpiredPendingRegistrations(eventId);
+
         const body = await req.json();
         // Support both old format (single productId) and new format (productIds array)
         const productIds: string[] = Array.from(new Set((body.productIds || (body.productId ? [body.productId] : [])).filter(Boolean)));
@@ -87,9 +92,6 @@ export async function POST(
             include: { 
                 products: {
                     orderBy: { createdAt: "asc" }
-                },
-                _count: {
-                    select: { registrations: true }
                 }
             }
         });
@@ -98,10 +100,6 @@ export async function POST(
 
         if (event.registrationOpensAt && new Date() < new Date(event.registrationOpensAt)) {
             return NextResponse.json({ error: "Registration is not yet open" }, { status: 403 });
-        }
-
-        if (event.maxRegistrations && event._count.registrations >= event.maxRegistrations) {
-            return NextResponse.json({ error: "Registration is full" }, { status: 403 });
         }
 
         // 2. Validate Products & Check Redis Availability
@@ -179,29 +177,87 @@ export async function POST(
         const result = await prisma.$transaction(async (tx) => {
             // Check existing registration
             const existing = await tx.registration.findUnique({
-                where: { userId_eventId: { userId: session.user.id, eventId } }
+                where: { userId_eventId: { userId: session.user.id, eventId } },
+                include: {
+                    payments: {
+                        select: {
+                            paymentStatus: true
+                        }
+                    }
+                }
             });
 
-            if (existing) {
+            const canReuseExistingRegistration =
+                existing?.status === "CANCELLED" &&
+                !existing.payments.some((payment) => payment.paymentStatus === "COMPLETED");
+
+            if (existing && !canReuseExistingRegistration) {
                  throw new Error("Already registered for this event");
+            }
+
+            if (event.maxRegistrations && confirmedProductIds.length > 0) {
+                const activeRegistrationCount = await countActiveRegistrations(tx, eventId);
+                if (activeRegistrationCount >= event.maxRegistrations) {
+                    throw new Error("Registration is full");
+                }
             }
 
             const isFullyWaitlisted = confirmedProductIds.length === 0 && waitlistProductIds.length > 0;
             const status = isFullyWaitlisted ? 'WAITLISTED' : 'PENDING';
+            const selectedTicketId = validProducts.find((product) => product.type === "TICKET")?.id;
 
-            const reg = await tx.registration.create({
-                data: {
-                    userId: session.user.id,
-                    eventId: eventId,
-                    status: status,
-                    expiresAt,
-                    preferences: {
-                        ...preferences,
-                        productId: body.productId,
-                        productIds
-                    } as Prisma.InputJsonValue
-                }
-            });
+            if (canReuseExistingRegistration && existing) {
+                await tx.payment.updateMany({
+                    where: {
+                        registrationId: existing.id,
+                        paymentStatus: "PENDING"
+                    },
+                    data: {
+                        paymentStatus: "FAILED"
+                    }
+                });
+
+                await tx.registrationItem.deleteMany({
+                    where: {
+                        registrationId: existing.id
+                    }
+                });
+
+                await tx.waitlistEntry.deleteMany({
+                    where: {
+                        registrationId: existing.id
+                    }
+                });
+            }
+
+            const reg = canReuseExistingRegistration && existing
+                ? await tx.registration.update({
+                    where: {
+                        id: existing.id
+                    },
+                    data: {
+                        status,
+                        expiresAt,
+                        preferences: {
+                            ...preferences,
+                            productId: selectedTicketId,
+                            productIds
+                        } as Prisma.InputJsonValue
+                    }
+                })
+                : await tx.registration.create({
+                    data: {
+                        userId: session.user.id,
+                        eventId: eventId,
+                        status: status,
+                        expiresAt,
+                        preferences: {
+                            ...preferences,
+                            productId: selectedTicketId,
+                            productIds
+                        } as Prisma.InputJsonValue
+                    }
+                });
 
             // Process Confirmed Items
             for (const pid of confirmedProductIds) {
@@ -258,6 +314,8 @@ export async function POST(
             }
 
             return { reg, payment, status };
+        }, {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable
         });
 
         return NextResponse.json({ 
@@ -276,8 +334,14 @@ export async function POST(
             await Promise.all(reservedItems.map(id => incrementProductStock(id)));
         }
 
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+            return NextResponse.json({
+                error: "Registration is busy right now. Please try again."
+            }, { status: 409 });
+        }
+
         const message = error instanceof Error ? error.message : "Internal Server Error";
-        const status = message.includes("sold out") ? 403 : 500;
+        const status = message.includes("sold out") || message === "Registration is full" ? 403 : 500;
 
         return NextResponse.json({ error: message }, { status });
     }
