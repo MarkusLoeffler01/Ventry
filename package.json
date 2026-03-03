@@ -16,7 +16,8 @@
     "test": "vitest --run",
     "test:watch": "vitest --watch",
     "db:backup": "bash scripts/db-backup.sh",
-    "db:restore": "bash scripts/db-restore.sh"
+    "db:restore": "bash scripts/db-restore.sh",
+    "db:reset": "bash scripts/db-reset.sh"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

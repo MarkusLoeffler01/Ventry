@@ -51,12 +51,15 @@ async function main() {
         createdAt: new Date(u.createdAt),
         updatedAt: new Date(u.updatedAt),
         profilePictures: {
-          create: u.profilePictures?.map((pp: any) => ({
-            ...pp,
-            createdAt: new Date(pp.createdAt),
-            updatedAt: new Date(pp.updatedAt),
-            cachedUntil: pp.cachedUntil ? new Date(pp.cachedUntil) : null
-          }))
+          create: u.profilePictures?.map((pp: any) => {
+            const { userID, ...restPP } = pp;
+            return {
+              ...restPP,
+              createdAt: new Date(pp.createdAt),
+              updatedAt: new Date(pp.updatedAt),
+              cachedUntil: pp.cachedUntil ? new Date(pp.cachedUntil) : null
+            };
+          })
         }
       }
     });
@@ -90,6 +93,14 @@ async function main() {
       for (const pk of u.passkeys) {
         await prisma.passkey.create({
           data: { ...pk, createdAt: new Date(pk.createdAt) }
+        });
+      }
+    }
+
+    if (u.twofactors) {
+      for (const tf of u.twofactors) {
+        await prisma.twoFactor.create({
+          data: { ...tf }
         });
       }
     }
