@@ -1,8 +1,60 @@
-import { PrismaClient } from "../src/generated/prisma";
+import { Prisma, PrismaClient } from "../src/generated/prisma";
 import fs from "fs";
 import path from "path";
 
 const prisma = new PrismaClient();
+
+type ModelMeta = {
+  scalarFields: string[];
+  dateFields: Set<string>;
+};
+
+const modelMeta = new Map<string, ModelMeta>(
+  Prisma.dmmf.datamodel.models.map((model) => {
+    const scalarFields = model.fields
+      .filter((field) => field.kind === "scalar")
+      .map((field) => field.name);
+    const dateFields = new Set(
+      model.fields
+        .filter((field) => field.kind === "scalar" && field.type === "DateTime")
+        .map((field) => field.name),
+    );
+
+    return [model.name, { scalarFields, dateFields }];
+  }),
+);
+
+function toModelData<T extends Record<string, unknown>>(modelName: string, source: T | null | undefined) {
+  if (!source) {
+    return {} as Record<string, unknown>;
+  }
+
+  const meta = modelMeta.get(modelName);
+  if (!meta) {
+    throw new Error(`Unknown Prisma model metadata for: ${modelName}`);
+  }
+
+  const target: Record<string, unknown> = {};
+  for (const field of meta.scalarFields) {
+    if (!(field in source)) {
+      continue;
+    }
+
+    const value = source[field];
+    if (value === undefined) {
+      continue;
+    }
+
+    if (meta.dateFields.has(field) && value !== null) {
+      target[field] = value instanceof Date ? value : new Date(String(value));
+      continue;
+    }
+
+    target[field] = value;
+  }
+
+  return target;
+}
 
 async function main() {
   const backupPath = process.argv[2] || path.join(process.cwd(), "backups", "json", "latest.json");
@@ -38,39 +90,16 @@ async function main() {
   for (const u of data.users) {
     await prisma.user.create({
       data: {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        bio: u.bio,
-        dateOfBirth: u.dateOfBirth ? new Date(u.dateOfBirth) : null,
-        pronouns: u.pronouns,
-        showAge: u.showAge,
-        isAdmin: u.isAdmin,
-        emailVerified: u.emailVerified,
-        image: u.image,
-        createdAt: new Date(u.createdAt),
-        updatedAt: new Date(u.updatedAt),
+        ...toModelData("User", u),
         profilePictures: {
-          create: u.profilePictures?.map((pp: any) => {
-            const { userID, ...restPP } = pp;
-            return {
-              ...restPP,
-              createdAt: new Date(pp.createdAt),
-              updatedAt: new Date(pp.updatedAt),
-              cachedUntil: pp.cachedUntil ? new Date(pp.cachedUntil) : null
-            };
-          })
+          create: (u.profilePictures || []).map((pp: Record<string, unknown>) => toModelData("ProfilePicture", pp))
         }
       }
     });
 
     if (u.adminProfile) {
       await prisma.admin.create({
-        data: {
-          ...u.adminProfile,
-          createdAt: new Date(u.adminProfile.createdAt),
-          updatedAt: new Date(u.adminProfile.updatedAt),
-        }
+        data: toModelData("Admin", u.adminProfile)
       });
     }
 
@@ -78,13 +107,7 @@ async function main() {
     if (u.accounts) {
       for (const acc of u.accounts) {
         await prisma.account.create({
-          data: {
-            ...acc,
-            accessTokenExpiresAt: acc.accessTokenExpiresAt ? new Date(acc.accessTokenExpiresAt) : null,
-            refreshTokenExpiresAt: acc.refreshTokenExpiresAt ? new Date(acc.refreshTokenExpiresAt) : null,
-            createdAt: new Date(acc.createdAt),
-            updatedAt: new Date(acc.updatedAt),
-          }
+          data: toModelData("Account", acc)
         });
       }
     }
@@ -92,7 +115,7 @@ async function main() {
     if (u.passkeys) {
       for (const pk of u.passkeys) {
         await prisma.passkey.create({
-          data: { ...pk, createdAt: new Date(pk.createdAt) }
+          data: toModelData("Passkey", pk)
         });
       }
     }
@@ -100,7 +123,7 @@ async function main() {
     if (u.twofactors) {
       for (const tf of u.twofactors) {
         await prisma.twoFactor.create({
-          data: { ...tf }
+          data: toModelData("TwoFactor", tf)
         });
       }
     }
@@ -111,38 +134,12 @@ async function main() {
   for (const e of data.events) {
     await prisma.event.create({
       data: {
-        id: e.id,
-        name: e.name,
-        description: e.description,
-        startDate: new Date(e.startDate),
-        endDate: new Date(e.endDate),
-        imageUrl: e.imageUrl,
-        status: e.status,
-        publishAt: e.publishAt ? new Date(e.publishAt) : null,
-        registrationOpensAt: e.registrationOpensAt ? new Date(e.registrationOpensAt) : null,
-        maxRegistrations: e.maxRegistrations,
-        paymentDeadline: e.paymentDeadline ? new Date(e.paymentDeadline) : null,
-        stayPolicy: e.stayPolicy,
-        customFields: e.customFields,
-        ownerId: e.ownerId,
-        schedule: e.schedule,
-        requiresHotel: e.requiresHotel,
-        createdAt: new Date(e.createdAt),
-        updatedAt: new Date(e.updatedAt),
+        ...toModelData("Event", e),
         location: e.location ? {
-          create: { ...e.location }
+          create: toModelData("Location", e.location)
         } : undefined,
         products: {
-          create: e.products.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            price: p.price,
-            type: p.type,
-            capacity: p.capacity,
-            soldCount: p.soldCount,
-            allowWaitlist: p.allowWaitlist
-          }))
+          create: (e.products || []).map((p: Record<string, unknown>) => toModelData("Product", p))
         }
       }
     });
@@ -153,48 +150,18 @@ async function main() {
   for (const r of data.registrations) {
     await prisma.registration.create({
       data: {
-        id: r.id,
-        ticketId: r.ticketId,
-        userId: r.userId,
-        eventId: r.eventId,
-        status: r.status,
-        preferences: r.preferences,
-        customFieldData: r.customFieldData,
-        expiresAt: r.expiresAt ? new Date(r.expiresAt) : null,
-        notes: r.notes,
-        createdAt: new Date(r.createdAt),
-        updatedAt: new Date(r.updatedAt),
+        ...toModelData("Registration", r),
         registrationItems: {
-          create: r.registrationItems.map((ri: any) => ({
-            ...ri,
-            createdAt: new Date(ri.createdAt),
-            updatedAt: new Date(ri.updatedAt)
-          }))
+          create: (r.registrationItems || []).map((ri: Record<string, unknown>) => toModelData("RegistrationItem", ri))
         },
         waitlistEntries: {
-          create: r.waitlistEntries.map((we: any) => ({
-            ...we,
-            createdAt: new Date(we.createdAt),
-            updatedAt: new Date(we.updatedAt)
-          }))
+          create: (r.waitlistEntries || []).map((we: Record<string, unknown>) => toModelData("WaitlistEntry", we))
         },
         payments: {
-          create: r.payments.map((p: any) => ({
-            id: p.id,
-            userId: p.userId,
-            amount: p.amount,
-            currency: p.currency,
-            paymentStatus: p.paymentStatus,
-            paymentProvider: p.paymentProvider,
-            createdAt: new Date(p.createdAt),
-            updatedAt: new Date(p.updatedAt),
-          }))
+          create: (r.payments || []).map((p: Record<string, unknown>) => toModelData("Payment", p))
         },
         history: {
-          create: r.history.map((h: any) => ({
-            ...h,
-            createdAt: new Date(h.createdAt)
-          }))
+          create: (r.history || []).map((h: Record<string, unknown>) => toModelData("RegistrationHistory", h))
         }
       }
     });
