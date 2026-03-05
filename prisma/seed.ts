@@ -63,6 +63,7 @@ async function main() {
       await prisma.event.create({
         data: {
           ...e,
+          requireApproval: Boolean(e.requireApproval),
           startDate: new Date(e.startDate),
           endDate: new Date(e.endDate),
           publishAt: e.publishAt ? new Date(e.publishAt) : null,
@@ -200,6 +201,7 @@ async function main() {
         startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
         endDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000), // 1 week + 1 day from now
         status: "PUBLISHED",
+        requireApproval: true,
         registrationOpensAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // Opened 2 days ago
         ownerId: randomAdminId,
         imageUrl: `${process.env.SUPABASE_BANNERS_BUCKET_URL}/events/TestEvent/banner0.jpg`,
@@ -233,6 +235,7 @@ async function main() {
     });
 
     console.log(`Created event: ${meetup.name}`);
+    console.log(`Created event with approval gate: ${publishedEvent.name}`);
     console.log("Seeding completed!");
   }
 }

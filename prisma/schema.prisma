@@ -159,6 +159,8 @@ model Event {
 
   requiresHotel Boolean   @default(false) // Force user to select a room
 
+  requireApproval Boolean @default(false) // Require organizer approval before payment is possible
+
   paymentDeadline DateTime? // Fixed deadline for all payments
 
   stayPolicy  Json        @default("{}")

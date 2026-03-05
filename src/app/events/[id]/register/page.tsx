@@ -12,6 +12,7 @@ interface SerializedEventForWizard {
   products: SerializedProduct[];
   stayPolicy: SerializedStayPolicy | null;
   requiresHotel?: boolean;
+  requireApproval?: boolean;
   customFields: { id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }[];
 }
 
@@ -98,6 +99,7 @@ export default async function RegisterEventPage({
       event.endDate
     ) as SerializedStayPolicy,
     requiresHotel: event.requiresHotel,
+    requireApproval: event.requireApproval,
     customFields: event.customFields as unknown as SerializedEventForWizard['customFields']
   };
 

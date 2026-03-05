@@ -232,6 +232,8 @@ export const EventBaseObject = z.object({
   maxRegistrations: z.coerce.number().int().positive().nullable().optional(),
   /** Force user to select a room (ACCOMMODATION product) */
   requiresHotel: z.boolean().default(false),
+  /** Require organizer approval before payment can be made */
+  requireApproval: z.boolean().default(false),
   /** Fixed deadline for all payments */
   paymentDeadline: z.coerce.date().nullable().optional(),
 
