@@ -6,6 +6,23 @@ import { renderComponentToHTML } from "@/lib/helpers/html";
 import RegistrationUpdateMail from "@/components/emails/RegistrationUpdateMail";
 import { sendMail } from "@/lib/mail";
 
+type FinanceAction = "NONE" | "UPCHARGE_REQUIRED" | "MANUAL_REFUND_RECOMMENDED";
+
+function isTicketProduct(
+    product: { type: "TICKET" | "ACCOMMODATION" | "ADDON" } | undefined
+) {
+    return product?.type === "TICKET";
+}
+
+function toNumber(value: unknown) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toMoney(value: number) {
+    return Number(value.toFixed(2));
+}
+
 // PATCH /api/admin/registrations/[id] - Update registration details by admin
 export async function PATCH(
     req: NextRequest,
@@ -34,7 +51,12 @@ export async function PATCH(
             where: { id },
             include: {
                 payments: { orderBy: { createdAt: 'desc' }, take: 1 },
-                event: { include: { products: true } }
+                event: { include: { products: true } },
+                registrationItems: {
+                    include: {
+                        product: true
+                    }
+                }
             }
         });
 
@@ -93,10 +115,194 @@ export async function PATCH(
                 where: { userId: authResult.user!.id }
             });
 
+            const currentTicketItem = current.registrationItems.find((item) => isTicketProduct(item.product));
+            const requestedTicketId = typeof preferences?.productId === "string" ? preferences.productId : undefined;
+            const oldSelectionTotal = toMoney(current.registrationItems.reduce((sum, item) => sum + toNumber(item.priceAtBooking), 0));
+
+            if (requestedTicketId && requestedTicketId !== currentTicketItem?.productId) {
+                const nextTicketProduct = current.event.products.find((product) => product.id === requestedTicketId);
+                if (!isTicketProduct(nextTicketProduct)) {
+                    throw new Error("Selected badge tier is invalid");
+                }
+
+                if (nextTicketProduct.capacity !== null && nextTicketProduct.soldCount >= nextTicketProduct.capacity) {
+                    throw new Error("Selected badge tier is sold out");
+                }
+
+                if (currentTicketItem) {
+                    await tx.registrationItem.update({
+                        where: { id: currentTicketItem.id },
+                        data: {
+                            productId: requestedTicketId,
+                            priceAtBooking: nextTicketProduct.price
+                        }
+                    });
+
+                    await tx.product.updateMany({
+                        where: {
+                            id: currentTicketItem.productId,
+                            soldCount: { gt: 0 }
+                        },
+                        data: {
+                            soldCount: { decrement: 1 }
+                        }
+                    });
+
+                    await tx.product.update({
+                        where: { id: requestedTicketId },
+                        data: {
+                            soldCount: { increment: 1 }
+                        }
+                    });
+                } else {
+                    await tx.registrationItem.create({
+                        data: {
+                            registrationId: id,
+                            productId: requestedTicketId,
+                            priceAtBooking: nextTicketProduct.price
+                        }
+                    });
+
+                    await tx.product.update({
+                        where: { id: requestedTicketId },
+                        data: {
+                            soldCount: { increment: 1 }
+                        }
+                    });
+                }
+            }
+
+            const refreshedItems = await tx.registrationItem.findMany({
+                where: { registrationId: id },
+                include: { product: true }
+            });
+
+            const newSelectionTotal = toMoney(refreshedItems.reduce((sum, item) => sum + toNumber(item.priceAtBooking), 0));
+            const selectionDelta = toMoney(newSelectionTotal - oldSelectionTotal);
+            const completedPayments = await tx.payment.findMany({
+                where: {
+                    registrationId: id,
+                    paymentStatus: "COMPLETED"
+                }
+            });
+            const completedAmount = toMoney(completedPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0));
+
+            let financeAction: FinanceAction = "NONE";
+            let financeAmount = 0;
+
+            const pendingPayment = await tx.payment.findFirst({
+                where: {
+                    registrationId: id,
+                    paymentStatus: "PENDING"
+                },
+                orderBy: { createdAt: "desc" }
+            });
+            const pendingAmount = toNumber(pendingPayment?.amount);
+
+            if (selectionDelta > 0) {
+                financeAction = "UPCHARGE_REQUIRED";
+                financeAmount = selectionDelta;
+                const nextPendingAmount = toMoney(pendingAmount + selectionDelta);
+
+                if (pendingPayment) {
+                    await tx.payment.update({
+                        where: { id: pendingPayment.id },
+                        data: {
+                            amount: nextPendingAmount,
+                            currency: "EUR",
+                            paymentProvider: pendingPayment.paymentProvider || "STRIPE"
+                        }
+                    });
+                } else {
+                    await tx.payment.create({
+                        data: {
+                            userId: current.userId,
+                            registrationId: id,
+                            amount: financeAmount,
+                            currency: "EUR",
+                            paymentStatus: "PENDING",
+                            paymentProvider: "STRIPE"
+                        }
+                    });
+                }
+            } else {
+                if (selectionDelta < 0) {
+                    const reduction = Math.abs(selectionDelta);
+
+                    if (pendingPayment) {
+                        if (pendingAmount > reduction) {
+                            await tx.payment.update({
+                                where: { id: pendingPayment.id },
+                                data: {
+                                    amount: toMoney(pendingAmount - reduction)
+                                }
+                            });
+                        } else {
+                            await tx.payment.delete({ where: { id: pendingPayment.id } });
+                        }
+                    }
+
+                    const remainingRefund = toMoney(Math.max(0, reduction - pendingAmount));
+                    if (remainingRefund > 0) {
+                        financeAction = "MANUAL_REFUND_RECOMMENDED";
+                        financeAmount = remainingRefund;
+                    }
+                } else if (pendingPayment && pendingAmount <= 0) {
+                    await tx.payment.delete({ where: { id: pendingPayment.id } });
+                }
+            }
+
+            const approvalJustGranted = current.event.requireApproval && status === "APPROVED" && current.status !== "APPROVED";
+            if (approvalJustGranted) {
+                const dueAfterApproval = toMoney(Math.max(0, newSelectionTotal - completedAmount));
+                const activePendingPayment = await tx.payment.findFirst({
+                    where: {
+                        registrationId: id,
+                        paymentStatus: "PENDING"
+                    },
+                    orderBy: { createdAt: "desc" }
+                });
+
+                if (dueAfterApproval > 0) {
+                    if (activePendingPayment) {
+                        await tx.payment.update({
+                            where: { id: activePendingPayment.id },
+                            data: {
+                                amount: dueAfterApproval,
+                                currency: "EUR",
+                                paymentProvider: activePendingPayment.paymentProvider || "STRIPE"
+                            }
+                        });
+                    } else {
+                        await tx.payment.create({
+                            data: {
+                                userId: current.userId,
+                                registrationId: id,
+                                amount: dueAfterApproval,
+                                currency: "EUR",
+                                paymentStatus: "PENDING",
+                                paymentProvider: "STRIPE"
+                            }
+                        });
+                    }
+
+                    financeAction = "UPCHARGE_REQUIRED";
+                    financeAmount = dueAfterApproval;
+                }
+            }
+
+            if (financeAction === "UPCHARGE_REQUIRED") {
+                changes.push({ label: "Finance", old: "No adjustment", new: `Additional payment required (${financeAmount}EUR)` });
+            }
+            if (financeAction === "MANUAL_REFUND_RECOMMENDED") {
+                changes.push({ label: "Finance", old: "No adjustment", new: `Manual refund review recommended (${financeAmount}EUR)` });
+            }
+
             const updatedReg = await tx.registration.update({
                 where: { id },
                 data: {
                     ...(status && { status }),
+                    ...(current.event.requireApproval && status === "APPROVED" ? { expiresAt: current.event.paymentDeadline || null } : {}),
                     ...(preferences && { preferences: preferences as Prisma.InputJsonValue }),
                     ...(customFieldData && { customFieldData: customFieldData as Prisma.InputJsonValue }),
                     ...(changeReason !== undefined && { notes: changeReason }),
@@ -134,26 +340,32 @@ export async function PATCH(
                 });
             }
 
-            return updatedReg;
+            return {
+                updatedReg,
+                finance: {
+                    action: financeAction,
+                    amount: toMoney(financeAmount)
+                }
+            };
         });
 
         // 3. Send notification email with diff
         if (changes.length > 0) {
             try {
-                const eventUrl = `${process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443"}/events/${registration.event.id}`;
+                const eventUrl = `${process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443"}/events/${registration.updatedReg.event.id}`;
                 
                 const emailHTML = await renderComponentToHTML(RegistrationUpdateMail, {
-                    userName: registration.user.name || "Attendee",
-                    eventName: registration.event.name,
-                    status: registration.status,
+                    userName: registration.updatedReg.user.name || "Attendee",
+                    eventName: registration.updatedReg.event.name,
+                    status: registration.updatedReg.status,
                     adminNotes: changeReason,
                     eventUrl,
                     changes // Pass the detected changes
                 });
 
                 await sendMail(
-                    registration.user.email,
-                    `Registration Changes: ${registration.event.name}`,
+                    registration.updatedReg.user.email,
+                    `Registration Changes: ${registration.updatedReg.event.name}`,
                     emailHTML
                 );
             } catch (mailError) {
@@ -161,10 +373,38 @@ export async function PATCH(
             }
         }
 
-        return NextResponse.json({ message: "Registration updated successfully", registration }, { status: 200 });
+        const refreshedPayments = await prisma.payment.findMany({
+            where: { registrationId: registration.updatedReg.id },
+            orderBy: { createdAt: 'desc' },
+            take: 1
+        });
+
+        const refreshedItems = await prisma.registrationItem.findMany({
+            where: { registrationId: registration.updatedReg.id }
+        });
+        const totalDue = toMoney(refreshedItems.reduce((sum, item) => sum + toNumber(item.priceAtBooking), 0));
+
+        return NextResponse.json({
+            message: "Registration updated successfully",
+            registration: {
+                ...registration.updatedReg,
+                payments: refreshedPayments
+            },
+            finance: registration.finance,
+            totals: {
+                selectionTotal: totalDue
+            }
+        }, { status: 200 });
 
     } catch (error) {
         console.error("Error updating admin registration:", error);
+        const message = error instanceof Error ? error.message : "Internal Server Error";
+        if (message === "Selected badge tier is invalid") {
+            return NextResponse.json({ error: message }, { status: 422 });
+        }
+        if (message === "Selected badge tier is sold out") {
+            return NextResponse.json({ error: message }, { status: 409 });
+        }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

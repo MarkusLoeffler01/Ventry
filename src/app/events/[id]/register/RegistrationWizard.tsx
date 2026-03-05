@@ -45,6 +45,7 @@ interface RegistrationWizardProps {
     products: SerializedProduct[];
     stayPolicy: SerializedStayPolicy | null;
     requiresHotel?: boolean;
+    requireApproval?: boolean;
     customFields: CustomField[];
   };
   userId: string;
@@ -78,31 +79,51 @@ function uniqueIds(ids: Array<string | undefined | null>) {
   return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
 }
 
+function normalizeId(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  return '';
+}
+
 export default function RegistrationWizard({
   event,
   userId,
   editMode = 'create',
   initialRegistration,
 }: RegistrationWizardProps) {
+  const ticketProducts = event.products.filter(product => !product.type || product.type === 'TICKET');
   const existingItems = initialRegistration?.registrationItems || [];
-  const existingTicketId =
-    existingItems.find(item => item.product.type === 'TICKET')?.productId ||
-    initialRegistration?.preferences?.productId ||
-    '';
+  const lockedCoreIds = uniqueIds(
+    existingItems
+      .filter(item => item.product.type !== 'ADDON')
+      .map(item => normalizeId(item.productId)),
+  );
+  const ticketCandidateIds = [
+    ...lockedCoreIds,
+    ...(initialRegistration?.preferences?.productIds || []).map(id => normalizeId(id)),
+    normalizeId(initialRegistration?.preferences?.productId),
+  ];
+  const existingTicketId = ticketCandidateIds.find(id => ticketProducts.some(product => product.id === id)) || '';
   const existingAccommodationId =
-    existingItems.find(item => item.product.type === 'ACCOMMODATION')?.productId ||
-    initialRegistration?.preferences?.accommodationId ||
+    normalizeId(existingItems.find(item => item.product.type === 'ACCOMMODATION')?.productId) ||
+    normalizeId(initialRegistration?.preferences?.accommodationId) ||
     '';
   const lockedAddonIds = existingItems
     .filter(item => item.product.type === 'ADDON')
-    .map(item => item.productId);
+    .map(item => normalizeId(item.productId))
+    .filter(Boolean);
   const fallbackAddonIds = (initialRegistration?.preferences?.productIds || []).filter(
     id => id !== existingTicketId && id !== existingAccommodationId && !lockedAddonIds.includes(id),
   );
   const initialAddonIds = uniqueIds([...lockedAddonIds, ...fallbackAddonIds]);
+  const defaultCreateTicketId = ticketProducts[0]?.id || '';
 
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProductId, setSelectedProductId] = useState<string>(existingTicketId);
+  const [selectedProductId, setSelectedProductId] = useState<string>(existingTicketId || (editMode === 'create' ? defaultCreateTicketId : ''));
   const [selectedAccommodationId, setSelectedAccommodationId] = useState<string>(existingAccommodationId);
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(initialAddonIds);
   const [needsHotel, setNeedsHotel] = useState(
@@ -123,6 +144,8 @@ export default function RegistrationWizard({
   const isExtrasOnlyMode = editMode === 'extras';
   const canEditCoreSelection = !isExtrasOnlyMode;
   const canEditStaySelection = !isExtrasOnlyMode;
+  const isApprovalSatisfied = !event.requireApproval || ['APPROVED', 'CONFIRMED'].includes(initialRegistration?.status || '');
+  const canProceedToPayment = isApprovalSatisfied;
   const accommodationHotels = resolveAccommodationHotels(event.stayPolicy, event.products, event.name);
   const selectedHotel = findHotelByRoomProductId(event.stayPolicy, selectedAccommodationId, event.products, event.name);
   const selectedRoom = event.products.find(p => p.id === selectedAccommodationId);
@@ -154,10 +177,10 @@ export default function RegistrationWizard({
   if (event.customFields?.length > 0) {
     baseSteps.push('Additional Info');
   }
-  const steps = [...baseSteps, 'Confirm', 'Payment'];
+  const steps = [...baseSteps, 'Confirm', ...(canProceedToPayment ? ['Payment'] : [])];
 
   const handleNext = () => {
-    if (steps[activeStep] === 'Choose Badge' && !selectedProductId) {
+    if (steps[activeStep] === 'Choose Badge' && canEditCoreSelection && !selectedProductId) {
       setError('Please select a badge type');
       return;
     }
@@ -187,8 +210,13 @@ export default function RegistrationWizard({
     setActiveStep(prev => prev - 1);
   };
 
-  const buildSelectedProductIds = () =>
-    uniqueIds([selectedProductId, ...selectedAddonIds, selectedAccommodationId]);
+  const buildSelectedProductIds = () => {
+    if (isExtrasOnlyMode) {
+      return uniqueIds([...lockedCoreIds, ...selectedAddonIds]);
+    }
+
+    return uniqueIds([selectedProductId, ...selectedAddonIds, selectedAccommodationId]);
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -198,10 +226,10 @@ export default function RegistrationWizard({
       const payload = {
         userId,
         mode: editMode,
-        productId: selectedProductId,
+        productId: canEditCoreSelection ? selectedProductId : existingTicketId,
         productIds: buildSelectedProductIds(),
         preferences: {
-          productId: selectedProductId || undefined,
+          productId: (canEditCoreSelection ? selectedProductId : existingTicketId) || undefined,
           needsHotel,
           earlyArrival,
           lateDeparture,
@@ -224,7 +252,8 @@ export default function RegistrationWizard({
         }
 
         if (!data.paymentId) {
-          router.push(`/events/${event.id}?message=update_success`);
+          const message = data.awaitingApproval ? 'approval_pending' : 'update_success';
+          router.push(`/events/${event.id}?message=${message}`);
           return;
         }
 
@@ -256,7 +285,7 @@ export default function RegistrationWizard({
       }
 
       if (!data.paymentId) {
-        router.push('/profile?message=registration_success');
+        router.push(data.awaitingApproval ? '/profile?message=approval_pending' : '/profile?message=registration_success');
         return;
       }
 
@@ -729,7 +758,9 @@ export default function RegistrationWizard({
                 <Alert severity="info">
                   {isExtrasOnlyMode
                     ? 'Only newly added extras will create an additional payment.'
-                    : 'Payment will be handled at the convention or via bank transfer instructions sent to your email.'}
+                    : !canProceedToPayment
+                      ? 'Registration will be submitted for approval. Payment will unlock after an admin approves it.'
+                      : 'Payment will be handled at the convention or via bank transfer instructions sent to your email.'}
                 </Alert>
               </Box>
             )}
@@ -757,7 +788,13 @@ export default function RegistrationWizard({
                 disabled={loading}
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
               >
-                {loading ? 'Processing...' : totalAmount > 0 ? 'Proceed to Payment' : 'Save Changes'}
+                {loading
+                  ? 'Processing...'
+                  : totalAmount > 0
+                    ? canProceedToPayment
+                      ? 'Proceed to Payment'
+                      : 'Submit for Approval'
+                    : 'Save Changes'}
               </Button>
             ) : activeStep < steps.length - 1 && steps[activeStep] !== 'Payment' ? (
               <Button variant="contained" onClick={handleNext}>

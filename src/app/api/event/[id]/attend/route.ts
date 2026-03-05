@@ -172,6 +172,7 @@ export async function POST(
         }
 
         const expiresAt = event.paymentDeadline;
+        const requiresApprovalBeforePayment = Boolean(event.requireApproval);
 
         // 3. Database Transaction
         const result = await prisma.$transaction(async (tx) => {
@@ -205,6 +206,7 @@ export async function POST(
             const isFullyWaitlisted = confirmedProductIds.length === 0 && waitlistProductIds.length > 0;
             const status = isFullyWaitlisted ? 'WAITLISTED' : 'PENDING';
             const selectedTicketId = validProducts.find((product) => product.type === "TICKET")?.id;
+            const nextExpiresAt = requiresApprovalBeforePayment ? null : expiresAt;
 
             if (canReuseExistingRegistration && existing) {
                 await tx.payment.updateMany({
@@ -237,7 +239,7 @@ export async function POST(
                     },
                     data: {
                         status,
-                        expiresAt,
+                        expiresAt: nextExpiresAt,
                         preferences: {
                             ...preferences,
                             productId: selectedTicketId,
@@ -250,7 +252,7 @@ export async function POST(
                         userId: session.user.id,
                         eventId: eventId,
                         status: status,
-                        expiresAt,
+                        expiresAt: nextExpiresAt,
                         preferences: {
                             ...preferences,
                             productId: selectedTicketId,
@@ -300,7 +302,7 @@ export async function POST(
             }
 
             let payment = null;
-            if (totalAmount > 0 && !isFullyWaitlisted) { 
+              if (totalAmount > 0 && !isFullyWaitlisted && !requiresApprovalBeforePayment) {
                  payment = await tx.payment.create({
                     data: {
                         userId: session.user.id,
@@ -322,6 +324,7 @@ export async function POST(
             message: result.status === 'WAITLISTED' ? "Added to waitlist" : "Registration successful",
             registrationId: result.reg.id,
             paymentId: result.payment?.id,
+            awaitingApproval: requiresApprovalBeforePayment && result.status !== 'WAITLISTED',
             status: result.status,
             confirmedProducts: confirmedProductIds,
             waitlistedProducts: waitlistProductIds

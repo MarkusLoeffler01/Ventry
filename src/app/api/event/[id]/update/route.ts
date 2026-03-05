@@ -126,6 +126,7 @@ export async function PATCH(
             const existingPreferences = (existingRegistration.preferences || {}) as RegistrationPreferences;
             const hasCompletedPayment = existingRegistration.payments.some((payment) => payment.paymentStatus === "COMPLETED");
             const pendingPayment = existingRegistration.payments.find((payment) => payment.paymentStatus === "PENDING") || null;
+            const approvalPending = Boolean(event.requireApproval) && existingRegistration.status === "PENDING" && !hasCompletedPayment;
 
             const existingConfirmedIds = existingRegistration.registrationItems.map((item) => item.productId);
             const existingWaitlistedIds = existingRegistration.waitlistEntries.map((item) => item.productId);
@@ -321,7 +322,12 @@ export async function PATCH(
             let paymentId: string | null = null;
             let nextExpiresAt: Date | null = existingRegistration.expiresAt;
 
-            if (hasCompletedPayment) {
+            if (approvalPending) {
+                if (pendingPayment) {
+                    await tx.payment.delete({ where: { id: pendingPayment.id } });
+                }
+                nextExpiresAt = null;
+            } else if (hasCompletedPayment) {
                 if (additionalCharge > 0) {
                     if (pendingPayment) {
                         const updatedPayment = await tx.payment.update({
@@ -401,7 +407,8 @@ export async function PATCH(
 
             return NextResponse.json({
                 message: "Registration updated",
-                paymentId
+                paymentId,
+                awaitingApproval: approvalPending
             }, { status: 200 });
         }, {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable

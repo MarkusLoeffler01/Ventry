@@ -37,6 +37,36 @@ export async function GET(req: NextRequest) {
                         name: true
                     }
                 },
+                registrationItems: {
+                    include: {
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                price: true,
+                                type: true
+                            }
+                        }
+                    },
+                    orderBy: {
+                        createdAt: 'asc'
+                    }
+                },
+                waitlistEntries: {
+                    include: {
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                price: true,
+                                type: true
+                            }
+                        }
+                    },
+                    orderBy: {
+                        createdAt: 'asc'
+                    }
+                },
                 payments: {
                     orderBy: { createdAt: 'desc' },
                     take: 1

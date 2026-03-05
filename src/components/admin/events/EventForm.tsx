@@ -48,6 +48,7 @@ export interface InitialData {
   registrationOpensAt?: string | Date | null;
   maxRegistrations?: number | null;
   requiresHotel?: boolean;
+  requireApproval?: boolean;
   paymentDeadline?: string | Date | null;
   status?: "DRAFT" | "PUBLISHED" | "CANCELLED";
   imageUrl?: string | null;
@@ -183,6 +184,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       registrationOpensAt: initialData?.registrationOpensAt ? new Date(initialData.registrationOpensAt) : null,
       maxRegistrations: initialData?.maxRegistrations || null,
       requiresHotel: initialData?.requiresHotel || false,
+      requireApproval: initialData?.requireApproval || false,
       paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || "DRAFT",
       imageUrl: initialData?.imageUrl || null,
@@ -1069,6 +1071,24 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                 />
                 <Typography variant="caption" display="block" color="text.secondary">
                   If enabled, attendees must choose one of the configured hotel room types.
+                </Typography>
+              </Box>
+
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Controller
+                      name="requireApproval"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch checked={field.value} onChange={event => field.onChange(event.target.checked)} />
+                      )}
+                    />
+                  }
+                  label="Require admin approval before payment"
+                />
+                <Typography variant="caption" display="block" color="text.secondary">
+                  If enabled, attendees can submit registration but payment remains locked until an admin approves it.
                 </Typography>
               </Box>
 

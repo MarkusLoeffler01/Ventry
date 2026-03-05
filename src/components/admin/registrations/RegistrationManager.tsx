@@ -40,13 +40,15 @@ import {
 interface Registration {
   id: string;
   ticketId: number;
-  status: 'PENDING' | 'APPROVED' | 'CONFIRMED' | 'CANCELLED';
+  status: 'PENDING' | 'APPROVED' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
   preferences: {
     productId?: string;
+    productIds?: string[];
+    accommodationId?: string;
     needsHotel?: boolean;
     earlyArrival?: boolean;
     lateDeparture?: boolean;
-    [key: string]: string | number | boolean | undefined | null;
+    [key: string]: string | string[] | number | boolean | undefined | null;
   };
   customFieldData: {
     [key: string]: string | number | boolean | undefined | null;
@@ -63,6 +65,26 @@ interface Registration {
     id: number;
     name: string;
   };
+  registrationItems: Array<{
+    id: string;
+    productId: string;
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      type: 'TICKET' | 'ACCOMMODATION' | 'ADDON';
+    };
+  }>;
+  waitlistEntries: Array<{
+    id: string;
+    productId: string;
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      type: 'TICKET' | 'ACCOMMODATION' | 'ADDON';
+    };
+  }>;
   payments: Array<{
     id: string;
     amount: number;
@@ -90,14 +112,29 @@ interface HistoryItem {
 interface FullEvent {
   id: number;
   name: string;
-  products: Array<{ id: string; name: string; price: number }>;
+  products: Array<{ id: string; name: string; price: number; type: 'TICKET' | 'ACCOMMODATION' | 'ADDON' }>;
   customFields: Array<{ id: string; label: string; type: 'text' | 'number' | 'boolean' | 'select'; options?: string[] }>;
+}
+
+function resolveSelectedTicketId(reg: Registration) {
+  const fromItems = reg.registrationItems.find((item) => item.product.type === 'TICKET')?.productId;
+  if (fromItems) {
+    return fromItems;
+  }
+
+  const prefTicket = reg.preferences?.productId;
+  if (prefTicket) {
+    return prefTicket;
+  }
+
+  return '';
 }
 
 export default function RegistrationManager() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [financeNotice, setFinanceNotice] = useState<{ severity: 'info' | 'warning' | 'success'; message: string } | null>(null);
   const [selectedReg, setSelectedReg] = useState<Registration | null>(null);
   const [fullEvent, setFullEvent] = useState<FullEvent | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -148,7 +185,24 @@ export default function RegistrationManager() {
   };
 
   const handleOpenEdit = async (reg: Registration) => {
-    setSelectedReg(reg);
+    const selectedTicketId = resolveSelectedTicketId(reg);
+    const selectedAccommodationId =
+      reg.registrationItems.find((item) => item.product.type === 'ACCOMMODATION')?.productId ||
+      reg.preferences?.accommodationId ||
+      '';
+    const selectedProductIds = [
+      ...new Set(reg.registrationItems.map((item) => item.productId)),
+    ];
+
+    setSelectedReg({
+      ...reg,
+      preferences: {
+        ...reg.preferences,
+        productId: selectedTicketId || undefined,
+        accommodationId: selectedAccommodationId || undefined,
+        productIds: selectedProductIds,
+      },
+    });
     setEditDialogOpen(true);
     await fetchEventDetails(reg.event.id);
   };
@@ -229,11 +283,33 @@ export default function RegistrationManager() {
       });
 
       if (response.ok) {
+        const data = await response.json();
+        if (data.finance?.action === 'UPCHARGE_REQUIRED') {
+          setFinanceNotice({
+            severity: 'info',
+            message: `Registration updated. Additional payment required: ${data.finance.amount}EUR. User should complete the new payment request.`,
+          });
+        } else if (data.finance?.action === 'MANUAL_REFUND_RECOMMENDED') {
+          setFinanceNotice({
+            severity: 'warning',
+            message: `Registration updated. Overpayment detected (${data.finance.amount}EUR). Review and process refund manually.`,
+          });
+        } else {
+          setFinanceNotice({
+            severity: 'success',
+            message: 'Registration updated with no outstanding balance changes.',
+          });
+        }
+
         setEditDialogOpen(false);
         await fetchRegistrations();
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to update registration');
       }
     } catch (err) {
       console.error(err);
+      setError('Failed to update registration');
     }
   };
 
@@ -292,6 +368,26 @@ export default function RegistrationManager() {
               />
             </Stack>
           </Button>
+        );
+      }
+    },
+    {
+      field: 'selection',
+      headerName: 'Selection',
+      minWidth: 260,
+      flex: 1,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams) => {
+        const row = params.row as Registration;
+        const names = row.registrationItems.map((item) => item.product.name);
+        if (names.length === 0) {
+          return <Typography variant="caption">No items</Typography>;
+        }
+
+        return (
+          <Typography variant="body2" noWrap title={names.join(', ')}>
+            {names.join(', ')}
+          </Typography>
         );
       }
     },
@@ -357,6 +453,7 @@ export default function RegistrationManager() {
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {financeNotice && <Alert severity={financeNotice.severity} sx={{ mb: 2 }}>{financeNotice.message}</Alert>}
 
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
@@ -390,12 +487,13 @@ export default function RegistrationManager() {
                   select
                   fullWidth
                   value={selectedReg.status}
-                  onChange={(e) => setSelectedReg({...selectedReg, status: e.target.value as 'PENDING' | 'APPROVED' | 'CONFIRMED' | 'CANCELLED'})}
+                  onChange={(e) => setSelectedReg({...selectedReg, status: e.target.value as 'PENDING' | 'APPROVED' | 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED'})}
                   sx={{ mt: 1 }}
                 >
                   <MenuItem value="PENDING">Pending Approval</MenuItem>
                   <MenuItem value="APPROVED">Approved</MenuItem>
                   <MenuItem value="CONFIRMED">Confirmed</MenuItem>
+                  <MenuItem value="WAITLISTED">Waitlisted</MenuItem>
                   <MenuItem value="CANCELLED">Cancelled</MenuItem>
                 </TextField>
               </Grid>
@@ -427,6 +525,44 @@ export default function RegistrationManager() {
                 <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Registration Details</Typography>
                 
                 <Grid container spacing={2}>
+                  <Grid size={{ xs: 12 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Current confirmed selection
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {selectedReg.registrationItems.length > 0 ? (
+                        selectedReg.registrationItems.map((item) => (
+                          <Chip
+                            key={item.id}
+                            label={`${item.product.name} (${item.product.price}EUR)`}
+                            color={item.product.type === 'TICKET' ? 'primary' : 'default'}
+                            variant={item.product.type === 'TICKET' ? 'filled' : 'outlined'}
+                            size="small"
+                          />
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No confirmed products</Typography>
+                      )}
+                    </Stack>
+                    {selectedReg.waitlistEntries.length > 0 && (
+                      <Box sx={{ mt: 1.5 }}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Waitlisted items
+                        </Typography>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {selectedReg.waitlistEntries.map((item) => (
+                            <Chip
+                              key={item.id}
+                              label={item.product.name}
+                              color="warning"
+                              variant="outlined"
+                              size="small"
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Grid>
                   <Grid size={{ xs: 12, md: 6 }}>
                     <TextField
                       select
@@ -435,10 +571,19 @@ export default function RegistrationManager() {
                       value={selectedReg.preferences?.productId || ''}
                       onChange={(e) => setSelectedReg({
                         ...selectedReg, 
-                        preferences: { ...selectedReg.preferences, productId: e.target.value }
+                        preferences: {
+                          ...selectedReg.preferences,
+                          productId: e.target.value,
+                          productIds: Array.from(
+                            new Set([
+                              e.target.value,
+                              ...(selectedReg.preferences?.productIds || []).filter((id) => id !== selectedReg.preferences?.productId),
+                            ]),
+                          ),
+                        }
                       })}
                     >
-                      {fullEvent?.products.map(p => (
+                      {fullEvent?.products.filter((p) => p.type === 'TICKET').map(p => (
                         <MenuItem key={p.id} value={p.id}>{p.name} ({p.price}€)</MenuItem>
                       ))}
                     </TextField>
