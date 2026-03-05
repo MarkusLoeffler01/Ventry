@@ -226,6 +226,14 @@ export default async function EventDetailPage({
         </Container>
       )}
 
+      {message === 'approval_pending' && (
+        <Container maxWidth="lg" sx={{ mt: 2 }}>
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            Your registration has been submitted and is awaiting admin approval before payment.
+          </Alert>
+        </Container>
+      )}
+
       {/* Hero Banner */}
       <Box sx={{ position: 'relative', height: { xs: 300, md: 500 }, width: '100%', bgcolor: 'grey.900' }}>
         {event.imageUrl ? (

@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
                 },
                 products: {
                     create: toPersistedProducts(validatedData.products)
-                }
+                },
+                requireApproval: validatedData.requireApproval,
             },
             include: {
                 location: true,
