@@ -56,6 +56,35 @@ function toModelData<T extends Record<string, unknown>>(modelName: string, sourc
   return target;
 }
 
+async function createWithColumnFallback(
+  modelLabel: string,
+  createFn: (args: { data: Record<string, unknown> }) => Promise<unknown>,
+  data: Record<string, unknown>,
+) {
+  const mutableData = { ...data };
+
+  while (true) {
+    try {
+      return await createFn({ data: mutableData });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
+        const rawColumn = String(error.meta?.column || "");
+        const column = rawColumn.includes(".") ? rawColumn.split(".").at(-1) || "" : rawColumn;
+
+        if (!column || !(column in mutableData)) {
+          throw error;
+        }
+
+        console.warn(`⚠️ ${modelLabel}: skipping missing database column \"${column}\" during restore.`);
+        delete mutableData[column];
+        continue;
+      }
+
+      throw error;
+    }
+  }
+}
+
 async function main() {
   const backupPath = process.argv[2] || path.join(process.cwd(), "backups", "json", "latest.json");
 
@@ -88,43 +117,36 @@ async function main() {
   // 2. Restore Users and Profiles
   console.log("👤 Restoring users and profiles...");
   for (const u of data.users) {
-    await prisma.user.create({
-      data: {
-        ...toModelData("User", u),
-        profilePictures: {
-          create: (u.profilePictures || []).map((pp: Record<string, unknown>) => toModelData("ProfilePicture", pp))
-        }
-      }
-    });
+    await createWithColumnFallback("User", prisma.user.create.bind(prisma.user), toModelData("User", u));
+
+    for (const pp of u.profilePictures || []) {
+      await createWithColumnFallback(
+        "ProfilePicture",
+        prisma.profilePicture.create.bind(prisma.profilePicture),
+        toModelData("ProfilePicture", pp),
+      );
+    }
 
     if (u.adminProfile) {
-      await prisma.admin.create({
-        data: toModelData("Admin", u.adminProfile)
-      });
+      await createWithColumnFallback("Admin", prisma.admin.create.bind(prisma.admin), toModelData("Admin", u.adminProfile));
     }
 
     // Auth models
     if (u.accounts) {
       for (const acc of u.accounts) {
-        await prisma.account.create({
-          data: toModelData("Account", acc)
-        });
+        await createWithColumnFallback("Account", prisma.account.create.bind(prisma.account), toModelData("Account", acc));
       }
     }
     
     if (u.passkeys) {
       for (const pk of u.passkeys) {
-        await prisma.passkey.create({
-          data: toModelData("Passkey", pk)
-        });
+        await createWithColumnFallback("Passkey", prisma.passkey.create.bind(prisma.passkey), toModelData("Passkey", pk));
       }
     }
 
     if (u.twofactors) {
       for (const tf of u.twofactors) {
-        await prisma.twoFactor.create({
-          data: toModelData("TwoFactor", tf)
-        });
+        await createWithColumnFallback("TwoFactor", prisma.twoFactor.create.bind(prisma.twoFactor), toModelData("TwoFactor", tf));
       }
     }
   }
@@ -132,39 +154,49 @@ async function main() {
   // 3. Restore Events
   console.log("📅 Restoring events...");
   for (const e of data.events) {
-    await prisma.event.create({
-      data: {
-        ...toModelData("Event", e),
-        location: e.location ? {
-          create: toModelData("Location", e.location)
-        } : undefined,
-        products: {
-          create: (e.products || []).map((p: Record<string, unknown>) => toModelData("Product", p))
-        }
-      }
-    });
+    await createWithColumnFallback("Event", prisma.event.create.bind(prisma.event), toModelData("Event", e));
+
+    if (e.location) {
+      await createWithColumnFallback("Location", prisma.location.create.bind(prisma.location), toModelData("Location", e.location));
+    }
+
+    for (const p of e.products || []) {
+      await createWithColumnFallback("Product", prisma.product.create.bind(prisma.product), toModelData("Product", p));
+    }
   }
 
   // 4. Restore Registrations and dependencies
   console.log("📝 Restoring registrations...");
   for (const r of data.registrations) {
-    await prisma.registration.create({
-      data: {
-        ...toModelData("Registration", r),
-        registrationItems: {
-          create: (r.registrationItems || []).map((ri: Record<string, unknown>) => toModelData("RegistrationItem", ri))
-        },
-        waitlistEntries: {
-          create: (r.waitlistEntries || []).map((we: Record<string, unknown>) => toModelData("WaitlistEntry", we))
-        },
-        payments: {
-          create: (r.payments || []).map((p: Record<string, unknown>) => toModelData("Payment", p))
-        },
-        history: {
-          create: (r.history || []).map((h: Record<string, unknown>) => toModelData("RegistrationHistory", h))
-        }
-      }
-    });
+    await createWithColumnFallback("Registration", prisma.registration.create.bind(prisma.registration), toModelData("Registration", r));
+
+    for (const ri of r.registrationItems || []) {
+      await createWithColumnFallback(
+        "RegistrationItem",
+        prisma.registrationItem.create.bind(prisma.registrationItem),
+        toModelData("RegistrationItem", ri),
+      );
+    }
+
+    for (const we of r.waitlistEntries || []) {
+      await createWithColumnFallback(
+        "WaitlistEntry",
+        prisma.waitlistEntry.create.bind(prisma.waitlistEntry),
+        toModelData("WaitlistEntry", we),
+      );
+    }
+
+    for (const p of r.payments || []) {
+      await createWithColumnFallback("Payment", prisma.payment.create.bind(prisma.payment), toModelData("Payment", p));
+    }
+
+    for (const h of r.history || []) {
+      await createWithColumnFallback(
+        "RegistrationHistory",
+        prisma.registrationHistory.create.bind(prisma.registrationHistory),
+        toModelData("RegistrationHistory", h),
+      );
+    }
   }
 
   console.log("✅ Data restoration complete!");
@@ -172,6 +204,7 @@ async function main() {
 
 main()
   .catch((e) => {
+    console.log("❌ An error occurred during restoration:", e);
     console.error("❌ Restore failed:", e);
     process.exit(1);
   })
