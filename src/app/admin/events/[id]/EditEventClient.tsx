@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EventForm from '@/components/admin/events/EventForm';
-import { type AdminCreateEventInput } from '@/types/schemas/event/admin';
+import type { AdminCreateEventInput } from '@/types/schemas/event/admin';
 import { Box } from '@mui/material';
-import { type SerializedEvent } from '@/types/event';
+import type { SerializedEvent } from '@/types/event';
 
-import { type InitialData } from '@/components/admin/events/EventForm';
+import type { InitialData } from '@/components/admin/events/EventForm';
 
 interface EditEventClientProps {
   event: SerializedEvent;

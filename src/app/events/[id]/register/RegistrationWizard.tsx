@@ -23,7 +23,7 @@ import {
   MenuItem
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { type SerializedProduct, type SerializedStayPolicy } from '@/types/event';
+import type { SerializedProduct, SerializedStayPolicy } from '@/types/event';
 import { Elements } from '@stripe/react-stripe-js';
 import { stripePromise } from '@/lib/stripeClient';
 import PaymentForm from '@/components/events/registration/PaymentForm';

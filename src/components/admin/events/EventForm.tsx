@@ -26,17 +26,17 @@ import {
 } from "@mui/material";
 import { Delete, Add, Save, CloudUpload, Error as ErrorIcon } from "@mui/icons-material";
 import { adminCreateEventSchema, type AdminCreateEventInput } from "@/types/schemas/event/admin";
-import { type Product as EventProduct } from "@/types/schemas/event/base";
+import type { Product as EventProduct } from "@/types/schemas/event/base";
 import ImageCropper from "@/components/profile/ImageCropper";
 import Image from "next/image";
-import ScheduleCalendarBuilder from "./ScheduleCalendarBuilder";
+import ScheduleCalendarBuilder, { type ScheduleItem } from "./ScheduleCalendarBuilder";
 import { SortableProductItem } from "./SortableProductItem";
 import {
   cloneHotelStayPolicy,
   createDefaultHotelStayPolicy,
   normalizeStayPolicy,
 } from "@/lib/events/accommodation";
-import { type SerializedHotelStayPolicy, type SerializedProduct } from "@/types/event";
+import type { SerializedHotelStayPolicy, SerializedProduct } from "@/types/event";
 
 export interface InitialData {
   id?: number;
@@ -1475,7 +1475,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                           <Typography variant="subtitle2" gutterBottom>Dropdown Options</Typography>
                           <Stack spacing={1}>
                             {(watch(`customFields.${index}.options`) || []).map((option: string, optionIndex: number) => (
-                              <Stack key={optionIndex} direction="row" spacing={1} alignItems="center">
+                              <Stack key={`${option || "option"}-${optionIndex}`} direction="row" spacing={1} alignItems="center">
                                 <TextField
                                   size="small"
                                   placeholder={`Option ${optionIndex + 1}`}
@@ -1536,7 +1536,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                 name="schedule"
                 render={({ field }) => (
                   <ScheduleCalendarBuilder
-                    items={field.value as any}
+                    items={(field.value ?? []) as ScheduleItem[]}
                     onChange={newItems => field.onChange(newItems)}
                     eventStartDate={watchStartDate as Date | undefined}
                   />

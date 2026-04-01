@@ -1,8 +1,8 @@
-import {
-  type SerializedHotel,
-  type SerializedHotelStayPolicy,
-  type SerializedProduct,
-  type SerializedStayPolicy,
+import type {
+  SerializedHotel,
+  SerializedHotelStayPolicy,
+  SerializedProduct,
+  SerializedStayPolicy,
 } from "@/types/event";
 
 type LegacyStayPolicy = {

@@ -5,6 +5,16 @@ import path from "path";
 
 const prisma = new PrismaClient();
 
+type RestoredProduct = Record<string, unknown> & {
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type RestoredPayment = Record<string, unknown> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
 async function main() {
   const dataPath = path.join(process.cwd(), "backups", "json", "latest.json");
   
@@ -73,7 +83,7 @@ async function main() {
           updatedAt: new Date(e.updatedAt),
           location: e.location ? { create: { ...e.location } } : undefined,
           products: {
-            create: e.products.map((p: any) => ({
+            create: e.products.map((p: RestoredProduct) => ({
               ...p,
               createdAt: undefined, // Let DB handle if present
               updatedAt: undefined
@@ -93,7 +103,7 @@ async function main() {
           createdAt: new Date(r.createdAt),
           updatedAt: new Date(r.updatedAt),
           payments: {
-            create: r.payments.map((p: any) => ({
+            create: r.payments.map((p: RestoredPayment) => ({
               ...p,
               createdAt: new Date(p.createdAt),
               updatedAt: new Date(p.updatedAt)
@@ -245,6 +255,6 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .finally(() => {
+    void prisma.$disconnect();
   });

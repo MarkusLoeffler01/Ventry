@@ -26,7 +26,7 @@ import {
   Visibility 
 } from '@mui/icons-material';
 import Link from 'next/link';
-import { type SerializedEvent } from '@/types/event';
+import type { SerializedEvent } from '@/types/event';
 
 interface EventListProps {
   initialEvents: SerializedEvent[];

@@ -31,7 +31,7 @@ import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
 import EventLocationMap from "@/components/events/EventLocationMap";
 import SupportTicketPanel from "@/components/events/SupportTicketPanel";
-import { type SerializedEvent, type SerializedProduct } from "@/types/event";
+import type { SerializedEvent, SerializedProduct } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 
