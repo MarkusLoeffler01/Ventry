@@ -211,10 +211,6 @@ export default function ProfilePictureGallery({
   const [deleting, setDeleting] = useState(false);
   const [settingPrimary, setSettingPrimary] = useState(false);
   
-  // Cropping state
-  const [cropOpen, setCropOpen] = useState(false);
-  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
-  
   // Overlay gallery state
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -222,6 +218,10 @@ export default function ProfilePictureGallery({
   // Drag-and-drop state
   const [orderedPictures, setOrderedPictures] = useState<ProfilePicture[]>(profilePictures);
   const [_reordering, setReordering] = useState(false);
+
+  // Cropper state
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
 
   // Update ordered pictures when profilePictures changes
   useEffect(() => {
@@ -345,40 +345,13 @@ export default function ProfilePictureGallery({
     };
   }, [overlayOpen, handleNext, handlePrevious, handleOverlayClose]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCropImageSrc(reader.result?.toString() || null);
-      setCropOpen(true);
-    };
-    reader.readAsDataURL(file);
-    
-    // Clear input so same file can be selected again
-    event.target.value = '';
-  };
-
-  const handleCropComplete = async (croppedBlob: Blob) => {
+  const processUpload = async (file: File) => {
     setUploading(true);
     setError(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', croppedBlob, 'profile.jpg');
+      formData.append('file', file);
       formData.append('isPrimary', profilePictures.length === 0 ? 'true' : 'false');
 
       const response = await fetch('/api/user/profile-picture', {
@@ -403,6 +376,38 @@ export default function ProfilePictureGallery({
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB before crop)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      setCropImageSrc(reader.result?.toString() || null);
+      setCropOpen(true);
+    });
+    reader.readAsDataURL(file);
+    
+    // Reset input so same file can be selected again
+    event.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const file = new File([croppedBlob], "profile.jpg", { type: "image/jpeg" });
+    await processUpload(file);
   };
 
   const handleSetPrimary = async (pictureId?: string) => {
@@ -529,11 +534,20 @@ export default function ProfilePictureGallery({
 
           {/* Helper text for drag-and-drop */}
           {orderedPictures.length > 1 && (
-            <Box sx={{ mb: 2, p: 1.5, bgcolor: 'info.lighter', borderRadius: 1 }}>
+            <>
+            
+            <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 1 }}>
               <Typography variant="body2" color="info.main">
                 💡 Drag and drop pictures to rearrange their order
               </Typography>
             </Box>
+            <Box sx={{ pl: 1.5, mb: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
+              <Typography variant="body2" color="info.main">
+                💡 Right-/ or Ctrl-click a picture to select it
+              </Typography>
+            </Box>
+            </>
+            
           )}
 
           {/* Gallery Grid with Drag-and-Drop */}
@@ -605,7 +619,7 @@ export default function ProfilePictureGallery({
               variant="contained"
               component="label"
               startIcon={<CloudUpload />}
-              disabled={uploading || cropOpen}
+              disabled={uploading}
               sx={{ flex: 1 }}
             >
               {uploading ? 'Uploading...' : 'Upload New'}
@@ -613,7 +627,7 @@ export default function ProfilePictureGallery({
                 type="file"
                 hidden
                 accept="image/*"
-                onChange={handleFileUpload}
+                onChange={handleFileSelect}
               />
             </Button>
 
@@ -652,17 +666,6 @@ export default function ProfilePictureGallery({
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Image Cropper */}
-      <ImageCropper
-        open={cropOpen}
-        imageSrc={cropImageSrc}
-        onCancel={() => {
-          setCropOpen(false);
-          setCropImageSrc(null);
-        }}
-        onCropComplete={handleCropComplete}
-      />
 
       {/* Full-Screen Overlay Gallery */}
       <Dialog
@@ -960,6 +963,17 @@ export default function ProfilePictureGallery({
           </Stack>
         </DialogContent>
       </Dialog>
+
+      <ImageCropper
+        open={cropOpen}
+        imageSrc={cropImageSrc}
+        onCancel={() => {
+          setCropOpen(false);
+          setCropImageSrc(null);
+        }}
+        onCropComplete={handleCropComplete}
+        aspect={1}
+      />
     </>
   );
 }

@@ -35,6 +35,7 @@ interface ImageCropperProps {
   aspect?: number;
 }
 
+// Helper to create HTMLImageElement from URL
 const createImage = (url: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
     const image = new Image();
@@ -44,6 +45,7 @@ const createImage = (url: string): Promise<HTMLImageElement> =>
     image.src = url;
   });
 
+// Helper to get cropped blob
 async function getCroppedImg(
   imageSrc: string,
   pixelCrop: Area,
@@ -99,6 +101,18 @@ export default function ImageCropper({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const onCropChange = (crop: Point) => {
+    setCrop(crop);
+  };
+
+  const onZoomChange = (zoom: number) => {
+    setZoom(zoom);
+  };
+
+  const onCropAreaChange = (_croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
   const handleSave = async () => {
     if (!imageSrc || !croppedAreaPixels) return;
 
@@ -106,6 +120,7 @@ export default function ImageCropper({
     try {
       const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
       await onCropComplete(croppedBlob);
+      // Don't close here, let the parent handle it or close after promise resolves
     } catch (e) {
       console.error(e);
     } finally {
@@ -137,9 +152,9 @@ export default function ImageCropper({
               crop={crop}
               zoom={zoom}
               aspect={aspect}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+              onCropChange={onCropChange}
+              onZoomChange={onZoomChange}
+              onCropComplete={onCropAreaChange}
             />
           )}
         </Box>
@@ -153,6 +168,7 @@ export default function ImageCropper({
               max={3}
               step={0.1}
               onChange={(_e, value) => setZoom(value as number)}
+              aria-labelledby="Zoom"
             />
             <ZoomIn color="action" />
           </Stack>

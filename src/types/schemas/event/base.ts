@@ -22,26 +22,21 @@ type Location = z.infer<typeof LocationSchema>;
 /**
  * Product, which can be associated with an event ( Merch, Tickets, etc. )
  */
-const ProductTypeSchema = z.enum(["TICKET", "ACCOMMODATION", "ADDON"]);
 const ProductSchema = z.object({
-  id: z.string().min(1).optional(),
+  id: z.uuid().optional(), // server should decide on the ID
   name: z.string().min(1, "Product name is required"),
   description: z.string().nullable().optional(),
-  price: z.coerce.number().nonnegative("Price cannot be negative"),
-  type: ProductTypeSchema.default("TICKET"),
-  capacity: z.coerce.number().int().positive().nullable().optional(),
-  order: z.coerce.number().int().default(0)
-}).passthrough();
+  price: z.coerce.number().positive("Price must be positive")
+}).strict();
 type Product = z.infer<typeof ProductSchema>;
 
 /**
- * Hotel/Stay policy of the event.
- * Policies are now scoped per hotel so the registration flow can calculate
- * early/late fees from the selected room price while still allowing overrides.
+ * Hotel/Stay policy of the event:
+ *  - Main-Days: Standard Check-in/Check-out
+ *  - Early-Arrival: optional early check-in
+ *  - Late-Departure: optional late check-out
  */
-const StayFeeModeSchema = z.enum(["AUTO", "CUSTOM"]);
-
-const HotelStayPolicySchema = z.object({
+const StayPolicySchema = z.object({
   main: z.object({
     /** First regular Check-in date */
     checkIn: z.coerce.date(),
@@ -54,8 +49,6 @@ const HotelStayPolicySchema = z.object({
     enabled: z.boolean().default(false),
     /** Optional early check-in date */
     from: z.coerce.date().optional(),
-    /** Auto = use the selected room price; Custom = explicit fee */
-    pricingMode: StayFeeModeSchema.default("AUTO"),
     /** costs per extra-night (if relevant) */
     feePerNight: z.coerce.number().nonnegative().optional(),
   }).strict(),
@@ -65,8 +58,6 @@ const HotelStayPolicySchema = z.object({
     enabled: z.boolean().default(false),
     /** Optional late check-out date */
     until: z.coerce.date().optional(),
-    /** Auto = use the selected room price; Custom = explicit fee */
-    pricingMode: StayFeeModeSchema.default("AUTO"),
     /** costs per extra-night (if relevant) */
     feePerNight: z.coerce.number().nonnegative().optional(),
   }).strict()
@@ -115,51 +106,6 @@ const HotelStayPolicySchema = z.object({
     }
   }
 }).strict();
-
-const HotelSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1, "Hotel name is required"),
-  isPrimary: z.boolean().default(false),
-  roomTypeProductIds: z.array(z.string().min(1)).default([]),
-  stayPolicy: HotelStayPolicySchema,
-}).strict();
-
-const StayPolicySchema = z.object({
-  version: z.literal(2).default(2),
-  mainLocationIsAccommodation: z.boolean().default(false),
-  allowOverflowHotels: z.boolean().default(false),
-  samePolicyAcrossHotels: z.boolean().default(false),
-  hotels: z.array(HotelSchema).default([]),
-}).superRefine((data, ctx) => {
-  if ((data.mainLocationIsAccommodation || data.allowOverflowHotels) && data.hotels.length === 0) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["hotels"],
-      message: "Add at least one hotel when accommodation is enabled.",
-    });
-  }
-
-  if (data.hotels.length > 0) {
-    const primaryHotelCount = data.hotels.filter(hotel => hotel.isPrimary).length;
-    if (primaryHotelCount !== 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["hotels"],
-        message: "Exactly one hotel must be marked as primary.",
-      });
-    }
-  }
-
-  data.hotels.forEach((hotel, index) => {
-    if (hotel.roomTypeProductIds.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["hotels", index, "roomTypeProductIds"],
-        message: "Add at least one room type for each hotel.",
-      });
-    }
-  });
-}).strict();
 type StayPolicy = z.infer<typeof StayPolicySchema>;
 
 
@@ -179,43 +125,11 @@ export const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: 
   }
 }
 
-export const checkCapacityLimits = (data: { maxRegistrations?: number | null; products?: any[] }, cxt: z.RefinementCtx) => {
-  if (data.maxRegistrations && data.products) {
-    data.products.forEach((p, index) => {
-      if (p.type === 'TICKET' && p.capacity && p.capacity > data.maxRegistrations!) {
-        cxt.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Ticket capacity (${p.capacity}) cannot exceed total event capacity (${data.maxRegistrations})`,
-          path: ["products", index, "capacity"],
-        });
-      }
-    });
-  }
-}
-
-const CustomFieldType = z.enum(["text", "number", "boolean", "select"]);
-const CustomFieldSchema = z.object({
-  id: z.string(),
-  label: z.string().min(1, "Label is required"),
-  type: CustomFieldType,
-  required: z.boolean().default(false),
-  options: z.array(z.string()).optional(), // For 'select' type
-}).strict();
-
-const ScheduleItemSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().min(1, "Session title is required"),
-  startTime: z.string().min(1, "Start time is required"),
-  endTime: z.string().optional(),
-  location: z.string().optional(),
-  description: z.string().optional(),
-}).strict();
-
 /**
  * Base schema of an event, only the client-delivered, stable fields
  * Used as base for Admin-Create/Update
  */
-export const EventBaseObject = z.object({
+const EventBaseObject = z.object({
   name: z.string().min(1, "Event name is required"),
   description: z.string().min(1, "Description is required"),
   startDate: z.coerce.date(),
@@ -224,30 +138,11 @@ export const EventBaseObject = z.object({
   imageUrl: z.url().nullable().optional(),
   products: z.array(ProductSchema).default([]),
 
-  /** Scheduled time for automatic status change to PUBLISHED */
-  publishAt: z.coerce.date().nullable().optional(),
-  /** When users can start registering */
-  registrationOpensAt: z.coerce.date().nullable().optional(),
-  /** Capacity limit */
-  maxRegistrations: z.coerce.number().int().positive().nullable().optional(),
-  /** Force user to select a room (ACCOMMODATION product) */
-  requiresHotel: z.boolean().default(false),
-  /** Require organizer approval before payment can be made */
-  requireApproval: z.boolean().default(false),
-  /** Fixed deadline for all payments */
-  paymentDeadline: z.coerce.date().nullable().optional(),
-
   /** Hotel/Stay-Policy: Main-Days + Early/Late-Options */
-  stayPolicy: StayPolicySchema,
-
-  /** Custom admin-defined fields for registration */
-  customFields: z.array(CustomFieldSchema).default([]),
-
-  /** Optional schedule/agenda items for the event */
-  schedule: z.array(ScheduleItemSchema).default([])
+  stayPolicy: StayPolicySchema
 });
 
-export const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).superRefine(checkCapacityLimits).strict();
+const EventBaseSchema = EventBaseObject.superRefine(checkDateOrder).strict();
 type EventBase = z.infer<typeof EventBaseSchema>;
 
 
@@ -276,9 +171,8 @@ const ParticipationBaseSchema = z.object({
   needsHotel: z.boolean().default(false),
   wantsEarlyArrival: z.boolean().default(false),
   wantsLateDeparture: z.boolean().default(false),
-  notes: z.string().max(1000).optional(),
-  /** Values for custom fields defined in the event */
-  customFieldsData: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({})
+  notes: z.string().max(1000).optional()
+
 }).strict();
 type ParticipationBase = z.infer<typeof ParticipationBaseSchema>;
 
@@ -294,6 +188,8 @@ const EventCreateBaseSchema = EventBaseSchema.superRefine((data, ctx) => {
 });
 
 export {
+    EventBaseSchema,
+    EventBaseObject,
     EventCreateBaseSchema,
     EventIdSchema,
     EventEntitySchema,
