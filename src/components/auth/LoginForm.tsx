@@ -17,7 +17,7 @@ import { Visibility, VisibilityOff, CheckCircle } from "@mui/icons-material";
 import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
 import type { PendingAccountLink } from "@/generated/prisma";
-import authClient, { isLastUsedLoginMethod } from "@/lib/auth/client";
+import authClient from "@/lib/auth/client";
 import LastUsedIndicator from "./LastUsedIndicator";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
@@ -181,7 +181,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                         }
                     }}
                 />
-                <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("email")} />
+                <LastUsedIndicator loginMethod="email" />
                 <Button
                     // type={(loading || success) ? "button" : "submit"}
                     type="submit"
@@ -214,7 +214,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                     <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
                         Login with Passkey
                     </Button>
-                    {!success && <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("passkey")} />}
+                    {!success && <LastUsedIndicator loginMethod="passkey" />}
                 </LoginMethodBox>
             </Box>
         </AuthTemplate>

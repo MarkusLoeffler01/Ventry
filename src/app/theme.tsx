@@ -4,10 +4,21 @@ import * as React from 'react';
 import { createTheme, ThemeProvider as MUIThemeProvider } from '@mui/material/styles';
 import { green } from '@mui/material/colors';
 import CssBaseline from '@mui/material/CssBaseline';
-import useMediaQuery from '@mui/material/useMediaQuery';
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+  const [prefersDarkMode, setPrefersDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const updatePreference = () => setPrefersDarkMode(mediaQuery.matches);
+
+    updatePreference();
+    mediaQuery.addEventListener('change', updatePreference);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updatePreference);
+    };
+  }, []);
 
   const theme = React.useMemo(
     () =>
