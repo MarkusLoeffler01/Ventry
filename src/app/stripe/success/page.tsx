@@ -26,7 +26,7 @@ export default async function Success({ searchParams }: { searchParams: Promise<
 
   if (status === 'complete') {
     return (
-      <section id="success">
+      <section>
         <p>
           We appreciate your business! A confirmation email will be sent to{' '}
           {customerEmail}. If you have any questions, please email{' '}

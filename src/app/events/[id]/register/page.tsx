@@ -4,7 +4,7 @@ import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import { Container, Box, Typography } from "@mui/material";
 import RegistrationWizard from "./RegistrationWizard";
-import { type SerializedProduct, type SerializedStayPolicy } from "@/types/event";
+import type { SerializedProduct, SerializedStayPolicy } from "@/types/event";
 
 interface SerializedEventForWizard {
   id: number;
@@ -20,10 +20,8 @@ export const dynamic = "force-dynamic";
 
 export default async function RegisterEventPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mode?: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) {
@@ -33,7 +31,6 @@ export default async function RegisterEventPage({
 
   const id = Number((await params).id);
   if (isNaN(id)) notFound();
-  const { mode } = await searchParams;
 
   const event = await prisma.event.findUnique({
     where: { id, status: 'PUBLISHED' },

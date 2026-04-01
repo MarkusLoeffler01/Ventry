@@ -3,7 +3,7 @@ import { checkAdminAuth } from "@/lib/auth/admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import EditEventClient from "./EditEventClient";
-import { type SerializedEvent, type SerializedProduct } from "@/types/event";
+import type { SerializedEvent, SerializedProduct } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 

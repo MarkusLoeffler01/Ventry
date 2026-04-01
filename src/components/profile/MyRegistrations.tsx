@@ -110,7 +110,7 @@ export default function MyRegistrations({ userId }: MyRegistrationsProps) {
               <Box sx={{ minWidth: 150, textAlign: { sm: 'right' } }}>
                 <Typography variant="subtitle2" gutterBottom>Payment</Typography>
                 {reg.payments.map((p, idx) => (
-                  <Box key={idx} sx={{ mb: 1 }}>
+                  <Box key={`${p.paymentStatus}-${p.amount}-${p.currency}-${idx}`} sx={{ mb: 1 }}>
                     <Typography variant="h6">{p.amount}{p.currency}</Typography>
                     <Chip 
                       label={p.paymentStatus} 

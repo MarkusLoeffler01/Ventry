@@ -11,7 +11,6 @@ export default async function LinkAccountPage({
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   const { callbackUrl } = await searchParams;
-
   // Require authentication
   const session = await getSession();
   

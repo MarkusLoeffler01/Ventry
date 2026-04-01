@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
-import { Prisma } from "@/generated/prisma";
+import type { Prisma } from "@/generated/prisma";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import RegistrationUpdateMail from "@/components/emails/RegistrationUpdateMail";
 import { sendMail } from "@/lib/mail";
@@ -111,8 +111,13 @@ export async function PATCH(
         // 2. Perform update in a transaction
         const registration = await prisma.$transaction(async (tx) => {
             // Find admin profile for current user
+            const adminUserId = authResult.user?.id;
+            if (!adminUserId) {
+                throw new Error("Admin authentication failed");
+            }
+
             const admin = await tx.admin.findUnique({
-                where: { userId: authResult.user!.id }
+                where: { userId: adminUserId }
             });
 
             const currentTicketItem = current.registrationItems.find((item) => isTicketProduct(item.product));
@@ -121,7 +126,7 @@ export async function PATCH(
 
             if (requestedTicketId && requestedTicketId !== currentTicketItem?.productId) {
                 const nextTicketProduct = current.event.products.find((product) => product.id === requestedTicketId);
-                if (!isTicketProduct(nextTicketProduct)) {
+                if (!nextTicketProduct || !isTicketProduct(nextTicketProduct)) {
                     throw new Error("Selected badge tier is invalid");
                 }
 

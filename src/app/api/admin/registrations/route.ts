@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
-import { RegistrationStatus } from "@/generated/prisma";
+import type { RegistrationStatus } from "@/generated/prisma";
 
 export const dynamic = "force-dynamic";
 

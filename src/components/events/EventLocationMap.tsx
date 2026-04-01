@@ -15,7 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Close, OpenInFull } from "@mui/icons-material";
-import { type SerializedLocation } from "@/types/event";
+import type { SerializedLocation } from "@/types/event";
 
 interface EventLocationMapProps {
   location: SerializedLocation;

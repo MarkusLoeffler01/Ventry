@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma/prisma";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (event.type) {
-      case "payment_intent.succeeded":
+      case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const paymentId = paymentIntent.metadata.paymentId;
         const registrationId = paymentIntent.metadata.registrationId;
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
           ]);
         }
         break;
+      }
       
       // Handle other events like payment_intent.payment_failed if needed
       default:

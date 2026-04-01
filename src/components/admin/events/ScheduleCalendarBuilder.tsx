@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import type { DateSelectArg, EventApi, EventClickArg, EventDropArg } from '@fullcalendar/core';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import interactionPlugin, { type EventResizeDoneArg } from '@fullcalendar/interaction';
 import { Box, Paper, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid } from '@mui/material';
 
-interface ScheduleItem {
+export interface ScheduleItem {
   id?: string;
   title: string;
   startTime: string;
@@ -15,6 +16,11 @@ interface ScheduleItem {
   location?: string;
   description?: string;
 }
+
+type ScheduleEventProps = {
+  location?: string;
+  description?: string;
+};
 
 interface ScheduleCalendarBuilderProps {
   items: ScheduleItem[];
@@ -39,7 +45,7 @@ export default function ScheduleCalendarBuilder({ items, onChange, eventStartDat
     }
   }));
 
-  const handleDateSelect = (selectInfo: any) => {
+  const handleDateSelect = (selectInfo: DateSelectArg) => {
     setEditingItem({
       title: '',
       startTime: selectInfo.startStr,
@@ -51,8 +57,8 @@ export default function ScheduleCalendarBuilder({ items, onChange, eventStartDat
     selectInfo.view.calendar.unselect(); // clear date selection
   };
 
-  const handleEventClick = (clickInfo: any) => {
-    const props = clickInfo.event.extendedProps;
+  const handleEventClick = (clickInfo: EventClickArg) => {
+    const props = clickInfo.event.extendedProps as ScheduleEventProps;
     setEditingItem({
       id: clickInfo.event.id,
       title: clickInfo.event.title,
@@ -64,15 +70,15 @@ export default function ScheduleCalendarBuilder({ items, onChange, eventStartDat
     setDialogOpen(true);
   };
 
-  const handleEventDrop = (dropInfo: any) => {
+  const handleEventDrop = (dropInfo: EventDropArg) => {
     updateEventFromCalendar(dropInfo.event);
   };
 
-  const handleEventResize = (resizeInfo: any) => {
+  const handleEventResize = (resizeInfo: EventResizeDoneArg) => {
     updateEventFromCalendar(resizeInfo.event);
   };
 
-  const updateEventFromCalendar = (eventInput: any) => {
+  const updateEventFromCalendar = (eventInput: EventApi) => {
     const updatedItems = items.map((item, index) => {
       const matchId = item.id || `item-${index}`;
       if (matchId === eventInput.id) {
