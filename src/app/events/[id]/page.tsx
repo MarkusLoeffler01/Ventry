@@ -30,6 +30,7 @@ import EventRegistrationStatus from "@/components/events/EventRegistrationStatus
 import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
 import EventLocationMap from "@/components/events/EventLocationMap";
+import SupportTicketPanel from "@/components/events/SupportTicketPanel";
 import { type SerializedEvent, type SerializedProduct } from "@/types/event";
 
 export const dynamic = "force-dynamic";
@@ -87,9 +88,16 @@ export default async function EventDetailPage({
   if (session?.user?.id) {
     const dbUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { isAdmin: true }
+      select: {
+        isAdmin: true,
+        adminProfile: {
+          select: {
+            id: true
+          }
+        }
+      }
     });
-    canEdit = !!dbUser?.isAdmin || event.ownerId === session.user.id;
+    canEdit = !!dbUser?.isAdmin || event.ownerId === dbUser?.adminProfile?.id;
   }
 
   // If it was a scheduled draft, update its status to PUBLISHED proactively
@@ -115,6 +123,8 @@ export default async function EventDetailPage({
       }
     }
   }) : null;
+
+  const canOpenSupportTicket = !!registration && registration.status !== "CANCELLED";
 
   // Add expiresAt to the cast/serialization if needed, 
   // but Prisma already includes it in the object since we updated the schema.
@@ -441,6 +451,13 @@ export default async function EventDetailPage({
                   </Box>
                 )}
               </Paper>
+
+              {canOpenSupportTicket && registration && (
+                <SupportTicketPanel
+                  eventId={event.id}
+                  registrationId={registration.id}
+                />
+              )}
 
               <Box sx={{ px: 2 }}>
                 <Typography variant="h6" gutterBottom>Includes</Typography>

@@ -6,11 +6,6 @@ if ! command -v pg_restore >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -z "${DATABASE_URL:-}" ]; then
-  echo "Error: DATABASE_URL is not set."
-  exit 1
-fi
-
 BACKUP_FILE="${1:-backups/json/latest.json}"
 
 if [ ! -f "${BACKUP_FILE}" ]; then
