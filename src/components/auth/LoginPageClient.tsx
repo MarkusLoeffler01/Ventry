@@ -11,11 +11,11 @@ import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import CircularProgress from "@mui/material/CircularProgress";
-import { isLastUsedLoginMethod } from "@/lib/auth/client";
 import LastUsedIndicator from "./LastUsedIndicator";
 
 export default function LoginPageClient() {
   const searchParams = useSearchParams();
+  const [mounted, setMounted] = React.useState(false);
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const registered = searchParams.get("registered");
   const passwordReset = searchParams.get("message") === "Password reset successful";
@@ -30,6 +30,10 @@ export default function LoginPageClient() {
   const [linkingPassword, setLinkingPassword] = React.useState("");
   const [linkingLoading, setLinkingLoading] = React.useState(false);
   const [linkingError, setLinkingError] = React.useState("");
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
@@ -89,6 +93,14 @@ export default function LoginPageClient() {
       setLinkingLoading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <>
@@ -209,7 +221,7 @@ export default function LoginPageClient() {
             >
               Sign in with Google
             </Button>
-            <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("google")} />
+            <LastUsedIndicator loginMethod="google" />
           </LoginMethodBox>
           <LoginMethodBox>
             <Button
@@ -219,7 +231,7 @@ export default function LoginPageClient() {
             >
               Sign in with GitHub
             </Button>
-            <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("github")} />
+            <LastUsedIndicator loginMethod="github" />
           </LoginMethodBox>
         </Stack>
         <Typography variant="caption" color="text.secondary" align="center">

@@ -1,7 +1,7 @@
 "use client";
 
 import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, AppBar, Typography, Divider } from "@mui/material";
-import { Event, Dashboard, People, Settings, Home } from "@mui/icons-material";
+import { Event, Dashboard, People, Settings, Home, SupportAgent } from "@mui/icons-material";
 import Link from "next/link";
 
 const drawerWidth = 240;
@@ -47,6 +47,12 @@ export default function AdminLayout({
               <ListItemButton component={Link} href="/admin/users">
                 <ListItemIcon><People /></ListItemIcon>
                 <ListItemText primary="Users" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={Link} href="/admin/tickets">
+                <ListItemIcon><SupportAgent /></ListItemIcon>
+                <ListItemText primary="Tickets" />
               </ListItemButton>
             </ListItem>
           </List>
