@@ -128,7 +128,10 @@ function PaymentStatusContent() {
                   <Typography fontWeight="bold" variant="h6">{(status.amount / 100).toFixed(2)} {status.currency.toUpperCase()}</Typography>
                 </Box>
                 {bankInstructions.financial_addresses?.map((addr, idx: number) => (
-                  <Box key={idx} sx={{ mt: 1 }}>
+                  <Box
+                    key={addr.iban ? `${addr.iban.iban}-${addr.iban.bic}` : `bank-address-${idx}`}
+                    sx={{ mt: 1 }}
+                  >
                     {addr.iban && (
                       <>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>

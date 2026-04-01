@@ -82,11 +82,11 @@ export default function EventSchedule({ schedule }: EventScheduleProps) {
             </Box>
 
             <Stack spacing={2}>
-              {dayItems.map((item, index) => (
-                <Paper 
-                  key={index} 
-                  variant="outlined" 
-                  sx={{ 
+              {dayItems.map((item) => (
+                <Paper
+                  key={item.id ?? `${item.title}-${item.startTime}-${item.endTime}`}
+                  variant="outlined"
+                  sx={{
                     p: 2,
                     transition: 'transform 0.2s, box-shadow 0.2s',
                     '&:hover': {

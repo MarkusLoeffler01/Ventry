@@ -8,7 +8,7 @@ export default async function IndexPage({ canceled }: { canceled?: boolean }) {
   return (
     <form action="/api/checkout_sessions" method="POST">
       <section>
-        <button type="submit" role="link">
+        <button type="submit">
           Checkout
         </button>
       </section>

@@ -179,13 +179,17 @@ export const checkDateOrder = (data: { startDate?: Date; endDate?: Date }, cxt: 
   }
 }
 
-export const checkCapacityLimits = (data: { maxRegistrations?: number | null; products?: any[] }, cxt: z.RefinementCtx) => {
-  if (data.maxRegistrations && data.products) {
+export const checkCapacityLimits = (
+  data: { maxRegistrations?: number | null; products?: Array<Pick<Product, "type" | "capacity">> },
+  cxt: z.RefinementCtx,
+) => {
+  const maxRegistrations = data.maxRegistrations;
+  if (maxRegistrations && data.products) {
     data.products.forEach((p, index) => {
-      if (p.type === 'TICKET' && p.capacity && p.capacity > data.maxRegistrations!) {
+      if (p.type === 'TICKET' && p.capacity && p.capacity > maxRegistrations) {
         cxt.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Ticket capacity (${p.capacity}) cannot exceed total event capacity (${data.maxRegistrations})`,
+          message: `Ticket capacity (${p.capacity}) cannot exceed total event capacity (${maxRegistrations})`,
           path: ["products", index, "capacity"],
         });
       }

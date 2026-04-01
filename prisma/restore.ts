@@ -9,6 +9,8 @@ type ModelMeta = {
   dateFields: Set<string>;
 };
 
+type RestoreCreateFn = (args: { data: Record<string, unknown> }) => Promise<unknown>;
+
 const modelMeta = new Map<string, ModelMeta>(
   Prisma.dmmf.datamodel.models.map((model) => {
     const scalarFields = model.fields
@@ -58,7 +60,7 @@ function toModelData<T extends Record<string, unknown>>(modelName: string, sourc
 
 async function createWithColumnFallback(
   modelLabel: string,
-  createFn: (args: { data: Record<string, unknown> }) => Promise<unknown>,
+  createFn: RestoreCreateFn,
   data: Record<string, unknown>,
 ) {
   const mutableData = { ...data };
@@ -117,36 +119,36 @@ async function main() {
   // 2. Restore Users and Profiles
   console.log("👤 Restoring users and profiles...");
   for (const u of data.users) {
-    await createWithColumnFallback("User", prisma.user.create.bind(prisma.user), toModelData("User", u));
+    await createWithColumnFallback("User", prisma.user.create.bind(prisma.user) as unknown as RestoreCreateFn, toModelData("User", u));
 
     for (const pp of u.profilePictures || []) {
       await createWithColumnFallback(
         "ProfilePicture",
-        prisma.profilePicture.create.bind(prisma.profilePicture),
+        prisma.profilePicture.create.bind(prisma.profilePicture) as unknown as RestoreCreateFn,
         toModelData("ProfilePicture", pp),
       );
     }
 
     if (u.adminProfile) {
-      await createWithColumnFallback("Admin", prisma.admin.create.bind(prisma.admin), toModelData("Admin", u.adminProfile));
+      await createWithColumnFallback("Admin", prisma.admin.create.bind(prisma.admin) as unknown as RestoreCreateFn, toModelData("Admin", u.adminProfile));
     }
 
     // Auth models
     if (u.accounts) {
       for (const acc of u.accounts) {
-        await createWithColumnFallback("Account", prisma.account.create.bind(prisma.account), toModelData("Account", acc));
+        await createWithColumnFallback("Account", prisma.account.create.bind(prisma.account) as unknown as RestoreCreateFn, toModelData("Account", acc));
       }
     }
     
     if (u.passkeys) {
       for (const pk of u.passkeys) {
-        await createWithColumnFallback("Passkey", prisma.passkey.create.bind(prisma.passkey), toModelData("Passkey", pk));
+        await createWithColumnFallback("Passkey", prisma.passkey.create.bind(prisma.passkey) as unknown as RestoreCreateFn, toModelData("Passkey", pk));
       }
     }
 
     if (u.twofactors) {
       for (const tf of u.twofactors) {
-        await createWithColumnFallback("TwoFactor", prisma.twoFactor.create.bind(prisma.twoFactor), toModelData("TwoFactor", tf));
+        await createWithColumnFallback("TwoFactor", prisma.twoFactor.create.bind(prisma.twoFactor) as unknown as RestoreCreateFn, toModelData("TwoFactor", tf));
       }
     }
   }
@@ -154,26 +156,26 @@ async function main() {
   // 3. Restore Events
   console.log("📅 Restoring events...");
   for (const e of data.events) {
-    await createWithColumnFallback("Event", prisma.event.create.bind(prisma.event), toModelData("Event", e));
+    await createWithColumnFallback("Event", prisma.event.create.bind(prisma.event) as unknown as RestoreCreateFn, toModelData("Event", e));
 
     if (e.location) {
-      await createWithColumnFallback("Location", prisma.location.create.bind(prisma.location), toModelData("Location", e.location));
+      await createWithColumnFallback("Location", prisma.location.create.bind(prisma.location) as unknown as RestoreCreateFn, toModelData("Location", e.location));
     }
 
     for (const p of e.products || []) {
-      await createWithColumnFallback("Product", prisma.product.create.bind(prisma.product), toModelData("Product", p));
+      await createWithColumnFallback("Product", prisma.product.create.bind(prisma.product) as unknown as RestoreCreateFn, toModelData("Product", p));
     }
   }
 
   // 4. Restore Registrations and dependencies
   console.log("📝 Restoring registrations...");
   for (const r of data.registrations) {
-    await createWithColumnFallback("Registration", prisma.registration.create.bind(prisma.registration), toModelData("Registration", r));
+    await createWithColumnFallback("Registration", prisma.registration.create.bind(prisma.registration) as unknown as RestoreCreateFn, toModelData("Registration", r));
 
     for (const ri of r.registrationItems || []) {
       await createWithColumnFallback(
         "RegistrationItem",
-        prisma.registrationItem.create.bind(prisma.registrationItem),
+        prisma.registrationItem.create.bind(prisma.registrationItem) as unknown as RestoreCreateFn,
         toModelData("RegistrationItem", ri),
       );
     }
@@ -181,19 +183,19 @@ async function main() {
     for (const we of r.waitlistEntries || []) {
       await createWithColumnFallback(
         "WaitlistEntry",
-        prisma.waitlistEntry.create.bind(prisma.waitlistEntry),
+        prisma.waitlistEntry.create.bind(prisma.waitlistEntry) as unknown as RestoreCreateFn,
         toModelData("WaitlistEntry", we),
       );
     }
 
     for (const p of r.payments || []) {
-      await createWithColumnFallback("Payment", prisma.payment.create.bind(prisma.payment), toModelData("Payment", p));
+      await createWithColumnFallback("Payment", prisma.payment.create.bind(prisma.payment) as unknown as RestoreCreateFn, toModelData("Payment", p));
     }
 
     for (const h of r.history || []) {
       await createWithColumnFallback(
         "RegistrationHistory",
-        prisma.registrationHistory.create.bind(prisma.registrationHistory),
+        prisma.registrationHistory.create.bind(prisma.registrationHistory) as unknown as RestoreCreateFn,
         toModelData("RegistrationHistory", h),
       );
     }
@@ -208,6 +210,6 @@ main()
     console.error("❌ Restore failed:", e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .finally(() => {
+    void prisma.$disconnect();
   });

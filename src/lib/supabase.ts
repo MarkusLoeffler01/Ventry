@@ -16,7 +16,7 @@ export async function uploadProfilePicture(file: File | Buffer, userId: string, 
         .upload(`users/${userId}/${name}`, file, {
             cacheControl: '3600',
             upsert: false,
-            contentType: 'image/jpeg'
+            contentType: 'image/jpeg' // Explicitly set content type for processed images
     });
 
     if(error) throw error;

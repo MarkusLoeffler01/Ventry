@@ -1,4 +1,4 @@
-import { Prisma } from "@/generated/prisma";
+import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma/prisma";
 import { clearProductStock } from "@/lib/redis";
 

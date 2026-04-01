@@ -144,7 +144,7 @@ export default function RegistrationUpdateMail({
                 <div style={emailStyles.changeList}>
                     <p style={{ ...emailStyles.text, fontWeight: 'bold', marginBottom: '16px' }}>What changed:</p>
                     {changes.map((change, i) => (
-                        <div key={i} style={emailStyles.changeItem}>
+                        <div key={`${change.label}-${change.old}-${change.new}-${i}`} style={emailStyles.changeItem}>
                             <div style={{ fontSize: '14px', color: '#666666', marginBottom: '4px' }}>{change.label}</div>
                             <div>
                                 <span style={emailStyles.oldValue}>{change.old}</span>

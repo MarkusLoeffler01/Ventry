@@ -3,7 +3,7 @@ import EventList from "@/components/admin/events/EventList";
 import { checkAdminAuth } from "@/lib/auth/admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect } from "next/navigation";
-import { type SerializedEvent } from "@/types/event";
+import type { SerializedEvent } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 
