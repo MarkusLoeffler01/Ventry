@@ -10,6 +10,7 @@ import { sendMail } from "@/lib/mail";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import WelcomeMail from "@/components/emails/WelcomeMail";
 import EmailVerificationMail from "@/components/emails/EmailVerificationMail";
+import { getTrustedOrigins } from "@/lib/security/origins";
 
 const cookiePrefix = "VENTRY";
 
@@ -28,7 +29,7 @@ export const auth = betterAuth({
         cookiePrefix: process.env.NODE_ENV === "production" ? `__Secure-${cookiePrefix}` : cookiePrefix,
     },
     baseURL: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443",
-    trustedOrigins: ["https://local.dev:3443", "http://localhost:3000"],
+    trustedOrigins: getTrustedOrigins(),
     secret: process.env.BETTER_AUTH_SECRET,
     plugins: [
         passkey(),

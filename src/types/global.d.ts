@@ -5,6 +5,11 @@ declare namespace NodeJS {
         JWT_AUDIENCE: string;
         JWT_ISSUER: string;
 
+        BETTER_AUTH_URL: string;
+        BETTER_AUTH_TRUSTED_ORIGINS?: string;
+        NEXTAUTH_URL?: string;
+        BETTER_AUTH_SECRET: string;
+
 
         GOOGLE_CLIENT_ID: string;
         GOOGLE_CLIENT_SECRET: string;
@@ -16,5 +21,7 @@ declare namespace NodeJS {
         SUPABASE_PUBLISHABLE_KEY: string;
         SUPABASE_URL: string;
         SUPABASE_BUCKET_ID: string;
+
+        SMTP_FROM?: string;
     }
 }
