@@ -18,7 +18,7 @@ on:
 
 env:
   HARBOR_REGISTRY: harbor.m-loeffler.de
-  IMAGE_NAME: ventry
+  IMAGE_NAME: ventry/app
   DEPLOY_HOST: m-loeffler.de
   DEPLOY_USER: ven
   DEPLOY_PATH: /docker/ventry
