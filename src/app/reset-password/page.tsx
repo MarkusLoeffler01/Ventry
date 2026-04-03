@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff, LockReset, CheckCircle } from "@mui/icons-material";
 import { useSearchParams, useRouter } from "next/navigation";
-import authClient from "@authclient";
+import authClient from "@/lib/auth/client";
 
 function ResetPasswordContent() {
     const [newPassword, setNewPassword] = useState("");

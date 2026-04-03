@@ -20,6 +20,7 @@ export default async function ProfilePage() {
       id: true,
       name: true,
       email: true,
+      country: true,
       profilePictures: {
         orderBy: [
           { order: 'asc' },

@@ -22,7 +22,7 @@ import PasswordStrengthMeter from "./PasswordStrengthMeter";
 import { registerSchema } from "@/types/schemas/client/register";
 import type { RegisterSchema } from "@/types/schemas/client/register";
 
-export default function RegisterForm() {
+export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<{ message: string | null; suggestions: string[] } | null>(null);
@@ -57,7 +57,11 @@ export default function RegisterForm() {
         return;
       }
 
-      router.push("/login?registered=true");
+      const loginRedirectUrl = callbackUrl 
+        ? `/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/login?registered=true";
+        
+      router.push(loginRedirectUrl);
     } catch (err) {
       console.error("Registration error:", err);
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten");

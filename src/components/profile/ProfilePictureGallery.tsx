@@ -211,6 +211,10 @@ export default function ProfilePictureGallery({
   const [deleting, setDeleting] = useState(false);
   const [settingPrimary, setSettingPrimary] = useState(false);
   
+  // Cropping state
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  
   // Overlay gallery state
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -218,10 +222,6 @@ export default function ProfilePictureGallery({
   // Drag-and-drop state
   const [orderedPictures, setOrderedPictures] = useState<ProfilePicture[]>(profilePictures);
   const [_reordering, setReordering] = useState(false);
-
-  // Cropper state
-  const [cropOpen, setCropOpen] = useState(false);
-  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
 
   // Update ordered pictures when profilePictures changes
   useEffect(() => {
@@ -345,13 +345,13 @@ export default function ProfilePictureGallery({
     };
   }, [overlayOpen, handleNext, handlePrevious, handleOverlayClose]);
 
-  const processUpload = async (file: File) => {
+  const processUpload = async (croppedBlob: Blob) => {
     setUploading(true);
     setError(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', croppedBlob, 'profile.jpg');
       formData.append('isPrimary', profilePictures.length === 0 ? 'true' : 'false');
 
       const response = await fetch('/api/user/profile-picture', {
@@ -400,14 +400,13 @@ export default function ProfilePictureGallery({
       setCropOpen(true);
     });
     reader.readAsDataURL(file);
-    
+
     // Reset input so same file can be selected again
     event.target.value = '';
   };
 
   const handleCropComplete = async (croppedBlob: Blob) => {
-    const file = new File([croppedBlob], "profile.jpg", { type: "image/jpeg" });
-    await processUpload(file);
+    await processUpload(croppedBlob);
   };
 
   const handleSetPrimary = async (pictureId?: string) => {
@@ -535,7 +534,7 @@ export default function ProfilePictureGallery({
           {/* Helper text for drag-and-drop */}
           {orderedPictures.length > 1 && (
             <>
-            
+
             <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 1 }}>
               <Typography variant="body2" color="info.main">
                 💡 Drag and drop pictures to rearrange their order
@@ -547,7 +546,7 @@ export default function ProfilePictureGallery({
               </Typography>
             </Box>
             </>
-            
+
           )}
 
           {/* Gallery Grid with Drag-and-Drop */}
@@ -619,7 +618,7 @@ export default function ProfilePictureGallery({
               variant="contained"
               component="label"
               startIcon={<CloudUpload />}
-              disabled={uploading}
+              disabled={uploading || cropOpen}
               sx={{ flex: 1 }}
             >
               {uploading ? 'Uploading...' : 'Upload New'}

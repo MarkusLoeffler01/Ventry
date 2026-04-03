@@ -34,3 +34,29 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Database Backup & Restore (1:1)
+
+This project includes PostgreSQL-native backup/restore scripts for full database snapshots.
+
+- Backup (custom dump):
+
+```bash
+npm run db:backup
+```
+
+- Restore from a dump:
+
+```bash
+npm run db:restore -- ./backups/postgres/db_YYYYMMDD_HHMMSS.dump
+```
+
+Requirements:
+
+- `DATABASE_URL` must be set
+- `pg_dump` and `pg_restore` must be installed
+
+Notes:
+
+- Dumps are written to `./backups/postgres` by default.
+- `db:backup` also attempts a globals export (`roles/tablespaces`) when supported by your Postgres environment.
