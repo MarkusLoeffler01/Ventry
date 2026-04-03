@@ -22,12 +22,17 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardTab, setDashboardTab] = useState(0);
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
   const handleStartOnboarding = async () => {
     setLoading(true);
     setError(null);
 
     try {
+      if (!publishableKey) {
+        throw new Error("Stripe publishable key is not configured for this deployment.");
+      }
+
       const fetchClientSecret = async () => {
         const response = await fetch('/api/admin/stripe/connect', { method: 'POST' });
         if (!response.ok) {
@@ -39,7 +44,7 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
       };
 
       const instance = loadConnectAndInitialize({
-        publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
+        publishableKey,
         fetchClientSecret,
         appearance: {
           overlays: 'dialog',
@@ -52,7 +57,7 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
       setStripeConnectInstance(instance);
     } catch (err) {
       console.error(err);
-      setError('Failed to initialize Stripe Connect. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to initialize Stripe Connect. Please try again.');
     } finally {
       setLoading(false);
     }
