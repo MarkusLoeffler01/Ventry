@@ -11,7 +11,7 @@ function toPersistedProducts(products: z.infer<typeof adminCreateEventSchema>["p
         name: product.name,
         description: product.description,
         price: product.price,
-        type: product.type as "TICKET" | "ACCOMMODATION" | "ADDON" | undefined,
+        type: product.type as "TICKET" | "ACCOMMODATION" | "ADDON",
         capacity: product.capacity,
     }));
 }

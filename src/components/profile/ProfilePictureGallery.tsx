@@ -666,17 +666,6 @@ export default function ProfilePictureGallery({
         </DialogActions>
       </Dialog>
 
-      {/* Image Cropper */}
-      <ImageCropper
-        open={cropOpen}
-        imageSrc={cropImageSrc}
-        onCancel={() => {
-          setCropOpen(false);
-          setCropImageSrc(null);
-        }}
-        onCropComplete={handleCropComplete}
-      />
-
       {/* Full-Screen Overlay Gallery */}
       <Dialog
         open={overlayOpen}

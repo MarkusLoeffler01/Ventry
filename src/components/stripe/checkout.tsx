@@ -1,16 +1,28 @@
-export default async function IndexPage({ canceled }: { canceled?: boolean }) {
+type StripeCheckoutProps = {
+  canceled?: boolean
+  productId?: string
+  productName?: string
+  productPrice?: number
+}
 
-  if (canceled) {
-    console.log(
-      'Order canceled -- continue to shop around and checkout when you’re ready.'
-    )
-  }
+export default function IndexPage({
+  canceled,
+  productId,
+  productName,
+  productPrice,
+}: StripeCheckoutProps) {
+  const isDisabled = !productId
+
   return (
     <form action="/api/checkout_sessions" method="POST">
       <section>
-        <button type="submit">
-          Checkout
+        {productId ? <input type="hidden" name="productId" value={productId} /> : null}
+        <button type="submit" disabled={isDisabled}>
+          {productName ? `Checkout ${productName}` : 'Checkout'}
         </button>
+        {typeof productPrice === 'number' ? <p>{productPrice.toFixed(2)} EUR</p> : null}
+        {canceled ? <p>Order canceled. You can retry checkout at any time.</p> : null}
+        {isDisabled ? <p>No product available for the checkout demo.</p> : null}
       </section>
     </form>
   )

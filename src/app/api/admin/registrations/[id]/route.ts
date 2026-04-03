@@ -5,6 +5,7 @@ import type { Prisma } from "@/generated/prisma";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import RegistrationUpdateMail from "@/components/emails/RegistrationUpdateMail";
 import { sendMail } from "@/lib/mail";
+import { cancelRegistrationAndReleaseCapacity, syncReleasedProductStocks } from "@/lib/events/registration-capacity";
 
 type FinanceAction = "NONE" | "UPCHARGE_REQUIRED" | "MANUAL_REFUND_RECOMMENDED";
 
@@ -120,70 +121,10 @@ export async function PATCH(
                 where: { userId: adminUserId }
             });
 
+            const isCancellingRegistration = status === "CANCELLED" && current.status !== "CANCELLED";
             const currentTicketItem = current.registrationItems.find((item) => isTicketProduct(item.product));
             const requestedTicketId = typeof preferences?.productId === "string" ? preferences.productId : undefined;
             const oldSelectionTotal = toMoney(current.registrationItems.reduce((sum, item) => sum + toNumber(item.priceAtBooking), 0));
-
-            if (requestedTicketId && requestedTicketId !== currentTicketItem?.productId) {
-                const nextTicketProduct = current.event.products.find((product) => product.id === requestedTicketId);
-                if (!nextTicketProduct || !isTicketProduct(nextTicketProduct)) {
-                    throw new Error("Selected badge tier is invalid");
-                }
-
-                if (nextTicketProduct.capacity !== null && nextTicketProduct.soldCount >= nextTicketProduct.capacity) {
-                    throw new Error("Selected badge tier is sold out");
-                }
-
-                if (currentTicketItem) {
-                    await tx.registrationItem.update({
-                        where: { id: currentTicketItem.id },
-                        data: {
-                            productId: requestedTicketId,
-                            priceAtBooking: nextTicketProduct.price
-                        }
-                    });
-
-                    await tx.product.updateMany({
-                        where: {
-                            id: currentTicketItem.productId,
-                            soldCount: { gt: 0 }
-                        },
-                        data: {
-                            soldCount: { decrement: 1 }
-                        }
-                    });
-
-                    await tx.product.update({
-                        where: { id: requestedTicketId },
-                        data: {
-                            soldCount: { increment: 1 }
-                        }
-                    });
-                } else {
-                    await tx.registrationItem.create({
-                        data: {
-                            registrationId: id,
-                            productId: requestedTicketId,
-                            priceAtBooking: nextTicketProduct.price
-                        }
-                    });
-
-                    await tx.product.update({
-                        where: { id: requestedTicketId },
-                        data: {
-                            soldCount: { increment: 1 }
-                        }
-                    });
-                }
-            }
-
-            const refreshedItems = await tx.registrationItem.findMany({
-                where: { registrationId: id },
-                include: { product: true }
-            });
-
-            const newSelectionTotal = toMoney(refreshedItems.reduce((sum, item) => sum + toNumber(item.priceAtBooking), 0));
-            const selectionDelta = toMoney(newSelectionTotal - oldSelectionTotal);
             const completedPayments = await tx.payment.findMany({
                 where: {
                     registrationId: id,
@@ -194,88 +135,92 @@ export async function PATCH(
 
             let financeAction: FinanceAction = "NONE";
             let financeAmount = 0;
+            let releasedProductIds: string[] = [];
 
-            const pendingPayment = await tx.payment.findFirst({
-                where: {
-                    registrationId: id,
-                    paymentStatus: "PENDING"
-                },
-                orderBy: { createdAt: "desc" }
-            });
-            const pendingAmount = toNumber(pendingPayment?.amount);
-
-            if (selectionDelta > 0) {
-                financeAction = "UPCHARGE_REQUIRED";
-                financeAmount = selectionDelta;
-                const nextPendingAmount = toMoney(pendingAmount + selectionDelta);
-
-                if (pendingPayment) {
-                    await tx.payment.update({
-                        where: { id: pendingPayment.id },
-                        data: {
-                            amount: nextPendingAmount,
-                            currency: "EUR",
-                            paymentProvider: pendingPayment.paymentProvider || "STRIPE"
-                        }
-                    });
-                } else {
-                    await tx.payment.create({
-                        data: {
-                            userId: current.userId,
-                            registrationId: id,
-                            amount: financeAmount,
-                            currency: "EUR",
-                            paymentStatus: "PENDING",
-                            paymentProvider: "STRIPE"
-                        }
-                    });
-                }
+            if (isCancellingRegistration) {
+                releasedProductIds = await cancelRegistrationAndReleaseCapacity(tx, id);
             } else {
-                if (selectionDelta < 0) {
-                    const reduction = Math.abs(selectionDelta);
-
-                    if (pendingPayment) {
-                        if (pendingAmount > reduction) {
-                            await tx.payment.update({
-                                where: { id: pendingPayment.id },
-                                data: {
-                                    amount: toMoney(pendingAmount - reduction)
-                                }
-                            });
-                        } else {
-                            await tx.payment.delete({ where: { id: pendingPayment.id } });
-                        }
+                if (requestedTicketId && requestedTicketId !== currentTicketItem?.productId) {
+                    const nextTicketProduct = current.event.products.find((product) => product.id === requestedTicketId);
+                    if (!nextTicketProduct || !isTicketProduct(nextTicketProduct)) {
+                        throw new Error("Selected badge tier is invalid");
                     }
 
-                    const remainingRefund = toMoney(Math.max(0, reduction - pendingAmount));
-                    if (remainingRefund > 0) {
-                        financeAction = "MANUAL_REFUND_RECOMMENDED";
-                        financeAmount = remainingRefund;
+                    if (nextTicketProduct.capacity !== null && nextTicketProduct.soldCount >= nextTicketProduct.capacity) {
+                        throw new Error("Selected badge tier is sold out");
                     }
-                } else if (pendingPayment && pendingAmount <= 0) {
-                    await tx.payment.delete({ where: { id: pendingPayment.id } });
+
+                    if (currentTicketItem) {
+                        await tx.registrationItem.update({
+                            where: { id: currentTicketItem.id },
+                            data: {
+                                productId: requestedTicketId,
+                                priceAtBooking: nextTicketProduct.price
+                            }
+                        });
+
+                        await tx.product.updateMany({
+                            where: {
+                                id: currentTicketItem.productId,
+                                soldCount: { gt: 0 }
+                            },
+                            data: {
+                                soldCount: { decrement: 1 }
+                            }
+                        });
+
+                        await tx.product.update({
+                            where: { id: requestedTicketId },
+                            data: {
+                                soldCount: { increment: 1 }
+                            }
+                        });
+                    } else {
+                        await tx.registrationItem.create({
+                            data: {
+                                registrationId: id,
+                                productId: requestedTicketId,
+                                priceAtBooking: nextTicketProduct.price
+                            }
+                        });
+
+                        await tx.product.update({
+                            where: { id: requestedTicketId },
+                            data: {
+                                soldCount: { increment: 1 }
+                            }
+                        });
+                    }
                 }
-            }
 
-            const approvalJustGranted = current.event.requireApproval && status === "APPROVED" && current.status !== "APPROVED";
-            if (approvalJustGranted) {
-                const dueAfterApproval = toMoney(Math.max(0, newSelectionTotal - completedAmount));
-                const activePendingPayment = await tx.payment.findFirst({
+                const refreshedItems = await tx.registrationItem.findMany({
+                    where: { registrationId: id },
+                    include: { product: true }
+                });
+
+                const newSelectionTotal = toMoney(refreshedItems.reduce((sum, item) => sum + toNumber(item.priceAtBooking), 0));
+                const selectionDelta = toMoney(newSelectionTotal - oldSelectionTotal);
+                const pendingPayment = await tx.payment.findFirst({
                     where: {
                         registrationId: id,
                         paymentStatus: "PENDING"
                     },
                     orderBy: { createdAt: "desc" }
                 });
+                const pendingAmount = toNumber(pendingPayment?.amount);
 
-                if (dueAfterApproval > 0) {
-                    if (activePendingPayment) {
+                if (selectionDelta > 0) {
+                    financeAction = "UPCHARGE_REQUIRED";
+                    financeAmount = selectionDelta;
+                    const nextPendingAmount = toMoney(pendingAmount + selectionDelta);
+
+                    if (pendingPayment) {
                         await tx.payment.update({
-                            where: { id: activePendingPayment.id },
+                            where: { id: pendingPayment.id },
                             data: {
-                                amount: dueAfterApproval,
+                                amount: nextPendingAmount,
                                 currency: "EUR",
-                                paymentProvider: activePendingPayment.paymentProvider || "STRIPE"
+                                paymentProvider: pendingPayment.paymentProvider || "STRIPE"
                             }
                         });
                     } else {
@@ -283,16 +228,77 @@ export async function PATCH(
                             data: {
                                 userId: current.userId,
                                 registrationId: id,
-                                amount: dueAfterApproval,
+                                amount: financeAmount,
                                 currency: "EUR",
                                 paymentStatus: "PENDING",
                                 paymentProvider: "STRIPE"
                             }
                         });
                     }
+                } else {
+                    if (selectionDelta < 0) {
+                        const reduction = Math.abs(selectionDelta);
 
-                    financeAction = "UPCHARGE_REQUIRED";
-                    financeAmount = dueAfterApproval;
+                        if (pendingPayment) {
+                            if (pendingAmount > reduction) {
+                                await tx.payment.update({
+                                    where: { id: pendingPayment.id },
+                                    data: {
+                                        amount: toMoney(pendingAmount - reduction)
+                                    }
+                                });
+                            } else {
+                                await tx.payment.delete({ where: { id: pendingPayment.id } });
+                            }
+                        }
+
+                        const remainingRefund = toMoney(Math.max(0, reduction - pendingAmount));
+                        if (remainingRefund > 0) {
+                            financeAction = "MANUAL_REFUND_RECOMMENDED";
+                            financeAmount = remainingRefund;
+                        }
+                    } else if (pendingPayment && pendingAmount <= 0) {
+                        await tx.payment.delete({ where: { id: pendingPayment.id } });
+                    }
+                }
+
+                const approvalJustGranted = current.event.requireApproval && status === "APPROVED" && current.status !== "APPROVED";
+                if (approvalJustGranted) {
+                    const dueAfterApproval = toMoney(Math.max(0, newSelectionTotal - completedAmount));
+                    const activePendingPayment = await tx.payment.findFirst({
+                        where: {
+                            registrationId: id,
+                            paymentStatus: "PENDING"
+                        },
+                        orderBy: { createdAt: "desc" }
+                    });
+
+                    if (dueAfterApproval > 0) {
+                        if (activePendingPayment) {
+                            await tx.payment.update({
+                                where: { id: activePendingPayment.id },
+                                data: {
+                                    amount: dueAfterApproval,
+                                    currency: "EUR",
+                                    paymentProvider: activePendingPayment.paymentProvider || "STRIPE"
+                                }
+                            });
+                        } else {
+                            await tx.payment.create({
+                                data: {
+                                    userId: current.userId,
+                                    registrationId: id,
+                                    amount: dueAfterApproval,
+                                    currency: "EUR",
+                                    paymentStatus: "PENDING",
+                                    paymentProvider: "STRIPE"
+                                }
+                            });
+                        }
+
+                        financeAction = "UPCHARGE_REQUIRED";
+                        financeAmount = dueAfterApproval;
+                    }
                 }
             }
 
@@ -306,8 +312,10 @@ export async function PATCH(
             const updatedReg = await tx.registration.update({
                 where: { id },
                 data: {
-                    ...(status && { status }),
-                    ...(current.event.requireApproval && status === "APPROVED" ? { expiresAt: current.event.paymentDeadline || null } : {}),
+                    ...(!isCancellingRegistration && status && { status }),
+                    ...(!isCancellingRegistration && current.event.requireApproval && status === "APPROVED"
+                        ? { expiresAt: current.event.paymentDeadline || null }
+                        : {}),
                     ...(preferences && { preferences: preferences as Prisma.InputJsonValue }),
                     ...(customFieldData && { customFieldData: customFieldData as Prisma.InputJsonValue }),
                     ...(changeReason !== undefined && { notes: changeReason }),
@@ -347,12 +355,15 @@ export async function PATCH(
 
             return {
                 updatedReg,
+                releasedProductIds,
                 finance: {
                     action: financeAction,
                     amount: toMoney(financeAmount)
                 }
             };
         });
+
+        await syncReleasedProductStocks(registration.releasedProductIds);
 
         // 3. Send notification email with diff
         if (changes.length > 0) {

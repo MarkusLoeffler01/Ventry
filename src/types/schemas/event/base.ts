@@ -28,7 +28,7 @@ const ProductSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   description: z.string().nullable().optional(),
   price: z.coerce.number().nonnegative("Price cannot be negative"),
-  type: ProductTypeSchema.default("TICKET"),
+  type: ProductTypeSchema,
   capacity: z.coerce.number().int().positive().nullable().optional(),
   order: z.coerce.number().int().default(0)
 }).passthrough();
