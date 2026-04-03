@@ -17,10 +17,10 @@ on:
           - main
 
 env:
-  HARBOR_REGISTRY: harbor.m-loeffler.de
+  HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
   IMAGE_NAME: ventry/app
-  DEPLOY_HOST: m-loeffler.de
-  DEPLOY_USER: ven
+  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
   DEPLOY_PATH: /docker/ventry
 
 jobs:
