@@ -7,5 +7,25 @@ services:
       - .prod.env
     environment:
       NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "127.0.0.1:5000:3000"
+
+  redis:
+    image: redis:7-alpine
+    container_name: ventry-redis-main
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ventry-redis-main-data:/data
+
+volumes:
+  ventry-redis-main-data:
