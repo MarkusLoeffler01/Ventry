@@ -13,6 +13,8 @@ import PhotoGallery from "@/components/profile/PhotoGallery";
 import EmptyState from "@/components/profile/EmptyState";
 import { getSignedUrl } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 interface ProfilePicture {
   id: string;
   signedUrl: string | null;
