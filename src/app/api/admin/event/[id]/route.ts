@@ -86,7 +86,7 @@ export async function PATCH(
                             name: p.name,
                             description: p.description,
                             price: p.price,
-                            type: p.type as "TICKET" | "ACCOMMODATION" | "ADDON" | undefined,
+                            type: p.type as "TICKET" | "ACCOMMODATION" | "ADDON",
                             capacity: p.capacity
                         }))
                     }

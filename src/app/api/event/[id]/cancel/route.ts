@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
+import { cancelRegistrationAndReleaseCapacity, syncReleasedProductStocks } from "@/lib/events/registration-capacity";
 
 export async function POST(
     req: NextRequest,
@@ -15,18 +16,31 @@ export async function POST(
         const eventId = Number((await params).id);
         if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-        // Update registration status to CANCELLED
-        await prisma.registration.update({
-            where: {
-                userId_eventId: {
-                    userId: session.user.id,
-                    eventId
+        const releasedProductIds = await prisma.$transaction(async (tx) => {
+            const registration = await tx.registration.findUnique({
+                where: {
+                    userId_eventId: {
+                        userId: session.user.id,
+                        eventId
+                    }
+                },
+                select: {
+                    id: true
                 }
-            },
-            data: {
-                status: 'CANCELLED'
+            });
+
+            if (!registration) {
+                return null;
             }
+
+            return cancelRegistrationAndReleaseCapacity(tx, registration.id);
         });
+
+        if (!releasedProductIds) {
+            return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+        }
+
+        await syncReleasedProductStocks(releasedProductIds);
 
         return NextResponse.json({ message: "Registration cancelled" }, { status: 200 });
 
