@@ -1,0 +1,11 @@
+services:
+  ventry:
+    image: harbor.m-loeffler.de/ventry:main
+    container_name: ventry-main
+    restart: unless-stopped
+    env_file:
+      - .prod.env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:5000:3000"

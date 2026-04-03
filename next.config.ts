@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { validateSecurityConfig } from "./src/lib/security/config";
+import { getTrustedOrigins } from "./src/lib/security/origins";
 
 // Validate security configuration on startup
 try {
@@ -10,10 +11,11 @@ try {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   allowedDevOrigins: ['localhost', 'local.dev'],
   experimental: {
     serverActions: {
-      allowedOrigins: ['https://local.dev:3443', 'http://localhost:3000'],
+      allowedOrigins: getTrustedOrigins(),
     },
     serverSourceMaps: true,
   },
