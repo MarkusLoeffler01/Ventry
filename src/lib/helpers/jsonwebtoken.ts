@@ -37,15 +37,6 @@ class JsonWebToken {
         return decoded;
     }
 
-    /**
-     * @deprecated never use for security, use `verify` instead
-     * @param token 
-     * @returns 
-     */
-    decode(token: string): null | string | jwt.JwtPayload | JwtPayload {
-        return jwt.decode(token);
-    }
-
     validatePayload(payload: null | string | jwt.JwtPayload | JwtPayload | object) {
         if(payload === null) throw new Error("Invalid token");
         if(typeof payload === "string") throw new Error("Invalid token");
@@ -56,10 +47,30 @@ class JsonWebToken {
     }
 }
 
-const jwtService = new JsonWebToken(
-    getPrivateKey(),
-    getPublicKey()
-);
+let jwtServiceInstance: JsonWebToken | null = null;
+
+function getJwtService(): JsonWebToken {
+    if(!jwtServiceInstance) {
+        jwtServiceInstance = new JsonWebToken(
+            getPrivateKey(),
+            getPublicKey()
+        );
+    }
+
+    return jwtServiceInstance;
+}
+
+const jwtService = {
+    sign(payload: object, userid: string, options?: jwt.SignOptions): string {
+        return getJwtService().sign(payload, userid, options);
+    },
+    verify(token: string, options?: jwt.VerifyOptions): string | jwt.JwtPayload {
+        return getJwtService().verify(token, options);
+    },
+    validatePayload(payload: null | string | jwt.JwtPayload | JwtPayload | object) {
+        return getJwtService().validatePayload(payload);
+    }
+};
 
 export default jwtService;
 export { JsonWebToken };
