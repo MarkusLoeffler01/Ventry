@@ -23,6 +23,19 @@ export async function uploadProfilePicture(file: File | Buffer, userId: string, 
     return data;
 }
 
+export async function uploadEventImage(file: Buffer, fileName: string) {
+    const { data, error } = await supabase.storage
+        .from(process.env.SUPABASE_BUCKET_ID)
+        .upload(`events/${fileName}`, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: 'image/jpeg'
+    });
+
+    if(error) throw error;
+    return data;
+}
+
 
 export async function getSignedUrl(path: string, expiresIn: number = 300) {
     const { data, error } = await supabase.storage

@@ -6,7 +6,10 @@ const middleware = async (req: NextRequest) => {
     if(!pathname.startsWith("/api/admin")) return NextResponse.next();
 
     // Security: Check for better-auth session token
-    const sessionToken = req.cookies.get("better-auth.session_token")?.value || 
+    // Note: We use VENTRY prefix as defined in auth.ts
+    const sessionToken = req.cookies.get("VENTRY.session_token")?.value || 
+                        req.cookies.get("__Secure-VENTRY.session_token")?.value ||
+                        req.cookies.get("better-auth.session_token")?.value || 
                         req.cookies.get("__Secure-better-auth.session_token")?.value;
     
     if (!sessionToken) {

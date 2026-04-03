@@ -32,13 +32,17 @@ export async function GET(req: NextRequest) {
             { createdAt: 'desc' }
           ]
         },
-        registration: {
+        registrations: {
           include: {
             payments: true
           }
         },
         payments: true,
-        eventsOwned: true,
+        adminProfile: {
+          include: {
+            eventsOwned: true
+          }
+        },
         accounts: {
           select: {
             providerId: true,  // Changed from 'provider' for better-auth
@@ -75,9 +79,9 @@ export async function GET(req: NextRequest) {
         createdAt: userData.createdAt,
         updatedAt: userData.updatedAt,
       },
-      registrations: userData.registration ? [userData.registration] : [],
+      registrations: userData.registrations,
       payments: userData.payments,
-      events: userData.eventsOwned,
+      events: userData.adminProfile?.eventsOwned || [],
       exportedAt: new Date().toISOString(),
     };
 

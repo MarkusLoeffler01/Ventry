@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
+import MyRegistrations from './MyRegistrations';
 
 interface ProfilePicture {
   id: string;
@@ -43,6 +44,7 @@ interface User {
   id: string;
   name?: string | null;
   email: string;
+  country?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
     providerId: string;  // Changed from 'provider' for better-auth
@@ -62,6 +64,7 @@ interface ProfilePageClientProps {
 
 interface ProfileFormData {
   name: string;
+  country: string;
   bio: string;
   dateOfBirth: string;
   pronouns: string;
@@ -84,6 +87,7 @@ const PRONOUN_OPTIONS = [
 export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
+    country: user.country || '',
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
@@ -142,6 +146,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         body: JSON.stringify({
           id: user.id,
           name: formData.name,
+          country: formData.country || null,
           bio: formData.bio,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
           pronouns: formData.pronouns,
@@ -268,6 +273,14 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             />
 
             <TextField
+              label="Country"
+              value={formData.country}
+              onChange={handleInputChange('country')}
+              fullWidth
+              helperText="Optional, shown on attendee cards if enabled"
+            />
+
+            <TextField
               label="Bio"
               value={formData.bio}
               onChange={handleInputChange('bio')}
@@ -289,7 +302,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               InputLabelProps={{ shrink: true }}
             />
 
-            {formData.dateOfBirth && (
+            {formData.dateOfBirth && !isNaN(new Date(formData.dateOfBirth).getTime()) && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Chip 
                   label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
@@ -348,6 +361,16 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               When enabled, your age will be visible to other users. When disabled, only you can see your age.
             </Typography>
           </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* My Registrations */}
+        <Box>
+          <Typography variant="h5" gutterBottom>
+            My Registrations
+          </Typography>
+          <MyRegistrations userId={user.id} />
         </Box>
 
         <Divider />
