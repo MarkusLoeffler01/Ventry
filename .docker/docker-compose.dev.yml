@@ -1,6 +1,6 @@
 services:
   ventry:
-    image: harbor.m-loeffler.de/ventry:dev
+    image: harbor.m-loeffler.de/ventry/app:dev
     container_name: ventry-dev
     restart: unless-stopped
     env_file:
