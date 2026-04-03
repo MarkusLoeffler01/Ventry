@@ -10,9 +10,13 @@ RUN npm ci
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+ARG BETTER_AUTH_URL=https://ventry.m-loeffler.de
+ARG NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+ENV BETTER_AUTH_URL=$BETTER_AUTH_URL
+ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-COPY .env.example .env
 
 RUN npm run build
 
