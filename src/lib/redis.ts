@@ -1,11 +1,45 @@
 import Redis from 'ioredis';
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisUrl = process.env.REDIS_URL;
 
-export const redis = new Redis(redisUrl);
+let redisClient: Redis | null = null;
+
+function getRedis() {
+  if (!redisUrl) {
+    throw new Error("REDIS_URL is not configured");
+  }
+
+  if (!redisClient) {
+    redisClient = new Redis(redisUrl, {
+      lazyConnect: true,
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+      retryStrategy(times) {
+        return Math.min(times * 200, 2_000);
+      },
+    });
+
+    redisClient.on("error", (error) => {
+      console.error("[redis] Connection error:", error.message);
+    });
+  }
+
+  return redisClient;
+}
+
+async function ensureRedis() {
+  const redis = getRedis();
+
+  if (redis.status === "wait") {
+    await redis.connect();
+  }
+
+  return redis;
+}
 
 export async function getOrInitProductStock(productId: string, capacity: number, currentSold: number): Promise<boolean> {
   const key = `product:${productId}:stock`;
+  const redis = await ensureRedis();
   
   // Try to set the initial available stock (Capacity - Sold)
   // setnx only sets if key doesn't exist
@@ -18,6 +52,7 @@ export async function getOrInitProductStock(productId: string, capacity: number,
 
 export async function decrementProductStock(productId: string): Promise<boolean> {
   const key = `product:${productId}:stock`;
+  const redis = await ensureRedis();
   
   // Atomic decrement
   const result = await redis.decr(key);
@@ -36,10 +71,12 @@ export async function decrementProductStock(productId: string): Promise<boolean>
 
 export async function incrementProductStock(productId: string): Promise<void> {
     const key = `product:${productId}:stock`;
+    const redis = await ensureRedis();
     await redis.incr(key);
 }
 
 export async function clearProductStock(productId: string): Promise<void> {
     const key = `product:${productId}:stock`;
+    const redis = await ensureRedis();
     await redis.del(key);
 }
