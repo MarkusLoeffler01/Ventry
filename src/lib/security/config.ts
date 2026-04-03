@@ -58,11 +58,7 @@ export const getSecurityHeaders = () => {
 
 // Validate environment variables on startup
 export const validateSecurityConfig = () => {
-  const required = ['BETTER_AUTH_URL'];
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  if (!process.env.BETTER_AUTH_URL && !process.env.NEXTAUTH_URL) {
+    throw new Error("Missing required environment variables: BETTER_AUTH_URL or NEXTAUTH_URL");
   }
-
 };

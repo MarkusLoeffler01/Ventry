@@ -29,11 +29,49 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Docker Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This repository ships a branch-based Docker deployment workflow:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `dev` builds and pushes `harbor.m-loeffler.de/ventry:dev`, then updates `/docker/ventry/docker-compose.dev.yml`
+- `main` builds and pushes `harbor.m-loeffler.de/ventry:main`, then updates `/docker/ventry/docker-compose.main.yml`
+
+Example compose files and environment templates for the server live in [.docker/docker-compose.dev.yml](/home/ven/Projekte/Gewerbe/Ventry/.docker/docker-compose.dev.yml), [.docker/docker-compose.main.yml](/home/ven/Projekte/Gewerbe/Ventry/.docker/docker-compose.main.yml), [.docker/.dev.env.example](/home/ven/Projekte/Gewerbe/Ventry/.docker/.dev.env.example), and [.docker/.prod.env.example](/home/ven/Projekte/Gewerbe/Ventry/.docker/.prod.env.example).
+
+Recommended database split:
+
+- `main`: keep `DATABASE_URL` on the production schema, for example `...?schema=public`
+- `dev`: use the same Postgres cluster only if needed, but isolate it with a separate schema such as `...?schema=dev`
+
+Using a live copy of the production database for `dev` is a bad default. It increases the risk of accidental email sends, payment/webhook side effects, and destructive test changes. If you need realistic data, use a sanitized snapshot and restore it into the dev schema or a separate dev database.
+
+Required GitHub Actions secrets:
+
+- `HARBOR_USER`
+- `HARBOR_PASSWORD`
+- `DEPLOY_SSH_PRIVATE_KEY`
+- `DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- optional: `MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- optional: `DEV_BETTER_AUTH_URL`
+- optional: `MAIN_BETTER_AUTH_URL`
+
+Expected Caddy routing on the server:
+
+- `ventry.m-loeffler.de` -> `http://127.0.0.1:5000`
+- `dev-ventry.m-loeffler.de` -> `http://127.0.0.1:5001`
+
+Deployment prerequisites on the server:
+
+- `/docker/ventry/.dev.env`
+- `/docker/ventry/.prod.env`
+- a running backend for `dev-ventry` on `127.0.0.1:5001`
+- a running backend for `ventry` on `127.0.0.1:5000`
+
+OAuth prerequisites:
+
+- Google must include the exact redirect URI for each environment
+- GitHub must allow the exact callback URL used by each environment
+- the env file for each deployment must provide the correct `GOOGLE_*` and `GITHUB_*` credentials for that domain
 
 ## Database Backup & Restore (1:1)
 
