@@ -50,13 +50,15 @@ interface LinkAccountClientProps {
   currentProviders: string[];
   hasPassword: boolean;
   hasOAuthProviders: boolean;
+  callbackUrl?: string;
 }
 
 export default function LinkAccountClient({
   pendingLinks,
   currentProviders,
   hasPassword,
-  hasOAuthProviders
+  hasOAuthProviders,
+  callbackUrl
 }: LinkAccountClientProps) {
   const router = useRouter();
   const [selectedLink, setSelectedLink] = useState<PendingLink | null>(null);
@@ -138,8 +140,8 @@ export default function LinkAccountClient({
         throw new Error(data.error || "Failed to link account");
       }
 
-      // Success - redirect to profile with hard refresh to ensure fresh data
-      window.location.href = `/profile?linked=${selectedLink.provider}`;
+      // Success - redirect to callbackUrl or profile with hard refresh to ensure fresh data
+      window.location.href = callbackUrl || `/profile?linked=${selectedLink.provider}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to link account");
     } finally {

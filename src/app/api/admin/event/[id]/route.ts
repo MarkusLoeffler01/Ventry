@@ -1,171 +1,148 @@
-import { adminCreateEventSchema, adminUpdateEventSchema } from "@/types/schemas/event/admin";
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma/prisma";
-import { handlePrismaError } from "@/lib/helpers/prismaErrorHandler";
+import { Prisma } from "@/generated/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { adminUpdateEventSchema } from "@/types/schemas/event/admin";
+import { z } from "zod";
 
-export async function POST(req: NextRequest) {
+// GET /api/admin/event/[id] - Get full event details for admin
+export async function GET(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        // Check admin authorization
         const authResult = await checkAdminAuth();
         if (!authResult.authorized) {
             return forbiddenResponse(authResult.error);
         }
 
-        const body = await req.json();
-        const event = adminCreateEventSchema.parse(body);
-        // Allow only a single event: use upsert on id=1 (implicit for first row with autoincrement)
-        // Strategy: If an event already exists, reject creation to preserve semantic "create" behavior
-        const existing = await prisma.event.findFirst({ select: { id: true } });
-        if (existing) {
-            return NextResponse.json({ error: "Event already exists. Use PUT to update it." }, { status: 409 });
-        }
+        const id = Number((await params).id);
+        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-        await prisma.event.create({
-            data: {
-                name: event.name,
-                description: event.description,
-                startDate: event.startDate,
-                endDate: event.endDate,
-                imageUrl: event.imageUrl,
-                status: event.status,
-                stayPolicy: event.stayPolicy,
-                location: { create: event.location },
-                products: { create: event.products }
+        const event = await prisma.event.findUnique({
+            where: { id },
+            include: {
+                location: true,
+                products: {
+                    orderBy: { createdAt: "asc" }
+                },
+                _count: {
+                    select: { registrations: true }
+                }
             }
         });
 
-        // await prisma.event.create({
-        //     data: {
-        //         description: event.description,
-        //         endDate: event.endDate,
-        //         name: event.name,
-        //         startDate: event.startDate,
-        //         createdAt: new Date(),
-        //         imageUrl: event.imageUrl,
-        //         location: {
-        //             create: event.location
-        //         },
-        //         products: {
-        //             create: event.products
-        //         },
-        //         status: event.status,
-        //         stayPolicy: event.stayPolicy,
-        //         updatedAt: new Date(),
-        //     }
-        // })
+        if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-        return NextResponse.json({ message: "Event created successfully" }, { status: 201 });
-
-    } catch(error) {
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: JSON.parse(error.message) }, { status: 422 });
-        }
-
-        const hasMessage = (err: unknown): err is { message: string } =>
-            typeof err === "object" && err !== null && "message" in err && typeof (err as { message?: unknown }).message === "string";
-        if (hasMessage(error)) {
-            return NextResponse.json({ error: error.message }, { status: 400 });
-        }
-
-        const response = handlePrismaError(error);
-        const { statusCode, ...rest } = response;
-        return NextResponse.json(rest, { status: statusCode });
+        return NextResponse.json({ event }, { status: 200 });
+    } catch (error) {
+        console.error("Error getting admin event:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
 
-export async function PUT(req: NextRequest) {
+// PATCH /api/admin/event/[id] - Update an event
+export async function PATCH(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        // Check admin authorization
         const authResult = await checkAdminAuth();
         if (!authResult.authorized) {
             return forbiddenResponse(authResult.error);
         }
 
-        const id = req.nextUrl.searchParams.get("id");
-
-        // For singleton event pattern, if no id is supplied, assume first (only) event
-        let parsedId: number | undefined;
-        if (id) {
-            parsedId = Number.parseInt(id, 10);
-            if (Number.isNaN(parsedId)) return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
-        } else {
-            const existing = await prisma.event.findFirst({ select: { id: true } });
-            if (!existing) return NextResponse.json({ error: "No existing event to update" }, { status: 404 });
-            parsedId = existing.id;
-        }
+        const id = Number((await params).id);
+        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const body = await req.json();
-        const event = adminUpdateEventSchema.parse(body);
-        const {...data} = event;
+        const validatedData = adminUpdateEventSchema.parse(body);
 
-        // Build nested updates. We want to upsert location (1:1) and replace products set.
-        const locationOp = data.location ? {
-            upsert: {
-                create: data.location,
-                update: data.location
-            }
-        } : undefined;
+        const { location, products, ...scalarFields } = validatedData;
 
-        const productOps = data.products ? {
-            deleteMany: { eventId: parsedId }, // clear previous products
-            create: data.products
-        } : undefined;
-
-        await prisma.event.update({
-            where: { id: parsedId },
+        const event = await prisma.event.update({
+            where: { id },
             data: {
-                name: data.name,
-                description: data.description,
-                startDate: data.startDate,
-                endDate: data.endDate,
-                imageUrl: data.imageUrl,
-                status: data.status,
-                stayPolicy: data.stayPolicy,
-                ...(locationOp && { location: locationOp }),
-                ...(productOps && { products: productOps })
+                ...scalarFields,
+                stayPolicy: validatedData.stayPolicy as Prisma.InputJsonValue,
+                customFields: validatedData.customFields as Prisma.InputJsonValue,
+                schedule: validatedData.schedule as Prisma.InputJsonValue,
+                // Handle location update
+                ...(location && {
+                    location: {
+                        upsert: {
+                            create: location,
+                            update: location
+                        }
+                    }
+                }),
+                // Handle products update - strategy: replace all for simplicity if provided
+                // This can be refined later if needed
+                ...(products && {
+                    products: {
+                        deleteMany: {},
+                        create: products.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            description: p.description,
+                            price: p.price,
+                            type: p.type as "TICKET" | "ACCOMMODATION" | "ADDON",
+                            capacity: p.capacity
+                        }))
+                    }
+                })
+            },
+            include: {
+                location: true,
+                products: {
+                    orderBy: { createdAt: "asc" }
+                }
             }
         });
 
-        return NextResponse.json({ message: "Event updated successfully" }, { status: 200 });
+        return NextResponse.json({ message: "Event updated successfully", event }, { status: 200 });
 
-    } catch(error) {
+    } catch (error) {
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.cause }, { status: 422 });
+            return NextResponse.json({ error: error.issues }, { status: 422 });
         }
-
-        const response = handlePrismaError(error);
-        const { statusCode, ...rest } = response;
-        return NextResponse.json(rest, { status: statusCode });
+        console.error("Error updating event:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
 
-export async function DELETE(req: NextRequest) {
+// DELETE /api/admin/event/[id] - Delete an event
+export async function DELETE(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        // Check admin authorization
         const authResult = await checkAdminAuth();
         if (!authResult.authorized) {
             return forbiddenResponse(authResult.error);
         }
 
-        const id = req.nextUrl.searchParams.get("id");
+        const id = Number((await params).id);
+        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-        if (!id) return NextResponse.json({ error: "Event ID is required" }, { status: 400 });
+        // Check if event has registrations
+        const registrationCount = await prisma.registration.count({
+            where: { eventId: id }
+        });
 
-        const existing = await prisma.event.findUnique({ where: { id: Number(id) } });
-        if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+        if (registrationCount > 0) {
+            return NextResponse.json({ 
+                error: "Cannot delete event with active registrations. Cancel them first or mark event as CANCELLED." 
+            }, { status: 409 });
+        }
 
-        await prisma.event.delete({ where: { id: Number(id) } });
+        await prisma.event.delete({
+            where: { id }
+        });
+
         return NextResponse.json({ message: "Event deleted successfully" }, { status: 200 });
-
-    } catch(error) {
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.cause }, { status: 422 });
-        }
-
-        const response = handlePrismaError(error);
-        const { statusCode, ...rest } = response;
-        return NextResponse.json(rest, { status: statusCode });
+    } catch (error) {
+        console.error("Error deleting event:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

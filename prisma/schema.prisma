@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -15,134 +9,137 @@ datasource db {
 }
 
 model ProfilePicture {
-  id     String @id @default(cuid())
-  userID String
-  user   User   @relation(fields: [userID], references: [id], onDelete: Cascade)
-
-  signedUrl   String? // Signed URL for profile picture (cached)
-  storagePath String // Storage path for profile picture
-  cachedUntil DateTime? // Optional: when the cached URL expires
-  isPrimary   Boolean   @default(false) // If user has multiple, which one is primary
-  order       Int       @default(0) // Display order for profile pictures
+  id          String    @id @default(cuid())
+  userID      String
+  signedUrl   String?
+  storagePath String
+  cachedUntil DateTime?
+  isPrimary   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  order       Int       @default(0)
+  user        User      @relation(fields: [userID], references: [id], onDelete: Cascade)
 }
-
-// There will be many users and multiple admins
 
 model User {
   id                   String               @id @default(cuid(2))
   name                 String?              @unique
   email                String               @unique
-  profilePictures      ProfilePicture[] // Signed URL for profile picture (cached)
-  bio                  String? // Profile bio
-  dateOfBirth          DateTime? // User's date of birth
-  pronouns             String? // User's pronouns
-  showAge              Boolean              @default(true) // Privacy setting for showing age
+  bio                  String?
+  dateOfBirth          DateTime?
+  pronouns             String?
+  showAge              Boolean              @default(true)
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
-  registration         Registration?
-  payments             Payment[]
   isAdmin              Boolean              @default(false)
-  emailVerified        Boolean              @default(false) // Changed from isVerified to match better-auth
-  twoFactorEnabled     Boolean              @default(false) // Required by better-auth twoFactor plugin
-  twoFactorSecret      String? // TOTP secret for two-factor authentication
-  twoFactorBackupCodes String? // Encrypted backup codes for account recovery
-  eventsOwned          Event[]
-  accounts             Account[]
-  sessions             Session[]
-  passkeys             Passkey[] // Changed from Authenticator to Passkey for better-auth
-  pendingAccountLinks  PendingAccountLink[]
+  emailVerified        Boolean              @default(false)
+  twoFactorEnabled     Boolean              @default(false)
+  twoFactorSecret      String?
+  twoFactorBackupCodes String?
   image                String?
+  country              String?
+  adminProfile         Admin?
+  payments             Payment[]
+  profilePictures      ProfilePicture[]
+  registrations        Registration[]
+  supportTickets       SupportTicket[]
+  accounts             Account[]
+  passkeys             Passkey[]
+  pendingAccountLinks  PendingAccountLink[]
+  sessions             Session[]
   twofactors           TwoFactor[]
 
   @@map("user")
 }
 
-// Better-auth Account model
+model Admin {
+  id                   String                @id @default(cuid())
+  userId               String                @unique
+  stripeConnectId      String?
+  notes                String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventsOwned          Event[]
+  history              RegistrationHistory[]
+  supportTicketUpdates SupportTicket[]       @relation("AdminSupportTicketUpdates")
+}
 
 model Account {
-  id                    String    @id @default(cuid(2))
+  id                    String               @id @default(cuid(2))
   userId                String
-  accountId             String    @default(cuid(2)) // Auto-generated for credential accounts, overridable for OAuth
-  providerId            String // The ID of the provider (e.g., "google", "github", "credential")
-  accessToken           String?   @db.Text
-  refreshToken          String?   @db.Text
+  accountId             String               @default(cuid(2))
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
   scope                 String?
-  idToken               String?   @db.Text
-  password              String? // For email/password authentication
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  PendingAccountLink PendingAccountLink[]
+  idToken               String?
+  password              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  PendingAccountLink    PendingAccountLink[]
 
   @@unique([id, providerId])
   @@map("account")
 }
 
-// Better-auth Session model
-
 model Session {
   id        String   @id @default(cuid())
   userId    String
-  token     String   @unique // The unique session token
-  expiresAt DateTime // The time when the session expires
-  ipAddress String? // The IP address of the device
-  userAgent String? // The user agent information of the device
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
 }
 
-// Better-auth Verification model
-
 model Verification {
   id         String   @id @default(cuid())
-  identifier String // The identifier for the verification request
-  value      String // The value to be verified
-  expiresAt  DateTime // The time when the verification request expires
+  identifier String
+  value      String
+  expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@map("verification")
 }
 
-//
-// Event-Singleton - In OSS, there will be only be one event at a time
-// With @default(1) for the id, we can have only one event at a time
-//
-
 model Event {
-  id          Int         @id @default(autoincrement())
-  name        String
-  description String
-  startDate   DateTime
-  endDate     DateTime
-  imageUrl    String?
-  status      EventStatus @default(DRAFT)
-  stayPolicy  Json        @default("{}")
-  ownerId     String? // temporary nullable for migration; will backfill and make required
-  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  location    Location?
-  products    Product[]
-
-  // registrations Registration[]
+  name                String
+  description         String
+  startDate           DateTime
+  endDate             DateTime
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  imageUrl            String?
+  id                  Int             @id @default(autoincrement())
+  status              EventStatus     @default(DRAFT)
+  stayPolicy          Json            @default("{}")
+  ownerId             String?
+  customFields        Json            @default("[]")
+  maxRegistrations    Int?
+  publishAt           DateTime?
+  registrationOpensAt DateTime?
+  paymentDeadline     DateTime?
+  schedule            Json            @default("[]")
+  requiresHotel       Boolean         @default(false)
+  requireApproval     Boolean         @default(false)
+  owner               Admin?          @relation(fields: [ownerId], references: [id])
+  location            Location?
+  products            Product[]
+  registrations       Registration[]
+  supportTickets      SupportTicket[]
 }
 
-// Location model to store event locations. As 1:1 relationship with event
-// This will be a venue, most likely a hotel or a conference center
-// This will be a children of the event model and act as a datatype instead of an independent table
-
 model Location {
-  id         Int      @id @default(1) // 1:1 relationship with event for singleton pattern
+  id         Int      @id @default(autoincrement())
   name       String
   address    String
   city       String
@@ -151,61 +148,190 @@ model Location {
   postalCode String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  eventId    Int      @unique
   event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  eventId    Int      @unique // For 1:1 relationship with event
 }
 
-// Registration model to store user registrations for the event
-// Normally, there will be only one registration per user
-// And we could get rid of ticketId and use the normal id as auto-increment, but that means we need to wipe the database every time we want a new event
-
 model Registration {
-  id        String             @id @default(cuid())
-  ticketId  Int                @unique @default(autoincrement())
-  status    RegistrationStatus @default(PENDING)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id                String                @id @default(cuid())
+  userId            String
+  status            RegistrationStatus    @default(PENDING)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  ticketId          Int                   @unique @default(autoincrement())
+  eventId           Int
+  preferences       Json                  @default("{}")
+  customFieldData   Json                  @default("{}")
+  expiresAt         DateTime?
+  notes             String?
+  payments          Payment[]
+  event             Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history           RegistrationHistory[]
+  registrationItems RegistrationItem[]
+  supportTickets    SupportTicket[]
+  waitlistEntries   WaitlistEntry[]
 
-  userId   String    @unique
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payments Payment[]
+  @@unique([userId, eventId])
+}
+
+model RegistrationItem {
+  id             String       @id @default(cuid())
+  registrationId String
+  productId      String
+  priceAtBooking Float
+  createdAt      DateTime     @default(now())
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId])
+}
+
+model RegistrationHistory {
+  id               String       @id @default(cuid())
+  registrationId   String
+  changedByAdminId String?
+  action           String
+  changes          Json
+  notes            String?
+  createdAt        DateTime     @default(now())
+  changedBy        Admin?       @relation(fields: [changedByAdminId], references: [id])
+  registration     Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
   id              String        @id @default(cuid())
+  userId          String
   amount          Float
   currency        String
   paymentStatus   PaymentStatus @default(PENDING)
-  paymentProvider String? // Stripe, PayPal, Bank Transfer, etc.
+  paymentProvider String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  registrationId String
-  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  registrationId  String
+  registration    Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Product model to store products for the event
-// For example, badges, t-shirts, sponsorships, etc etc.
+model SupportTicket {
+  id                   String              @id @default(cuid())
+  subject              String
+  description          String
+  status               SupportTicketStatus @default(OPEN)
+  adminResponse        String?
+  resolvedAt           DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  eventId              Int
+  registrationId       String
+  userId               String
+  lastUpdatedByAdminId String?
+  event                Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  lastUpdatedByAdmin   Admin?              @relation("AdminSupportTicketUpdates", fields: [lastUpdatedByAdminId], references: [id])
+  registration         Registration        @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, status])
+  @@index([userId, eventId])
+  @@index([registrationId])
+}
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  price       Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String             @id @default(cuid())
+  name              String
+  description       String?
+  price             Float
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  eventId           Int
+  capacity          Int?
+  soldCount         Int                @default(0)
+  type              ProductType        @default(TICKET)
+  allowWaitlist     Boolean            @default(true)
+  order             Int                @default(0)
+  event             Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationItems RegistrationItem[]
+  waitlistEntries   WaitlistEntry[]
+}
 
-  eventId Int   @default(1)
-  event   Event @relation(fields: [eventId], references: [id])
+model WaitlistEntry {
+  id             String       @id @default(cuid())
+  registrationId String
+  productId      String
+  createdAt      DateTime     @default(now())
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, productId])
+}
+
+model Passkey {
+  id           String   @id @default(cuid())
+  name         String?
+  publicKey    String
+  userId       String
+  credentialID String   @unique
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime @default(now())
+  aaguid       String?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("passkey")
+}
+
+model PendingAccountLink {
+  id                String    @id @default(cuid())
+  provider          String
+  scope             String?
+  accessToken       String?
+  confirmedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  disableEmailLogin Boolean   @default(false)
+  emailToken        String?   @unique
+  emailTokenSentAt  DateTime?
+  emailVerified     Boolean   @default(false)
+  expiresAt         DateTime
+  idToken           String?
+  providerAccountId String
+  providerEmail     String
+  refreshToken      String?
+  tokenExpiresAt    Int?
+  tokenType         String?
+  userId            String
+  accountId         String    @default(cuid(2))
+  account           Account   @relation(fields: [accountId, provider], references: [id, providerId], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([emailToken])
+  @@map("pending_account_links")
+}
+
+model TwoFactor {
+  id          String @id
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("twoFactor")
+}
+
+enum ProductType {
+  TICKET
+  ACCOMMODATION
+  ADDON
 }
 
 enum RegistrationStatus {
   PENDING
   CONFIRMED
   CANCELLED
+  APPROVED
+  WAITLISTED
 }
 
 enum PaymentStatus {
@@ -221,66 +347,9 @@ enum EventStatus {
   CANCELLED
 }
 
-// Better-auth Passkey model (replaces Authenticator)
-
-model Passkey {
-  id           String   @id @default(cuid())
-  name         String? // The name of the passkey
-  publicKey    String // The public key of the passkey
-  userId       String // The ID of the user
-  credentialID String   @unique // The unique identifier of the registered credential
-  counter      Int // The counter of the passkey
-  deviceType   String // The type of device used to register the passkey
-  backedUp     Boolean // Whether the passkey is backed up
-  transports   String? // The transports used to register the passkey
-  createdAt    DateTime @default(now())
-  aaguid       String? // Authenticator's Attestation GUID
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("passkey")
-}
-
-model PendingAccountLink {
-  id                String  @id @default(cuid())
-  userId            String
-  accountId         String  @default(cuid(2)) // Auto-generated, overridable when linking to existing account
-  provider          String // github, google, etc.
-  providerAccountId String
-  providerEmail     String
-  emailVerified     Boolean @default(false)
-
-  // OAuth tokens (to complete linking later)
-  accessToken    String? @db.Text
-  refreshToken   String? @db.Text
-  idToken        String? @db.Text
-  tokenExpiresAt Int?
-  tokenType      String?
-  scope          String?
-
-  // Option B: Email verification fields (reserved for future use)
-  emailToken        String?   @unique
-  emailTokenSentAt  DateTime?
-  confirmedAt       DateTime?
-  disableEmailLogin Boolean   @default(false)
-
-  createdAt DateTime @default(now())
-  expiresAt DateTime // Pending links expire after 1 hour
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account Account? @relation(fields: [accountId, provider], references: [id, providerId], onDelete: Cascade)
-
-  @@unique([userId, provider])
-  @@index([emailToken])
-  @@map("pending_account_links")
-}
-
-model TwoFactor {
-  id          String @id
-  secret      String
-  backupCodes String
-  userId      String
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("twoFactor")
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }
