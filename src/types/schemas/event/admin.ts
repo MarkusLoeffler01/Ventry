@@ -13,7 +13,7 @@ const AdminOnlySchema = z.object({
 
 /**
  * Admin create event
- * @endpoint POST /api/admin/event/:id
+ * @endpoint POST /api/admin/event
  * @body EventBase + AdminOnly (without id/createdAt/updatedAt)
  * @who server-side, to create a new event
  */
@@ -41,9 +41,7 @@ type AdminGetEventInput = z.infer<typeof adminGetEventSchema>;
  *  - Stay-Policy adjustments
  * @who server-side for updates. All fields optional
  */
-// Apply `.partial()` to the base schema first, then safe-extend with admin-only fields.
-// This avoids attempting to extend an object that already contains refinements.
-const adminUpdateEventSchema = EventBaseObject.partial().extend(AdminOnlySchema.shape).superRefine(checkDateOrder).strict();
+const adminUpdateEventSchema = EventBaseObject.partial().extend(AdminOnlySchema.partial().shape).superRefine(checkDateOrder).strict();
 type AdminUpdateEventInput = z.input<typeof adminUpdateEventSchema>;
 
 
@@ -75,10 +73,11 @@ const makeParticipationDecisionSchema = (policy: StayPolicy) =>
         }).strict()
     }).strict().superRefine((data, ctx) => {
         const d = data.decisions ?? {};
-        if(d.early && !policy.earlyArrival.enabled && d.early.status !== "NONE") {
+        const activePolicy = policy.hotels.find(hotel => hotel.isPrimary)?.stayPolicy || policy.hotels[0]?.stayPolicy;
+        if(d.early && !activePolicy?.earlyArrival.enabled && d.early.status !== "NONE") {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decisions", "early", "status"], message: "Early-arrival is disabled for this event" })
         }
-        if (d.late && !policy.lateDeparture.enabled && d.late.status !== "NONE") {
+        if (d.late && !activePolicy?.lateDeparture.enabled && d.late.status !== "NONE") {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decisions", "late", "status"], message: "Late-departure is disabled for this event" })
         }
 });

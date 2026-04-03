@@ -11,7 +11,13 @@ import CircularProgress from "@mui/material/CircularProgress";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
+
   // Check if user is already logged in and has pending links
   const session = await getSession();
   
@@ -28,7 +34,10 @@ export default async function LoginPage() {
     
     if (pendingLinks.length > 0) {
       // Redirect to link-account page
-      redirect("/link-account");
+      const redirectUrl = callbackUrl 
+        ? `/link-account?callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/link-account";
+      redirect(redirectUrl);
     }
   }
 
