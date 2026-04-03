@@ -95,7 +95,7 @@ export default function RegistrationWizard({
   editMode = 'create',
   initialRegistration,
 }: RegistrationWizardProps) {
-  const ticketProducts = event.products.filter(product => !product.type || product.type === 'TICKET');
+  const ticketProducts = event.products.filter(product => product.type === 'TICKET');
   const existingItems = initialRegistration?.registrationItems || [];
   const lockedCoreIds = uniqueIds(
     existingItems
@@ -411,7 +411,7 @@ export default function RegistrationWizard({
                   }}
                 >
                   <Stack spacing={2}>
-                    {event.products.filter(product => !product.type || product.type === 'TICKET').map(product => (
+                    {ticketProducts.map(product => (
                       <Paper
                         key={product.id}
                         variant="outlined"
@@ -443,6 +443,11 @@ export default function RegistrationWizard({
                         />
                       </Paper>
                     ))}
+                    {ticketProducts.length === 0 && (
+                      <Alert severity="warning">
+                        No ticket products are configured for this event.
+                      </Alert>
+                    )}
                   </Stack>
                 </RadioGroup>
               </Box>

@@ -135,6 +135,22 @@ describe("App Router: /api/admin/event/[id]", () => {
                         price: 100,
                         type: "TICKET",
                         capacity: 50
+                    },
+                    {
+                        id: "shirt",
+                        name: "T-Shirt",
+                        description: "Merch addon",
+                        price: 25,
+                        type: "ADDON",
+                        capacity: 100
+                    },
+                    {
+                        id: "room-standard",
+                        name: "Standard Room",
+                        description: "Hotel room",
+                        price: 199,
+                        type: "ACCOMMODATION",
+                        capacity: 20
                     }
                 ]
             };
@@ -174,6 +190,22 @@ describe("App Router: /api/admin/event/[id]", () => {
                                     price: 100,
                                     type: "TICKET",
                                     capacity: 50
+                                },
+                                {
+                                    id: "shirt",
+                                    name: "T-Shirt",
+                                    description: "Merch addon",
+                                    price: 25,
+                                    type: "ADDON",
+                                    capacity: 100
+                                },
+                                {
+                                    id: "room-standard",
+                                    name: "Standard Room",
+                                    description: "Hotel room",
+                                    price: 199,
+                                    type: "ACCOMMODATION",
+                                    capacity: 20
                                 }
                             ]
                         }
