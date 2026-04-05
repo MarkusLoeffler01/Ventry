@@ -2,8 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 import type { RegistrationStatus } from "@/generated/prisma";
-
-export const dynamic = "force-dynamic";
+import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 
 // GET /api/admin/registrations - List all registrations for admins
 export async function GET(req: NextRequest) {
@@ -77,6 +76,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ registrations }, { status: 200 });
     } catch (error) {
+        rethrowIfExpectedPrerenderInterruption(error);
         console.error("Error listing admin registrations:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

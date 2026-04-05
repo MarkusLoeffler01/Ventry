@@ -3,10 +3,18 @@ import { Alert, Box, Typography } from "@mui/material";
 import { checkAdminAuth } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma/prisma";
 import AdminTicketsOverview from "@/components/admin/tickets/AdminTicketsOverview";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function AdminTicketsPage() {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <AdminTicketsPageContent />
+    </Suspense>
+  );
+}
 
-export default async function AdminTicketsPage() {
+async function AdminTicketsPageContent() {
   const authResult = await checkAdminAuth();
 
   if (!authResult.authorized) {

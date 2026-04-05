@@ -1,8 +1,18 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 import { stripe } from '@lib/stripe'
+import PageLoadingState from '@/components/common/PageLoadingState'
 
-export default async function Success({ searchParams }: { searchParams: Promise<{ session_id?: string }> }) {
+export default function Success({ searchParams }: { searchParams: Promise<{ session_id?: string }> }) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <SuccessContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function SuccessContent({ searchParams }: { searchParams: Promise<{ session_id?: string }> }) {
   const { session_id } = await searchParams
 
   if (!session_id)

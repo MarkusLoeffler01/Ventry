@@ -5,8 +5,6 @@ import { forbiddenResponse } from "@/lib/auth/admin";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { prisma } from "@/lib/prisma/prisma";
 
-export const dynamic = "force-dynamic";
-
 const statusQuerySchema = z.nativeEnum(SupportTicketStatus);
 
 function serializeAdminTicket(ticket: {

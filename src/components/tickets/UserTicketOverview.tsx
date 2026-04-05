@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   Alert,
   Box,
@@ -81,7 +80,7 @@ export default function UserTicketOverview({ groups }: UserTicketOverviewProps) 
                 {new Date(group.eventStartDate).toLocaleDateString()} - {new Date(group.eventEndDate).toLocaleDateString()}
               </Typography>
             </Box>
-            <Button component={Link} href={`/events/${group.eventId}`} variant="outlined" size="small">
+            <Button href={`/events/${group.eventId}`} variant="outlined" size="small">
               Open Event
             </Button>
           </Box>
