@@ -8,8 +8,6 @@ import { renderComponentToHTML } from "@/lib/helpers/html";
 import { sendMail } from "@/lib/mail";
 import SupportTicketStatusMail from "@/components/emails/SupportTicketStatusMail";
 
-export const dynamic = "force-dynamic";
-
 const updateSupportTicketSchema = z
   .object({
     status: z.nativeEnum(SupportTicketStatus).optional(),

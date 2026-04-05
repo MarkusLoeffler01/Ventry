@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma/prisma";
 import EventCard from "@/components/events/EventCard";
 import { Container, Grid, Typography, Box } from "@mui/material";
+import { cacheLife } from "next/cache";
 
 interface SerializedEventForCard {
   id: number;
@@ -14,9 +15,10 @@ interface SerializedEventForCard {
   } | null;
 }
 
-export const dynamic = "force-dynamic";
-
 export default async function Home() {
+  "use cache";
+  cacheLife("minutes");
+
   const events = await prisma.event.findMany({
     where: { status: 'PUBLISHED' },
     include: {
@@ -55,9 +57,9 @@ export default async function Home() {
 
       {serializedEvents.length > 0 ? (
         <Grid container spacing={4}>
-          {serializedEvents.map((event) => (
+          {serializedEvents.map((event, index) => (
             <Grid key={event.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <EventCard event={event} />
+              <EventCard event={event} priority={index === 0} />
             </Grid>
           ))}
         </Grid>
