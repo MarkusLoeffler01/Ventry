@@ -1,10 +1,18 @@
 import { checkAdminAuth } from "@/lib/auth/admin";
 import { redirect } from "next/navigation";
 import RegistrationManager from "@/components/admin/registrations/RegistrationManager";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function AdminUsersPage() {
+    return (
+        <Suspense fallback={<PageLoadingState />}>
+            <AdminUsersPageContent />
+        </Suspense>
+    );
+}
 
-export default async function AdminUsersPage() {
+async function AdminUsersPageContent() {
     const authResult = await checkAdminAuth();
     
     if (!authResult.authorized) {

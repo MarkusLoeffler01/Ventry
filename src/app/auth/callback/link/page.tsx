@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma/prisma';
+import { Suspense } from "react";
 
 interface LinkCallbackPageProps {
     searchParams: Promise<{
@@ -26,7 +27,15 @@ interface LinkCallbackPageProps {
  * 4. User must verify with password on /link-account page
  * 5. Only then is the OAuth account actually linked
  */
-export default async function LinkCallbackPage({ searchParams }: LinkCallbackPageProps) {
+export default function LinkCallbackPage({ searchParams }: LinkCallbackPageProps) {
+    return (
+        <Suspense fallback={null}>
+            <LinkCallbackPageContent searchParams={searchParams} />
+        </Suspense>
+    );
+}
+
+async function LinkCallbackPageContent({ searchParams }: LinkCallbackPageProps) {
     const params = await searchParams;
     
     // Handle OAuth errors
@@ -113,4 +122,6 @@ export default async function LinkCallbackPage({ searchParams }: LinkCallbackPag
 
     // No recent OAuth account - might be an error or normal sign-in
     redirect('/profile');
+
+    return null;
 }

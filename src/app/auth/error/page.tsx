@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
+import { Suspense } from "react";
 
 interface ErrorPageProps {
   searchParams: Promise<{
@@ -8,7 +9,15 @@ interface ErrorPageProps {
   }>;
 }
 
-export default async function AuthErrorPage({ searchParams }: ErrorPageProps) {
+export default function AuthErrorPage({ searchParams }: ErrorPageProps) {
+  return (
+    <Suspense fallback={null}>
+      <AuthErrorPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function AuthErrorPageContent({ searchParams }: ErrorPageProps) {
   const params = await searchParams;
   const error = params.error;
 
@@ -55,4 +64,6 @@ export default async function AuthErrorPage({ searchParams }: ErrorPageProps) {
 
   // Handle other auth errors
   redirect(`/login?error=${error || 'Unknown'}`);
+
+  return null;
 }

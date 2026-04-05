@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma/prisma";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(req.headers);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ paymentIntent });
 
   } catch (error) {
+    rethrowIfExpectedPrerenderInterruption(error);
     console.error("Error retrieving payment intent:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

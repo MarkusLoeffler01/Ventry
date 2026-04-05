@@ -7,7 +7,6 @@ import {
   Stack 
 } from '@mui/material';
 import { CalendarMonth, LocationOn } from '@mui/icons-material';
-import Link from 'next/link';
 import Image from 'next/image';
 
 interface EventCardProps {
@@ -22,9 +21,10 @@ interface EventCardProps {
       country: string;
     } | null;
   };
+  priority?: boolean;
 }
 
-export default function EventCard({ event }: EventCardProps) {
+export default function EventCard({ event, priority = false }: EventCardProps) {
   const startDate = new Date(event.startDate);
   const dateString = startDate.toLocaleDateString(undefined, { 
     month: 'short', 
@@ -40,6 +40,9 @@ export default function EventCard({ event }: EventCardProps) {
             src={event.imageUrl}
             alt={event.name}
             fill
+            sizes="(min-width: 1200px) 33vw, (min-width: 600px) 50vw, 100vw"
+            preload={priority}
+            loading={priority ? "eager" : "lazy"}
             style={{ objectFit: 'cover' }}
           />
         ) : (
@@ -72,7 +75,6 @@ export default function EventCard({ event }: EventCardProps) {
         <Button 
           fullWidth 
           variant="contained" 
-          component={Link} 
           href={`/events/${event.id}`}
         >
           View Details

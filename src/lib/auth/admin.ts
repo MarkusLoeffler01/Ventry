@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/auth";
 import { prisma } from "@/lib/prisma/prisma";
 import { headers } from "next/headers";
+import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 
 // Helper function to check admin authorization using better-auth
 export async function checkAdminAuth(requestHeaders?: Headers): Promise<{ 
@@ -46,6 +47,7 @@ export async function checkAdminAuth(requestHeaders?: Headers): Promise<{
     };
     
   } catch (error) {
+    rethrowIfExpectedPrerenderInterruption(error);
     console.error("Admin auth check failed:", error);
     return { authorized: false, error: "Authentication check failed" };
   }

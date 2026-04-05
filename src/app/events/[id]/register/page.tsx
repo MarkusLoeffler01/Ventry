@@ -5,6 +5,8 @@ import { redirect, notFound } from "next/navigation";
 import { Container, Box, Typography } from "@mui/material";
 import RegistrationWizard from "./RegistrationWizard";
 import type { SerializedProduct, SerializedStayPolicy } from "@/types/event";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
 interface SerializedEventForWizard {
   id: number;
@@ -16,9 +18,19 @@ interface SerializedEventForWizard {
   customFields: { id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }[];
 }
 
-export const dynamic = "force-dynamic";
+export default function RegisterEventPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <RegisterEventPageContent params={params} />
+    </Suspense>
+  );
+}
 
-export default async function RegisterEventPage({
+async function RegisterEventPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;

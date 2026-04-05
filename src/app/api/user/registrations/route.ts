@@ -1,12 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
-
-export const dynamic = "force-dynamic";
+import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 
 export async function GET(req: NextRequest) {
     try {
-        const session = await getSession();
+        const session = await getSession(req.headers);
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -52,6 +51,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ registrations }, { status: 200 });
     } catch (error) {
+        rethrowIfExpectedPrerenderInterruption(error);
         console.error("Error fetching user registrations:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
