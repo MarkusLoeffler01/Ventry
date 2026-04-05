@@ -7,8 +7,6 @@ import { sendMail } from "@/lib/mail";
 import SupportTicketCreatedMail from "@/components/emails/SupportTicketCreatedMail";
 import SupportTicketStatusMail from "@/components/emails/SupportTicketStatusMail";
 
-export const dynamic = "force-dynamic";
-
 const createSupportTicketSchema = z.object({
   subject: z.string().trim().min(5).max(120),
   description: z.string().trim().min(10).max(5000),

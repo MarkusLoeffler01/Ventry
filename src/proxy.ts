@@ -8,7 +8,7 @@ const routes: Array<{ pattern: URLPattern, mw: SubMW }> = [
     { pattern: new URLPattern({ pathname: "/api/admin/:path*" }), mw: mws.admin.middleware },
 ];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     const res = NextResponse.next();
     const pathname = req.nextUrl.pathname;
 

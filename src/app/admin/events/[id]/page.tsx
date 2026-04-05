@@ -3,11 +3,23 @@ import { checkAdminAuth } from "@/lib/auth/admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import EditEventClient from "./EditEventClient";
-import { type SerializedEvent, type SerializedProduct } from "@/types/event";
+import type { SerializedEvent, SerializedProduct } from "@/types/event";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function EditEventPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <EditEventPageContent params={params} />
+    </Suspense>
+  );
+}
 
-export default async function EditEventPage({
+async function EditEventPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;
