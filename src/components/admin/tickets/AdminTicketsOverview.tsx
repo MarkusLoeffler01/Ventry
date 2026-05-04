@@ -39,7 +39,7 @@ function getStatusColor(status: TicketStatus): "default" | "warning" | "success"
   }
 }
 
-interface AdminTicket {
+export interface AdminTicket {
   id: string;
   subject: string;
   description: string;

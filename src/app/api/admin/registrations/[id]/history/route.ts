@@ -2,8 +2,6 @@ import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }

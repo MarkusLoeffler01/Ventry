@@ -1,18 +1,40 @@
-import { Prisma, PrismaClient } from "../src/generated/prisma";
+import "dotenv/config";
+import { Prisma } from "../src/generated/prisma";
+import { createPrismaClient } from "../src/lib/prisma/client";
 import fs from "fs";
 import path from "path";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 type ModelMeta = {
   scalarFields: string[];
   dateFields: Set<string>;
 };
 
+type RuntimeModelField = {
+  kind: string;
+  name: string;
+  type: string;
+};
+
+type RuntimeModel = {
+  fields: RuntimeModelField[];
+};
+
+type RuntimeDataModel = {
+  models: Record<string, RuntimeModel>;
+};
+
 type RestoreCreateFn = (args: { data: Record<string, unknown> }) => Promise<unknown>;
 
+const runtimeDataModel = (prisma as unknown as { _runtimeDataModel?: RuntimeDataModel })._runtimeDataModel;
+
+if (!runtimeDataModel) {
+  throw new Error("Prisma runtime data model is not available.");
+}
+
 const modelMeta = new Map<string, ModelMeta>(
-  Prisma.dmmf.datamodel.models.map((model) => {
+  Object.entries(runtimeDataModel.models).map(([modelName, model]) => {
     const scalarFields = model.fields
       .filter((field) => field.kind === "scalar")
       .map((field) => field.name);
@@ -22,7 +44,7 @@ const modelMeta = new Map<string, ModelMeta>(
         .map((field) => field.name),
     );
 
-    return [model.name, { scalarFields, dateFields }];
+    return [modelName, { scalarFields, dateFields }];
   }),
 );
 

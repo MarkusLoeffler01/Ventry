@@ -1,6 +1,4 @@
 // Set Node.js runtime to enable native modules (e.g., bcrypt) required by better-auth for secure authentication
-export const runtime = 'nodejs';
-
 import { GET as BetterAuthGET, POST as BetterAuthPOST } from "../auth";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";

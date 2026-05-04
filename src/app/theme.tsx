@@ -1,56 +1,47 @@
 'use client';
 
-import * as React from 'react';
+import type * as React from 'react';
 import { createTheme, ThemeProvider as MUIThemeProvider } from '@mui/material/styles';
 import { green } from '@mui/material/colors';
 import CssBaseline from '@mui/material/CssBaseline';
 
+// CSS variables mode: dark/light switching is handled entirely by CSS.
+// No JS re-render is needed when the color scheme changes, so there is
+// no server/client theme mismatch during hydration.
+const theme = createTheme({
+  cssVariables: {
+    colorSchemeSelector: 'class',
+  },
+  colorSchemes: {
+    light: {
+      palette: {
+        primary: { main: '#1976d2' },
+        success: { main: green[500] },
+        background: { default: '#ffffff', paper: '#ffffff' },
+      },
+    },
+    dark: {
+      palette: {
+        primary: { main: '#1976d2' },
+        success: { main: green[500] },
+        background: { default: '#0a0a0a', paper: '#171717' },
+      },
+    },
+  },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+  },
+});
+
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [prefersDarkMode, setPrefersDarkMode] = React.useState(false);
-
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const updatePreference = () => setPrefersDarkMode(mediaQuery.matches);
-
-    updatePreference();
-    mediaQuery.addEventListener('change', updatePreference);
-
-    return () => {
-      mediaQuery.removeEventListener('change', updatePreference);
-    };
-  }, []);
-
-  const theme = React.useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: prefersDarkMode ? 'dark' : 'light',
-          primary: {
-            main: '#1976d2', // Default blue
-          },
-          success: {
-            main: green[500], // Use Material UI green
-          },
-          background: {
-            default: prefersDarkMode ? '#0a0a0a' : '#ffffff',
-            paper: prefersDarkMode ? '#171717' : '#ffffff',
-          }
-        },
-        components: {
-          MuiPaper: {
-            styleOverrides: {
-              root: {
-                backgroundImage: 'none', // Remove elevation gradient in dark mode for cleaner look
-              },
-            },
-          },
-        },
-      }),
-    [prefersDarkMode],
-  );
-
   return (
-    <MUIThemeProvider theme={theme}>
+    <MUIThemeProvider theme={theme} defaultMode="system">
       <CssBaseline />
       {children}
     </MUIThemeProvider>

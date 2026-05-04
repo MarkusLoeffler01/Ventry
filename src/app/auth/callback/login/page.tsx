@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma/prisma';
+import { Suspense } from "react";
 
 interface LoginCallbackPageProps {
     searchParams: Promise<{
@@ -29,7 +30,15 @@ interface LoginCallbackPageProps {
  * 3. better-auth creates new user + OAuth account
  * 4. User logged in → redirect to dashboard
  */
-export default async function LoginCallbackPage({ searchParams }: LoginCallbackPageProps) {
+export default function LoginCallbackPage({ searchParams }: LoginCallbackPageProps) {
+    return (
+        <Suspense fallback={null}>
+            <LoginCallbackPageContent searchParams={searchParams} />
+        </Suspense>
+    );
+}
+
+async function LoginCallbackPageContent({ searchParams }: LoginCallbackPageProps) {
     const params = await searchParams;
     
     // Handle better-auth's "account exists" error
@@ -77,4 +86,6 @@ export default async function LoginCallbackPage({ searchParams }: LoginCallbackP
 
     // No session and no error - something unexpected
     redirect('/login');
+
+    return null;
 }

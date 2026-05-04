@@ -7,12 +7,22 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/prisma";
 import { Suspense } from "react";
-import CircularProgress from "@mui/material/CircularProgress";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
-
-export default async function LoginPage({
+export default function LoginPage({
   searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <LoginPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function LoginPageContent({
+  searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
@@ -66,9 +76,7 @@ export default async function LoginPage({
             Login
           </Typography>
           
-          <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}>
-            <LoginPageClient />
-          </Suspense>
+          <LoginPageClient />
         </Paper>
       </Box>
     </Container>

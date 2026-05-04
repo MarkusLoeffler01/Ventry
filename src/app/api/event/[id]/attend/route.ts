@@ -6,34 +6,50 @@ import { Prisma } from "@/generated/prisma";
 import { decrementProductStock, getOrInitProductStock, incrementProductStock } from "@/lib/redis";
 import { countActiveRegistrations, releaseExpiredPendingRegistrations } from "@/lib/events/registration-capacity";
 
+const availabilityEventInclude = {
+    products: {
+        select: {
+            id: true,
+            name: true,
+            type: true,
+            capacity: true,
+            soldCount: true,
+            price: true,
+        },
+        orderBy: {
+            createdAt: "asc" as const,
+        },
+    },
+} satisfies Prisma.EventInclude;
+
+type AvailabilityEvent = Prisma.EventGetPayload<{
+    include: typeof availabilityEventInclude;
+}>;
+
+const registrationEventInclude = {
+    products: {
+        orderBy: { createdAt: "asc" as const },
+    },
+} satisfies Prisma.EventInclude;
+
+type RegistrationEvent = Prisma.EventGetPayload<{
+    include: typeof registrationEventInclude;
+}>;
+
 export async function GET(
-    req: NextRequest,
+    _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await releaseExpiredPendingRegistrations(eventId);
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            include: {
-                products: {
-                    select: {
-                        id: true,
-                        name: true,
-                        type: true,
-                        capacity: true,
-                        soldCount: true,
-                        price: true
-                    },
-                    orderBy: {
-                        createdAt: "asc"
-                    }
-                }
-            }
-        });
+            include: availabilityEventInclude
+        }) as AvailabilityEvent | null;
 
         if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
@@ -73,7 +89,7 @@ export async function POST(
         }
 
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await releaseExpiredPendingRegistrations(eventId);
 
@@ -89,12 +105,8 @@ export async function POST(
         // 1. Verify event exists and is published
         const event = await prisma.event.findUnique({
             where: { id: eventId, status: 'PUBLISHED' },
-            include: { 
-                products: {
-                    orderBy: { createdAt: "asc" }
-                }
-            }
-        });
+            include: registrationEventInclude
+        }) as RegistrationEvent | null;
 
         if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
@@ -263,7 +275,8 @@ export async function POST(
 
             // Process Confirmed Items
             for (const pid of confirmedProductIds) {
-                const p = validProducts.find(vp => vp.id === pid)!;
+                const p = validProducts.find(vp => vp.id === pid);
+                if (!p) continue;
 
                 await tx.registrationItem.create({
                     data: {

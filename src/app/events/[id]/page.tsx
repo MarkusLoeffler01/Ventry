@@ -25,17 +25,32 @@ import {
   Edit
 } from "@mui/icons-material";
 import Image from "next/image";
-import Link from "next/link";
 import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
 import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
 import EventLocationMap from "@/components/events/EventLocationMap";
 import SupportTicketPanel from "@/components/events/SupportTicketPanel";
 import type { SerializedEvent, SerializedProduct } from "@/types/event";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+const eventDateFormatter = new Intl.DateTimeFormat("en-US");
 
-export default async function EventDetailPage({
+export default function EventDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ message?: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <EventDetailPageContent params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function EventDetailPageContent({
   params,
   searchParams,
 }: {
@@ -43,7 +58,7 @@ export default async function EventDetailPage({
   searchParams: Promise<{ message?: string }>;
 }) {
   const id = Number((await params).id);
-  if (isNaN(id)) notFound();
+  if (Number.isNaN(id)) notFound();
 
   const { message } = await searchParams;
   const session = await getSession();
@@ -251,8 +266,10 @@ export default async function EventDetailPage({
             src={event.imageUrl}
             alt={event.name}
             fill
+            sizes="100vw"
+            preload
+            loading="eager"
             style={{ objectFit: 'cover', opacity: 0.7 }}
-            priority
           />
         ) : (
           <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -278,7 +295,7 @@ export default async function EventDetailPage({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CalendarMonth />
                 <Typography variant="h6">
-                  {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
+                  {eventDateFormatter.format(startDate)} - {eventDateFormatter.format(endDate)}
                 </Typography>
               </Box>
               {event.location && (
@@ -401,7 +418,6 @@ export default async function EventDetailPage({
                       variant="contained" 
                       size="large" 
                       sx={{ py: 2, fontSize: '1.1rem' }}
-                      component={Link}
                       href={`/events/${event.id}/register`}
                       disabled={!!(event.registrationOpensAt && new Date(event.registrationOpensAt) > new Date()) || !!(event.maxRegistrations && event._count.registrations >= event.maxRegistrations)}
                     >
@@ -412,7 +428,8 @@ export default async function EventDetailPage({
 
                     {event.registrationOpensAt && new Date(event.registrationOpensAt) > new Date() && (
                       <Box sx={{ mt: 3 }}>
-                        {new Date(event.registrationOpensAt).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000 ? (
+                        {/* eslint-disable-next-line react-hooks/purity -- server component, Date.now() is safe here */}
+                        {new Date(event.registrationOpensAt).getTime() - Date.now()< 3 * 24 * 60 * 60 * 1000 ? (
                           <RegistrationCountdown opensAt={event.registrationOpensAt.toISOString()} />
                         ) : (
                           <Alert severity="info" icon={false} sx={{ textAlign: 'center' }}>
@@ -420,7 +437,7 @@ export default async function EventDetailPage({
                               Registration opens on:
                             </Typography>
                             <Typography variant="h6">
-                              {new Date(event.registrationOpensAt).toLocaleDateString()}
+                              {eventDateFormatter.format(new Date(event.registrationOpensAt))}
                             </Typography>
                           </Alert>
                         )}
@@ -435,7 +452,6 @@ export default async function EventDetailPage({
                     variant="outlined"
                     color="secondary"
                     startIcon={<Edit />}
-                    component={Link}
                     href={`/admin/events/${event.id}`}
                     sx={{ mt: 2 }}
                   >
