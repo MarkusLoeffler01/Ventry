@@ -6,6 +6,7 @@ import { renderComponentToHTML } from "@/lib/helpers/html";
 import { sendMail } from "@/lib/mail";
 import SupportTicketCreatedMail from "@/components/emails/SupportTicketCreatedMail";
 import SupportTicketStatusMail from "@/components/emails/SupportTicketStatusMail";
+import type { Prisma } from "@/generated/prisma";
 
 const createSupportTicketSchema = z.object({
   subject: z.string().trim().min(5).max(120),
@@ -15,6 +16,34 @@ const createSupportTicketSchema = z.object({
 function getAppBaseUrl() {
   return process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443";
 }
+
+const ticketRegistrationInclude = {
+  user: {
+    select: {
+      name: true,
+      email: true,
+    },
+  },
+  event: {
+    select: {
+      id: true,
+      name: true,
+      owner: {
+        select: {
+          user: {
+            select: {
+              email: true,
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.RegistrationInclude;
+
+type TicketRegistration = Prisma.RegistrationGetPayload<{
+  include: typeof ticketRegistrationInclude;
+}>;
 
 function serializeTicket(ticket: {
   id: string;
@@ -109,30 +138,8 @@ export async function POST(
         eventId,
         status: { not: "CANCELLED" },
       },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        event: {
-          select: {
-            id: true,
-            name: true,
-            owner: {
-              select: {
-                user: {
-                  select: {
-                    email: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+      include: ticketRegistrationInclude,
+    }) as TicketRegistration | null;
 
     if (!registration) {
       return NextResponse.json(
