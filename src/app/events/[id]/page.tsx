@@ -25,7 +25,6 @@ import {
   Edit
 } from "@mui/icons-material";
 import Image from "next/image";
-import Link from "next/link";
 import EventRegistrationStatus from "@/components/events/EventRegistrationStatus";
 import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
@@ -59,7 +58,7 @@ async function EventDetailPageContent({
   searchParams: Promise<{ message?: string }>;
 }) {
   const id = Number((await params).id);
-  if (isNaN(id)) notFound();
+  if (Number.isNaN(id)) notFound();
 
   const { message } = await searchParams;
   const session = await getSession();
@@ -429,7 +428,8 @@ async function EventDetailPageContent({
 
                     {event.registrationOpensAt && new Date(event.registrationOpensAt) > new Date() && (
                       <Box sx={{ mt: 3 }}>
-                        {new Date(event.registrationOpensAt).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000 ? (
+                        {/* eslint-disable-next-line react-hooks/purity -- server component, Date.now() is safe here */}
+                        {new Date(event.registrationOpensAt).getTime() - Date.now()< 3 * 24 * 60 * 60 * 1000 ? (
                           <RegistrationCountdown opensAt={event.registrationOpensAt.toISOString()} />
                         ) : (
                           <Alert severity="info" icon={false} sx={{ textAlign: 'center' }}>

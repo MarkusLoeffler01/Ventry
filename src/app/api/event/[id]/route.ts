@@ -3,12 +3,12 @@ import { prisma } from "@/lib/prisma/prisma";
 
 // GET /api/event/[id] - Get public event details
 export async function GET(
-    req: NextRequest,
+    _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const id = Number((await params).id);
-        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const event = await prisma.event.findUnique({
             where: { 
