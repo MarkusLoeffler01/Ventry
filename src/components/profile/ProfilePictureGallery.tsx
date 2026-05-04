@@ -225,6 +225,7 @@ export default function ProfilePictureGallery({
 
   // Update ordered pictures when profilePictures changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-to-state sync
     setOrderedPictures(profilePictures);
   }, [profilePictures]);
 

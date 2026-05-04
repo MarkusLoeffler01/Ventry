@@ -7,7 +7,7 @@ import { z } from "zod";
 
 // GET /api/admin/event/[id] - Get full event details for admin
 export async function GET(
-    req: NextRequest,
+    _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
@@ -17,7 +17,7 @@ export async function GET(
         }
 
         const id = Number((await params).id);
-        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const event = await prisma.event.findUnique({
             where: { id },
@@ -53,7 +53,7 @@ export async function PATCH(
         }
 
         const id = Number((await params).id);
-        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const body = await req.json();
         const validatedData = adminUpdateEventSchema.parse(body);
@@ -113,7 +113,7 @@ export async function PATCH(
 
 // DELETE /api/admin/event/[id] - Delete an event
 export async function DELETE(
-    req: NextRequest,
+    _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
@@ -123,7 +123,7 @@ export async function DELETE(
         }
 
         const id = Number((await params).id);
-        if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         // Check if event has registrations
         const registrationCount = await prisma.registration.count({

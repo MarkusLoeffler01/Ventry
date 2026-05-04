@@ -44,7 +44,7 @@ async function SuccessContent({ searchParams }: { searchParams: Promise<{ sessio
         <a href="mailto:ventry-support@m-loeffler.de">ventry-support@m-loeffler.de</a>.
         <br />
         <br />
-        Your invoice: {invoice && invoice.toString()}
+        Your invoice: {invoice?.toString()}
       </section>
 
     )

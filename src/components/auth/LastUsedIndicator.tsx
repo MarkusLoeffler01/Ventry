@@ -17,6 +17,7 @@ export default function LastUsedIndicator({
   const [isLastUsed, setIsLastUsed] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage access must run in effect
     setIsLastUsed(isLastUsedLoginMethod(loginMethod));
   }, [loginMethod]);
 

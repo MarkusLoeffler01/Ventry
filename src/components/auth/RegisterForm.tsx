@@ -38,6 +38,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
     mode: "onBlur",
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
   const password = watch("password");
 
   const onSubmit = async (data: RegisterSchema, e?: React.BaseSyntheticEvent) => {

@@ -26,7 +26,7 @@ interface EventCardProps {
 
 export default function EventCard({ event, priority = false }: EventCardProps) {
   const startDate = new Date(event.startDate);
-  const dateString = startDate.toLocaleDateString(undefined, { 
+  const dateString = startDate.toLocaleDateString('en', { 
     month: 'short', 
     day: 'numeric', 
     year: 'numeric' 

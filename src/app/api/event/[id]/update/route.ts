@@ -64,7 +64,7 @@ export async function PATCH(
         }
 
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await releaseExpiredPendingRegistrations(eventId);
 
