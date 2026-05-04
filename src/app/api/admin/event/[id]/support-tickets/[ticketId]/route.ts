@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 import { SupportTicketStatus } from "@/generated/prisma";
 import { forbiddenResponse } from "@/lib/auth/admin";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
@@ -21,18 +22,27 @@ function getAppBaseUrl() {
   return process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443";
 }
 
-function serializeAdminTicket(ticket: {
-  id: string;
-  subject: string;
-  description: string;
-  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
-  adminResponse: string | null;
-  resolvedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  user: { id: string; name: string | null; email: string };
-  registration: { id: string; ticketId: number };
-}) {
+const updatedTicketInclude = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  registration: {
+    select: {
+      id: true,
+      ticketId: true,
+    },
+  },
+} satisfies Prisma.SupportTicketInclude;
+
+type UpdatedTicketRow = Prisma.SupportTicketGetPayload<{
+  include: typeof updatedTicketInclude;
+}>;
+
+function serializeAdminTicket(ticket: UpdatedTicketRow) {
   return {
     ...ticket,
     resolvedAt: ticket.resolvedAt?.toISOString() || null,
@@ -110,22 +120,8 @@ export async function PATCH(
         lastUpdatedByAdminId: authResult.adminId,
         resolvedAt: shouldSetResolvedAt ? existing.resolvedAt || new Date() : null,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        registration: {
-          select: {
-            id: true,
-            ticketId: true,
-          },
-        },
-      },
-    });
+      include: updatedTicketInclude,
+    }) as UpdatedTicketRow;
 
     const statusChanged = existing.status !== updated.status;
     const responseChanged = (existing.adminResponse || "") !== (updated.adminResponse || "");

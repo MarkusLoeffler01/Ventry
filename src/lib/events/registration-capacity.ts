@@ -1,4 +1,3 @@
-import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma/prisma";
 import { clearProductStock } from "@/lib/redis";
 
@@ -14,8 +13,13 @@ type RegistrationCapacitySnapshot = {
     }>;
 };
 
+type TransactionClient = Pick<
+    typeof prisma,
+    "payment" | "product" | "registration" | "registrationItem" | "waitlistEntry"
+>;
+
 export async function countActiveRegistrations(
-    tx: Prisma.TransactionClient,
+    tx: TransactionClient,
     eventId: number
 ) {
     return tx.registration.count({
@@ -29,7 +33,7 @@ export async function countActiveRegistrations(
 }
 
 async function releaseRegistrationInventory(
-    tx: Prisma.TransactionClient,
+    tx: TransactionClient,
     registration: RegistrationCapacitySnapshot
 ) {
     const releaseCounts = new Map<string, { count: number; hasCapacityLimit: boolean }>();
@@ -78,7 +82,7 @@ export async function syncReleasedProductStocks(productIds: string[]) {
 }
 
 export async function cancelRegistrationAndReleaseCapacity(
-    tx: Prisma.TransactionClient,
+    tx: TransactionClient,
     registrationId: string
 ) {
     const registration = await tx.registration.findUnique({
