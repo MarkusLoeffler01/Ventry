@@ -37,9 +37,18 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const router = useRouter();
 
     const doPasskeyLogin = async () => {
+        setError("");
         try {
             setLoading(true);
-            await authClient.signIn.passkey();
+
+            const { error } = await authClient.signIn.passkey();
+            if (error) {
+                const message = error.message || error.statusText || "Passkey authentication failed";
+                const status = error.status ? ` (${error.status})` : "";
+                setError(`${message}${status}`);
+                return;
+            }
+
             // After successful passkey login, redirect
             router.push(callbackUrl ?? "/");
         } catch (err) {
@@ -206,11 +215,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                 </Button>
 
                 <LoginMethodBox>
-                    <Button onClick={() => {
-                        void doPasskeyLogin().catch(() => {
-                            console.error("Passkey login failed");
-                        });
-                    }} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
+                    <Button onClick={() => void doPasskeyLogin()} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
                     <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
                         Login with Passkey
                     </Button>
