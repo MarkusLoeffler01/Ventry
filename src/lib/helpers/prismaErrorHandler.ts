@@ -1,7 +1,11 @@
 // prismaErrorHandler.ts
 
 // "use client";
-import { PrismaClientValidationError, PrismaClientInitializationError, PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import {
+  PrismaClientValidationError,
+  PrismaClientInitializationError,
+  PrismaClientKnownRequestError,
+} from "@prisma/client/runtime/client";
 
 /**
  * Registrierungsfehlertypen, die dem Client zurückgegeben werden

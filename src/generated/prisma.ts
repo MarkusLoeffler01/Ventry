@@ -4,7 +4,7 @@ export {
   PrismaClient,
   RegistrationStatus,
   SupportTicketStatus,
-} from "@prisma/client";
+} from "./prisma/client";
 
 export type {
   Event,
@@ -12,4 +12,4 @@ export type {
   PendingAccountLink,
   Product,
   Registration,
-} from "@prisma/client";
+} from "./prisma/client";

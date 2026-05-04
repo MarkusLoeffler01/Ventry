@@ -1,7 +1,8 @@
-import { prisma } from "@/lib/prisma/prisma";
 import EventCard from "@/components/events/EventCard";
 import { Container, Grid, Typography, Box } from "@mui/material";
 import { cacheLife } from "next/cache";
+import { prisma } from "@/lib/prisma/prisma";
+import type { Prisma } from "@/generated/prisma";
 
 interface SerializedEventForCard {
   id: number;
@@ -15,34 +16,47 @@ interface SerializedEventForCard {
   } | null;
 }
 
-export default async function Home() {
+const homeEventInclude = {
+  location: {
+    select: {
+      city: true,
+      country: true,
+    },
+  },
+} satisfies Prisma.EventInclude;
+
+type HomeEventRow = Prisma.EventGetPayload<{
+  include: typeof homeEventInclude;
+}>;
+
+async function getHomeEvents(): Promise<SerializedEventForCard[]> {
   "use cache";
+
   cacheLife("minutes");
 
   const events = await prisma.event.findMany({
-    where: { status: 'PUBLISHED' },
-    include: {
-      location: {
-        select: {
-          city: true,
-          country: true
-        }
-      }
-    },
-    orderBy: { startDate: 'asc' }
-  });
+    where: { status: "PUBLISHED" },
+    include: homeEventInclude,
+    orderBy: { startDate: "asc" },
+  }) as unknown as HomeEventRow[];
 
-  const serializedEvents: SerializedEventForCard[] = events.map(event => ({
+  return events.map((event) => ({
     id: event.id,
     name: event.name,
     startDate: event.startDate.toISOString(),
     endDate: event.endDate.toISOString(),
     imageUrl: event.imageUrl,
-    location: event.location ? {
-      city: event.location.city,
-      country: event.location.country
-    } : null
+    location: event.location
+      ? {
+          city: event.location.city,
+          country: event.location.country,
+        }
+      : null,
   }));
+}
+
+export default async function Home() {
+  const serializedEvents = await getHomeEvents();
 
   return (
     <Container maxWidth="lg" sx={{ py: 8 }}>
