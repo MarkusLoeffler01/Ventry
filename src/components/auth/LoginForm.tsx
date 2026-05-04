@@ -149,7 +149,6 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
 
     return (
         <AuthTemplate form="login" error={error} onClose={handlePasswordForgetClose} resetPasswordOpen={passwordForgetOpen}>
-            {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <Box component="form" onSubmit={handleSubmit} noValidate sx={{ width: '100%' }}>
                 <TextField
                     margin="normal"

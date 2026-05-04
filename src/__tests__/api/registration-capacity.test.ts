@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { POST, GET } from '@/app/api/event/[id]/attend/route';
 import { NextRequest } from 'next/server';
-import { type Event, type Product, type Registration, type Payment, type Prisma } from '@/generated/prisma';
+import type { Event, Product, Registration, Payment, Prisma } from '@/generated/prisma';
 
 // ------------------------------------------------------------------
 // Type Definitions
@@ -60,8 +60,7 @@ vi.mock('@/lib/prisma/prisma', () => {
   };
   
   // Self-reference for transaction callback
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
+  // @ts-expect-error
   prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => await callback(prismaMock));
 
   return { prisma: prismaMock };
@@ -317,7 +316,7 @@ describe('Capacity Limit Integration Test', () => {
 
     expect(res.status).toBe(201);
     expect(data.status).toBe('PENDING');
-    if (mockDb.event && mockDb.event.products[0]) {
+    if (mockDb.event?.products[0]) {
         expect(mockDb.event.products[0].soldCount).toBe(1); // Consumed 1
     }
   });
@@ -333,7 +332,7 @@ describe('Capacity Limit Integration Test', () => {
     req = createRegisterRequest(String(EVENT_ID), { productId: PRODUCT_ID });
     await POST(req, { params: Promise.resolve({ id: String(EVENT_ID) }) });
     
-    if (mockDb.event && mockDb.event.products[0]) {
+    if (mockDb.event?.products[0]) {
         expect(mockDb.event.products[0].soldCount).toBe(2);
     }
 
@@ -349,7 +348,7 @@ describe('Capacity Limit Integration Test', () => {
     expect(body.status).toBe('WAITLISTED');
     
     // Count should remain at 2
-    if (mockDb.event && mockDb.event.products[0]) {
+    if (mockDb.event?.products[0]) {
         expect(mockDb.event.products[0].soldCount).toBe(2);
     }
     
@@ -386,7 +385,7 @@ describe('Capacity Limit Integration Test', () => {
 
   it('should block waitlisting if disabled (T-shirt scenario)', async () => {
     // Modify product to disable waitlist
-    if (mockDb.event && mockDb.event.products[0]) {
+    if (mockDb.event?.products[0]) {
         mockDb.event.products[0].allowWaitlist = false;
         // Make it full
         mockDb.event.products[0].soldCount = CAPACITY;
@@ -406,7 +405,7 @@ describe('Capacity Limit Integration Test', () => {
   });
 
   it('should ignore capacity if capacity is null (unlimited)', async () => {
-    if (mockDb.event && mockDb.event.products[0]) {
+    if (mockDb.event?.products[0]) {
         // make unlimited
         mockDb.event.products[0].capacity = null;
         mockDb.event.products[0].soldCount = 1000;
@@ -418,7 +417,7 @@ describe('Capacity Limit Integration Test', () => {
     const res = await POST(req, { params: Promise.resolve({ id: String(EVENT_ID) }) });
     
     expect(res.status).toBe(201);
-    if (mockDb.event && mockDb.event.products[0]) {
+    if (mockDb.event?.products[0]) {
         expect(mockDb.event.products[0].soldCount).toBe(1001);
     }
   });

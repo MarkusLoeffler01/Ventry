@@ -37,12 +37,12 @@ type RegistrationEvent = Prisma.EventGetPayload<{
 }>;
 
 export async function GET(
-    req: NextRequest,
+    _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await releaseExpiredPendingRegistrations(eventId);
 
@@ -89,7 +89,7 @@ export async function POST(
         }
 
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await releaseExpiredPendingRegistrations(eventId);
 
@@ -275,7 +275,8 @@ export async function POST(
 
             // Process Confirmed Items
             for (const pid of confirmedProductIds) {
-                const p = validProducts.find(vp => vp.id === pid)!;
+                const p = validProducts.find(vp => vp.id === pid);
+                if (!p) continue;
 
                 await tx.registrationItem.create({
                     data: {
