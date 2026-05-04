@@ -26,5 +26,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build prisma
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "prisma+postgres://dummy:dummy@dummy/dummy?api_key=dummy"
+
       - name: Run tests
         run: npm test

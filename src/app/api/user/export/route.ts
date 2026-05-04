@@ -1,12 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 import prisma from "@/lib/prisma/prisma";
 import type { UserDataExport } from "@/types/user/profile";
 
 // GET: Export user data (GDPR compliance)
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(req.headers);
 
     
     if (!session?.user?.id) {
@@ -97,6 +98,7 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
+    rethrowIfExpectedPrerenderInterruption(error);
     console.error("Error exporting user data:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

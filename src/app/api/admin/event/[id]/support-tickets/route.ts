@@ -1,26 +1,34 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 import { SupportTicketStatus } from "@/generated/prisma";
 import { forbiddenResponse } from "@/lib/auth/admin";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { prisma } from "@/lib/prisma/prisma";
 
-export const dynamic = "force-dynamic";
-
 const statusQuerySchema = z.nativeEnum(SupportTicketStatus);
 
-function serializeAdminTicket(ticket: {
-  id: string;
-  subject: string;
-  description: string;
-  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
-  adminResponse: string | null;
-  resolvedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  user: { id: string; name: string | null; email: string };
-  registration: { id: string; ticketId: number };
-}) {
+const adminTicketInclude = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  registration: {
+    select: {
+      id: true,
+      ticketId: true,
+    },
+  },
+} satisfies Prisma.SupportTicketInclude;
+
+type AdminTicketRow = Prisma.SupportTicketGetPayload<{
+  include: typeof adminTicketInclude;
+}>;
+
+function serializeAdminTicket(ticket: AdminTicketRow) {
   return {
     ...ticket,
     resolvedAt: ticket.resolvedAt?.toISOString() || null,
@@ -58,23 +66,9 @@ export async function GET(
         eventId,
         ...(parsedStatus?.success ? { status: parsedStatus.data } : {}),
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        registration: {
-          select: {
-            id: true,
-            ticketId: true,
-          },
-        },
-      },
+      include: adminTicketInclude,
       orderBy: [{ updatedAt: "desc" }],
-    });
+    }) as AdminTicketRow[];
 
     return NextResponse.json({ tickets: tickets.map(serializeAdminTicket) }, { status: 200 });
   } catch (error) {

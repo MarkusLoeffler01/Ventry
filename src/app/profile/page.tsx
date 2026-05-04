@@ -3,10 +3,18 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
 import { Container, Box, Typography, Paper } from "@mui/material";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}
 
-export default async function ProfilePage() {
+async function ProfilePageContent() {
   const session = await getSession();
 
   if (!session?.user?.id) {

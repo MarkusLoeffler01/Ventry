@@ -1,9 +1,10 @@
-import { PrismaClient } from "../src/generated/prisma";
+import "dotenv/config";
 import { hashPassword } from "../src/lib/bcrypt";
+import { createPrismaClient } from "../src/lib/prisma/client";
 import fs from "fs";
 import path from "path";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 type RestoredProduct = Record<string, unknown> & {
   createdAt?: string;

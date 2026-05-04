@@ -31,6 +31,28 @@ function sameIdSet(left: string[], right: string[]) {
     return left.every((value) => rightSet.has(value));
 }
 
+const updatableEventInclude = {
+    products: {
+        orderBy: { createdAt: "asc" as const }
+    }
+} satisfies Prisma.EventInclude;
+
+type UpdatableEvent = Prisma.EventGetPayload<{
+    include: typeof updatableEventInclude;
+}>;
+
+const existingRegistrationInclude = {
+    registrationItems: true,
+    waitlistEntries: true,
+    payments: {
+        orderBy: { createdAt: "desc" as const }
+    }
+} satisfies Prisma.RegistrationInclude;
+
+type ExistingRegistration = Prisma.RegistrationGetPayload<{
+    include: typeof existingRegistrationInclude;
+}>;
+
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -42,7 +64,7 @@ export async function PATCH(
         }
 
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await releaseExpiredPendingRegistrations(eventId);
 
@@ -57,12 +79,8 @@ export async function PATCH(
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            include: {
-                products: {
-                    orderBy: { createdAt: "asc" }
-                }
-            }
-        });
+            include: updatableEventInclude
+        }) as UpdatableEvent | null;
 
         if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
@@ -110,14 +128,8 @@ export async function PATCH(
                         eventId
                     }
                 },
-                include: {
-                    registrationItems: true,
-                    waitlistEntries: true,
-                    payments: {
-                        orderBy: { createdAt: "desc" }
-                    }
-                }
-            });
+                include: existingRegistrationInclude
+            }) as ExistingRegistration | null;
 
             if (!existingRegistration) {
                 throw new Error("Registration not found");

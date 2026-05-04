@@ -6,13 +6,24 @@ import {
 } from '@mui/material';
 import RegisterForm from '@/components/auth/RegisterForm';
 import { Suspense } from 'react';
+import PageLoadingState from '@/components/common/PageLoadingState';
 
-export const dynamic = "force-dynamic";
-
-export default async function RegisterPage({ 
+export default function RegisterPage({ 
   searchParams 
 }: { 
   searchParams: Promise<{ callbackUrl?: string }> 
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <RegisterPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function RegisterPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   const { callbackUrl } = await searchParams;
 
@@ -39,9 +50,7 @@ export default async function RegisterPage({
             Sign up
           </Typography>
           
-          <Suspense>
-            <RegisterForm callbackUrl={callbackUrl}/>
-          </Suspense>
+          <RegisterForm callbackUrl={callbackUrl}/>
         </Paper>
       </Box>
     </Container>

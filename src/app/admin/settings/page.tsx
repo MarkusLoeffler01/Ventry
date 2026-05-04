@@ -4,10 +4,18 @@ import { redirect } from "next/navigation";
 import { Box, Typography, Paper, Divider } from "@mui/material";
 import StripeEmbeddedConnect from "@/components/admin/settings/StripeEmbeddedConnect";
 import { stripe } from "@/lib/stripe";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function AdminSettingsPage() {
+    return (
+        <Suspense fallback={<PageLoadingState />}>
+            <AdminSettingsPageContent />
+        </Suspense>
+    );
+}
 
-export default async function AdminSettingsPage() {
+async function AdminSettingsPageContent() {
     const authResult = await checkAdminAuth();
     if (!authResult.authorized || !authResult.user) {
         if (authResult.error === "Not authenticated") {

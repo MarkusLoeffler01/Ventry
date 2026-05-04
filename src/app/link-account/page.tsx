@@ -2,11 +2,23 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/prisma";
 import LinkAccountClient from "@/components/auth/LinkAccountClient";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
-
-export default async function LinkAccountPage({
+export default function LinkAccountPage({
   searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <LinkAccountPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function LinkAccountPageContent({
+  searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {

@@ -9,6 +9,20 @@ import { cancelRegistrationAndReleaseCapacity, syncReleasedProductStocks } from 
 
 type FinanceAction = "NONE" | "UPCHARGE_REQUIRED" | "MANUAL_REFUND_RECOMMENDED";
 
+const registrationInclude = {
+    payments: { orderBy: { createdAt: "desc" as const }, take: 1 },
+    event: { include: { products: true } },
+    registrationItems: {
+        include: {
+            product: true,
+        },
+    },
+} satisfies Prisma.RegistrationInclude;
+
+type RegistrationWithAdminContext = Prisma.RegistrationGetPayload<{
+    include: typeof registrationInclude;
+}>;
+
 function isTicketProduct(
     product: { type: "TICKET" | "ACCOMMODATION" | "ADDON" } | undefined
 ) {
@@ -50,16 +64,8 @@ export async function PATCH(
         // 1. Fetch current state for diffing
         const current = await prisma.registration.findUnique({
             where: { id },
-            include: {
-                payments: { orderBy: { createdAt: 'desc' }, take: 1 },
-                event: { include: { products: true } },
-                registrationItems: {
-                    include: {
-                        product: true
-                    }
-                }
-            }
-        });
+            include: registrationInclude
+        }) as RegistrationWithAdminContext | null;
 
         if (!current) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
 

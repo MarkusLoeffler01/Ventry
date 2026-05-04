@@ -54,3 +54,6 @@ next-env.d.ts
 
 /backups/
 .github/instructions/
+.playwright-mcp
+/*.md
+/.*

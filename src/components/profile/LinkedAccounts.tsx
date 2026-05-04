@@ -19,6 +19,7 @@ import {
   CheckCircle,
   Link as LinkIcon
 } from "@mui/icons-material";
+import PasskeyManager from "./PasskeyManager";
 
 interface LinkedAccountsProps {
   accounts: Array<{
@@ -75,6 +76,7 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     }
 
     // Redirect to password verification page
+    // eslint-disable-next-line react-hooks/immutability -- intentional navigation via window.location
     window.location.href = `/link-account/verify?provider=${providerId}&returnTo=${encodeURIComponent('/profile')}`;
   };
 
@@ -183,6 +185,10 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
             </Stack>
           </>
         )}
+
+        <Divider sx={{ my: 3 }} />
+
+        <PasskeyManager />
 
         {!hasPassword && hasOAuthProviders && (
           <Alert severity="info" sx={{ mt: 2 }}>
