@@ -1,6 +1,7 @@
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
   authors: [{ name: "Markus Löffler", url: "https://github.com/MarkusLoeffler01/Ventry"}]
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -29,9 +30,11 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AppRouterCacheProvider>
-          <Providers>
-            {children}
-          </Providers>
+          <Suspense fallback={null}>
+            <Providers>
+              {children}
+            </Providers>
+          </Suspense>
         </AppRouterCacheProvider>
       </body>
     </html>
