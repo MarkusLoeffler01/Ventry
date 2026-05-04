@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { cancelRegistrationAndReleaseCapacity, syncReleasedProductStocks } from "@/lib/events/registration-capacity";
 
 export async function POST(
-    req: NextRequest,
+    _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
@@ -14,7 +14,7 @@ export async function POST(
         }
 
         const eventId = Number((await params).id);
-        if (isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (Number.isNaN(eventId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const releasedProductIds = await prisma.$transaction(async (tx) => {
             const registration = await tx.registration.findUnique({

@@ -1,4 +1,5 @@
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
@@ -27,8 +28,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <InitColorSchemeScript attribute="class" />
         <AppRouterCacheProvider>
           <Suspense fallback={null}>
             <Providers>

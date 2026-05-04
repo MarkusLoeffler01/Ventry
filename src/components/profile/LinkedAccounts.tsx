@@ -76,6 +76,7 @@ export default function LinkedAccounts({ accounts, hasPassword, hasOAuthProvider
     }
 
     // Redirect to password verification page
+    // eslint-disable-next-line react-hooks/immutability -- intentional navigation via window.location
     window.location.href = `/link-account/verify?provider=${providerId}&returnTo=${encodeURIComponent('/profile')}`;
   };
 

@@ -42,7 +42,7 @@ async function RegisterEventPageContent({
   }
 
   const id = Number((await params).id);
-  if (isNaN(id)) notFound();
+  if (Number.isNaN(id)) notFound();
 
   const event = await prisma.event.findUnique({
     where: { id, status: 'PUBLISHED' },

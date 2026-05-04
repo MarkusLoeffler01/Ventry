@@ -42,7 +42,7 @@ async function EditEventPageContent({
   }
 
   const id = Number((await params).id);
-  if (isNaN(id)) notFound();
+  if (Number.isNaN(id)) notFound();
 
   const event: EditEventData | null = await prisma.event.findUnique({
     where: { id },

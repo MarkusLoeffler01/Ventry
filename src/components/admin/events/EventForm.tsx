@@ -1521,6 +1521,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                                     placeholder={`Option ${optionIndex + 1}`}
                                     value={option}
                                     onChange={event => {
+                                      // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
                                       const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
                                       currentOptions[optionIndex] = event.target.value;
                                       setValue(`customFields.${index}.options`, currentOptions);
