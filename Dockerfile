@@ -18,6 +18,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+ENV DATABASE_URL="prisma+postgres://dummy:dummy@dummy/dummy?api_key=dummy"
 RUN npx prisma generate && npm run build
 
 FROM base AS runner
