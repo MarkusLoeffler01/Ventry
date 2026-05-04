@@ -3,10 +3,21 @@ import {
   Typography, 
   Paper, 
   Stack, 
-  Chip, 
   Grid
 } from "@mui/material";
 import { AccessTime, LocationOn } from "@mui/icons-material";
+
+const scheduleDateFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+const scheduleTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 interface ScheduleItem {
   id?: string;
@@ -36,12 +47,7 @@ export default function EventSchedule({ schedule }: EventScheduleProps) {
   // Group by day
   const groupedItems = items.reduce((acc, item) => {
     const date = new Date(item.startTime);
-    const dateKey = date.toLocaleDateString(undefined, { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    const dateKey = scheduleDateFormatter.format(date);
     
     if (!acc[dateKey]) {
       acc[dateKey] = [];
@@ -51,10 +57,7 @@ export default function EventSchedule({ schedule }: EventScheduleProps) {
   }, {} as Record<string, ScheduleItem[]>);
 
   const formatTime = (isoString: string) => {
-    return new Date(isoString).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return scheduleTimeFormatter.format(new Date(isoString));
   };
 
   return (
@@ -117,13 +120,22 @@ export default function EventSchedule({ schedule }: EventScheduleProps) {
                           {item.title}
                         </Typography>
                         {item.location && (
-                          <Chip 
-                            icon={<LocationOn fontSize="small" />} 
-                            label={item.location} 
-                            size="small" 
-                            variant="outlined" 
-                            color="default"
-                          />
+                          <Box
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              px: 1,
+                              py: 0.5,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              borderRadius: 999,
+                              color: "text.secondary",
+                            }}
+                          >
+                            <LocationOn fontSize="small" />
+                            <Typography variant="caption">{item.location}</Typography>
+                          </Box>
                         )}
                       </Box>
                       

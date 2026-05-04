@@ -3,10 +3,46 @@ import { Alert, Box, Typography } from "@mui/material";
 import { checkAdminAuth } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma/prisma";
 import AdminTicketsOverview from "@/components/admin/tickets/AdminTicketsOverview";
+import type { AdminTicket } from "@/components/admin/tickets/AdminTicketsOverview";
+import type { Prisma } from "@/generated/prisma";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+const adminTicketInclude = {
+  event: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  registration: {
+    select: {
+      id: true,
+      ticketId: true,
+    },
+  },
+} satisfies Prisma.SupportTicketInclude;
 
-export default async function AdminTicketsPage() {
+type AdminTicketRow = Prisma.SupportTicketGetPayload<{
+  include: typeof adminTicketInclude;
+}>;
+
+export default function AdminTicketsPage() {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <AdminTicketsPageContent />
+    </Suspense>
+  );
+}
+
+async function AdminTicketsPageContent() {
   const authResult = await checkAdminAuth();
 
   if (!authResult.authorized) {
@@ -34,33 +70,13 @@ export default async function AdminTicketsPage() {
         ],
       },
     },
-    include: {
-      event: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      registration: {
-        select: {
-          id: true,
-          ticketId: true,
-        },
-      },
-    },
+    include: adminTicketInclude,
     orderBy: {
       updatedAt: "desc",
     },
-  });
+  }) as AdminTicketRow[];
 
-  const serializedTickets = tickets.map((ticket) => ({
+  const serializedTickets: AdminTicket[] = tickets.map((ticket) => ({
     ...ticket,
     updatedAt: ticket.updatedAt.toISOString(),
   }));

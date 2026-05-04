@@ -1,27 +1,22 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-import parser from "@typescript-eslint/parser";
+import nextConfig from "eslint-config-next";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript", "plugin:@typescript-eslint/recommended"),
+/** @type {import("eslint").Linter.Config[]} */
+const config = [
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/public/**",
+      "**/src/generated/**",
+      "next-env.d.ts",
+    ],
+  },
+  ...nextConfig,
   {
     files: ["**/*.ts", "**/*.tsx"],
-    languageOptions: {
-      parser,
-      parserOptions: {
-        project: "./tsconfig.json",
-        tsconfigRootDir: __dirname,
-        sourceType: "module",
-      },
-    },
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", {
         argsIgnorePattern: "^_",
@@ -29,24 +24,8 @@ const eslintConfig = [
         caughtErrorsIgnorePattern: "^_",
         ignoreRestSiblings: true,
       }],
-      "@typescript-eslint/no-misused-promises": "error"
-    }
-  }
+    },
+  },
 ];
-
-const config = [{
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"]
-}, ...eslintConfig, {
-  ignores: [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/.next/**",
-    "**/out/**",
-    "**/build/**",
-    "**/coverage/**",
-    "**/public/**",
-    "**/src/generated/**"
-  ],
-}]
 
 export default config;

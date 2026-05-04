@@ -1,17 +1,19 @@
 import { auth } from "@/app/api/auth/auth";
 import { headers } from "next/headers";
+import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 
 /**
  * Get the current session in server components or API routes
  * This is a wrapper around better-auth's getSession API
  */
-export async function getSession() {
+export async function getSession(requestHeaders?: Headers) {
     try {
         const session = await auth.api.getSession({
-            headers: await headers()
+            headers: requestHeaders ?? await headers()
         });
         return session;
     } catch (error) {
+        rethrowIfExpectedPrerenderInterruption(error);
         console.error("Error getting session:", error);
         return null;
     }
