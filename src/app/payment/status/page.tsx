@@ -43,6 +43,7 @@ function PaymentStatusContent() {
 
   useEffect(() => {
     if (!paymentIntentId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- early-exit error state in effect
       setError("No payment information found.");
       setLoading(false);
       return;

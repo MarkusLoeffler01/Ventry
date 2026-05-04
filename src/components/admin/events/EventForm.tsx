@@ -26,17 +26,17 @@ import {
 } from "@mui/material";
 import { Delete, Add, Save, CloudUpload, Error as ErrorIcon } from "@mui/icons-material";
 import { adminCreateEventSchema, type AdminCreateEventInput } from "@/types/schemas/event/admin";
-import { type Product as EventProduct } from "@/types/schemas/event/base";
+import type { Product as EventProduct } from "@/types/schemas/event/base";
 import ImageCropper from "@/components/profile/ImageCropper";
 import Image from "next/image";
-import ScheduleCalendarBuilder from "./ScheduleCalendarBuilder";
+import ScheduleCalendarBuilder, { type ScheduleItem } from "./ScheduleCalendarBuilder";
 import { SortableProductItem } from "./SortableProductItem";
 import {
   cloneHotelStayPolicy,
   createDefaultHotelStayPolicy,
   normalizeStayPolicy,
 } from "@/lib/events/accommodation";
-import { type SerializedHotelStayPolicy, type SerializedProduct } from "@/types/event";
+import type { SerializedHotelStayPolicy, SerializedProduct } from "@/types/event";
 
 export interface InitialData {
   id?: number;
@@ -82,6 +82,8 @@ type HotelDraft = {
   roomTypes: ProductDraft[];
   stayPolicy: SerializedHotelStayPolicy;
 };
+
+type CustomFieldDraft = NonNullable<AdminCreateEventInput["customFields"]>[number];
 
 function createDraftId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -146,6 +148,30 @@ function toSerializedProducts(products: EventFormProduct[]): SerializedProduct[]
   }));
 }
 
+function normalizeCustomFields(
+  customFields: unknown[] | undefined,
+): AdminCreateEventInput["customFields"] {
+  if (!Array.isArray(customFields)) {
+    return [];
+  }
+
+  return customFields.map((field, index) => {
+    const candidate = (field && typeof field === "object" ? field : {}) as Partial<CustomFieldDraft>;
+    const type = candidate.type;
+
+    return {
+      id: candidate.id || createDraftId(`custom-field-${index + 1}`),
+      label: candidate.label || "",
+      type:
+        type === "text" || type === "number" || type === "boolean" || type === "select"
+          ? type
+          : "text",
+      required: Boolean(candidate.required),
+      options: Array.isArray(candidate.options) ? candidate.options.filter(option => typeof option === "string") : [],
+    };
+  });
+}
+
 export default function EventForm({ initialData, onSubmit, loading: externalLoading }: EventFormProps) {
   const [tabValue, setTabValue] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +224,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       },
       stayPolicy: normalizedStayPolicy,
       products: initialProducts,
-      customFields: (initialData?.customFields as AdminCreateEventInput["customFields"]) || [],
+      customFields: normalizeCustomFields(initialData?.customFields),
       schedule: (initialData?.schedule as AdminCreateEventInput["schedule"]) || [],
     },
   });
@@ -1100,6 +1126,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                       src={watchImageUrl}
                       alt="Preview"
                       fill
+                      sizes="(min-width: 900px) 320px, 100vw"
                       style={{ objectFit: "cover", borderRadius: 8 }}
                     />
                   </Box>
@@ -1429,94 +1456,109 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                 </Button>
               </Stack>
 
-              {customFields.map((field, index) => (
-                <Paper key={field.id} variant="outlined" sx={{ p: 2, position: "relative" }}>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    sx={{ position: "absolute", top: 8, right: 8 }}
-                    onClick={() => removeCustomField(index)}
-                  >
-                    <Delete />
-                  </IconButton>
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 5 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Question Label"
-                        {...register(`customFields.${index}.label` as const)}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        select
-                        label="Input Type"
-                        {...register(`customFields.${index}.type` as const)}
-                      >
-                        <MenuItem value="text">Text</MenuItem>
-                        <MenuItem value="number">Number</MenuItem>
-                        <MenuItem value="boolean">Checkbox</MenuItem>
-                        <MenuItem value="select">Dropdown</MenuItem>
-                      </TextField>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <FormControlLabel
-                        control={<Switch {...register(`customFields.${index}.required` as const)} />}
-                        label="Required"
-                      />
-                    </Grid>
+              {customFields.map((field, index) => {
+                const customFieldType = watch(`customFields.${index}.type`) ?? "text";
 
-                    {watch(`customFields.${index}.type`) === "select" && (
-                      <Grid size={{ xs: 12 }}>
-                        <Box sx={{ mt: 1, pl: 2, borderLeft: "2px solid", borderColor: "primary.light" }}>
-                          <Typography variant="subtitle2" gutterBottom>Dropdown Options</Typography>
-                          <Stack spacing={1}>
-                            {(watch(`customFields.${index}.options`) || []).map((option: string, optionIndex: number) => (
-                              <Stack key={optionIndex} direction="row" spacing={1} alignItems="center">
-                                <TextField
-                                  size="small"
-                                  placeholder={`Option ${optionIndex + 1}`}
-                                  value={option}
-                                  onChange={event => {
-                                    const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
-                                    currentOptions[optionIndex] = event.target.value;
-                                    setValue(`customFields.${index}.options`, currentOptions);
-                                  }}
-                                />
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => {
-                                    const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
-                                    currentOptions.splice(optionIndex, 1);
-                                    setValue(`customFields.${index}.options`, currentOptions);
-                                  }}
-                                >
-                                  <Delete fontSize="small" />
-                                </IconButton>
-                              </Stack>
-                            ))}
-                            <Button
-                              size="small"
-                              startIcon={<Add />}
-                              onClick={() => {
-                                const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
-                                setValue(`customFields.${index}.options`, [...currentOptions, ""]);
-                              }}
-                              sx={{ alignSelf: "flex-start" }}
-                            >
-                              Add Option
-                            </Button>
-                          </Stack>
-                        </Box>
+                return (
+                  <Paper key={field.id} variant="outlined" sx={{ p: 2, position: "relative" }}>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      sx={{ position: "absolute", top: 8, right: 8 }}
+                      onClick={() => removeCustomField(index)}
+                    >
+                      <Delete />
+                    </IconButton>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12, md: 5 }}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Question Label"
+                          {...register(`customFields.${index}.label` as const)}
+                        />
                       </Grid>
-                    )}
-                  </Grid>
-                </Paper>
-              ))}
+                      <Grid size={{ xs: 12, md: 3 }}>
+                        <Controller
+                          control={control}
+                          name={`customFields.${index}.type` as const}
+                          render={({ field: controllerField }) => (
+                            <TextField
+                              fullWidth
+                              size="small"
+                              select
+                              label="Input Type"
+                              value={controllerField.value ?? "text"}
+                              onChange={controllerField.onChange}
+                              onBlur={controllerField.onBlur}
+                              inputRef={controllerField.ref}
+                              name={controllerField.name}
+                            >
+                              <MenuItem value="text">Text</MenuItem>
+                              <MenuItem value="number">Number</MenuItem>
+                              <MenuItem value="boolean">Checkbox</MenuItem>
+                              <MenuItem value="select">Dropdown</MenuItem>
+                            </TextField>
+                          )}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 3 }}>
+                        <FormControlLabel
+                          control={<Switch {...register(`customFields.${index}.required` as const)} />}
+                          label="Required"
+                        />
+                      </Grid>
+
+                      {customFieldType === "select" && (
+                        <Grid size={{ xs: 12 }}>
+                          <Box sx={{ mt: 1, pl: 2, borderLeft: "2px solid", borderColor: "primary.light" }}>
+                            <Typography variant="subtitle2" gutterBottom>Dropdown Options</Typography>
+                            <Stack spacing={1}>
+                              {(watch(`customFields.${index}.options`) || []).map((option: string, optionIndex: number) => (
+                                <Stack key={`${option || "option"}-${optionIndex}`} direction="row" spacing={1} alignItems="center">
+                                  <TextField
+                                    size="small"
+                                    placeholder={`Option ${optionIndex + 1}`}
+                                    value={option}
+                                    onChange={event => {
+                                      // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
+                                      const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
+                                      currentOptions[optionIndex] = event.target.value;
+                                      setValue(`customFields.${index}.options`, currentOptions);
+                                    }}
+                                  />
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => {
+                                      const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
+                                      currentOptions.splice(optionIndex, 1);
+                                      setValue(`customFields.${index}.options`, currentOptions);
+                                    }}
+                                  >
+                                    <Delete fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+                              ))}
+                              <Button
+                                size="small"
+                                startIcon={<Add />}
+                                onClick={() => {
+                                  const currentOptions = [...(watch(`customFields.${index}.options`) || [])];
+                                  setValue(`customFields.${index}.options`, [...currentOptions, ""]);
+                                }}
+                                sx={{ alignSelf: "flex-start" }}
+                              >
+                                Add Option
+                              </Button>
+                            </Stack>
+                          </Box>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Paper>
+                );
+              })}
 
               {customFields.length === 0 && (
                 <Alert severity="info">No custom questions added yet.</Alert>
@@ -1536,7 +1578,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                 name="schedule"
                 render={({ field }) => (
                   <ScheduleCalendarBuilder
-                    items={field.value as any}
+                    items={(field.value ?? []) as ScheduleItem[]}
                     onChange={newItems => field.onChange(newItems)}
                     eventStartDate={watchStartDate as Date | undefined}
                   />

@@ -3,8 +3,8 @@ import { Box, Container, Typography } from "@mui/material";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import UserTicketOverview from "@/components/tickets/UserTicketOverview";
-
-export const dynamic = "force-dynamic";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
 interface SerializedTicketItem {
   id: string;
@@ -24,7 +24,15 @@ interface SerializedEventGroup {
   tickets: SerializedTicketItem[];
 }
 
-export default async function TicketsPage() {
+export default function TicketsPage() {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <TicketsPageContent />
+    </Suspense>
+  );
+}
+
+async function TicketsPageContent() {
   const session = await getSession();
   if (!session?.user?.id) {
     redirect("/login?callbackUrl=/tickets");

@@ -7,11 +7,27 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/prisma";
 import { Suspense } from "react";
-import CircularProgress from "@mui/material/CircularProgress";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function LoginPage({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <LoginPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
 
-export default async function LoginPage() {
+async function LoginPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
+
   // Check if user is already logged in and has pending links
   const session = await getSession();
   
@@ -28,7 +44,10 @@ export default async function LoginPage() {
     
     if (pendingLinks.length > 0) {
       // Redirect to link-account page
-      redirect("/link-account");
+      const redirectUrl = callbackUrl 
+        ? `/link-account?callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/link-account";
+      redirect(redirectUrl);
     }
   }
 
@@ -57,9 +76,7 @@ export default async function LoginPage() {
             Login
           </Typography>
           
-          <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}>
-            <LoginPageClient />
-          </Suspense>
+          <LoginPageClient />
         </Paper>
       </Box>
     </Container>

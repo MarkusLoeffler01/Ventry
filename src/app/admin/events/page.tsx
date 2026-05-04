@@ -3,11 +3,19 @@ import EventList from "@/components/admin/events/EventList";
 import { checkAdminAuth } from "@/lib/auth/admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect } from "next/navigation";
-import { type SerializedEvent } from "@/types/event";
+import type { SerializedEvent } from "@/types/event";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function AdminEventsPage() {
+    return (
+        <Suspense fallback={<PageLoadingState />}>
+            <AdminEventsPageContent />
+        </Suspense>
+    );
+}
 
-export default async function AdminEventsPage() {
+async function AdminEventsPageContent() {
     const authResult = await checkAdminAuth();
     
     if (!authResult.authorized) {

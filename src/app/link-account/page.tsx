@@ -2,15 +2,35 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/prisma";
 import LinkAccountClient from "@/components/auth/LinkAccountClient";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export const dynamic = "force-dynamic";
+export default function LinkAccountPage({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <LinkAccountPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
 
-export default async function LinkAccountPage() {
+async function LinkAccountPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
   // Require authentication
   const session = await getSession();
   
   if (!session?.user) {
-    redirect("/login?callbackUrl=/link-account");
+    const loginUrl = callbackUrl 
+      ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+      : "/login?callbackUrl=/link-account";
+    redirect(loginUrl);
   }
 
   // Get pending link requests
@@ -56,6 +76,7 @@ export default async function LinkAccountPage() {
       currentProviders={userAccounts.map(a => a.providerId)}
       hasPassword={hasPassword}
       hasOAuthProviders={hasOAuthProviders}
+      callbackUrl={callbackUrl}
     />
   );
 }

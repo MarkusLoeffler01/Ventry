@@ -152,6 +152,7 @@ export default function RegistrationWizard({
   const selectedProduct = event.products.find(p => p.id === selectedProductId);
   const newlySelectedAddonIds = selectedAddonIds.filter(id => !lockedAddonIds.includes(id));
 
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional derived state reset when hotel selection changes */
   useEffect(() => {
     if (!selectedHotel) {
       setEarlyArrival(false);
@@ -167,6 +168,7 @@ export default function RegistrationWizard({
       setLateDeparture(false);
     }
   }, [selectedHotel]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const baseSteps = ['Choose Badge'];
   const hasAddons = event.products.some(p => p.type === 'ADDON');

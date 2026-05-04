@@ -4,7 +4,9 @@ import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import { Container, Box, Typography } from "@mui/material";
 import RegistrationWizard from "./RegistrationWizard";
-import { type SerializedProduct, type SerializedStayPolicy } from "@/types/event";
+import type { SerializedProduct, SerializedStayPolicy } from "@/types/event";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
 interface SerializedEventForWizard {
   id: number;
@@ -16,14 +18,22 @@ interface SerializedEventForWizard {
   customFields: { id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }[];
 }
 
-export const dynamic = "force-dynamic";
-
-export default async function RegisterEventPage({
+export default function RegisterEventPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mode?: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <RegisterEventPageContent params={params} />
+    </Suspense>
+  );
+}
+
+async function RegisterEventPageContent({
+  params,
+}: {
+  params: Promise<{ id: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) {
@@ -32,8 +42,7 @@ export default async function RegisterEventPage({
   }
 
   const id = Number((await params).id);
-  if (isNaN(id)) notFound();
-  const { mode } = await searchParams;
+  if (Number.isNaN(id)) notFound();
 
   const event = await prisma.event.findUnique({
     where: { id, status: 'PUBLISHED' },

@@ -32,6 +32,7 @@ export default function LoginPageClient() {
   const [linkingError, setLinkingError] = React.useState("");
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration guard pattern
     setMounted(true);
   }, []);
 

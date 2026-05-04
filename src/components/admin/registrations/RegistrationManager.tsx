@@ -233,6 +233,7 @@ export default function RegistrationManager() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching in effect is intentional
     void fetchRegistrations();
   }, [fetchRegistrations]);
 

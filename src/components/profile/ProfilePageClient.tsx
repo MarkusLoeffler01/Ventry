@@ -122,6 +122,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('linked') === 'success') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL param check must run in effect
       setLinkSuccess(true);
       // Clean URL
       window.history.replaceState({}, '', '/profile');
@@ -302,7 +303,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               InputLabelProps={{ shrink: true }}
             />
 
-            {formData.dateOfBirth && !isNaN(new Date(formData.dateOfBirth).getTime()) && (
+            {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Chip 
                   label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
