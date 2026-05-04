@@ -1,10 +1,13 @@
-import { PrismaClient } from "./src/generated/prisma";
+import "dotenv/config";
+import { createPrismaClient } from "./src/lib/prisma/client";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prismaExportDir = process.env.PRISMA_EXPORT_DIR || path.join(__dirname, "exports");
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log("Exporting data...");

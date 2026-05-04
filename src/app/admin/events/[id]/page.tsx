@@ -3,9 +3,21 @@ import { checkAdminAuth } from "@/lib/auth/admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import EditEventClient from "./EditEventClient";
+import type { Prisma } from "@/generated/prisma";
 import type { SerializedEvent, SerializedProduct } from "@/types/event";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
+
+const editEventInclude = {
+  location: true,
+  products: {
+    orderBy: { createdAt: "asc" as const },
+  },
+} satisfies Prisma.EventInclude;
+
+type EditEventData = Prisma.EventGetPayload<{
+  include: typeof editEventInclude;
+}>;
 
 export default function EditEventPage({
   params,
@@ -32,14 +44,9 @@ async function EditEventPageContent({
   const id = Number((await params).id);
   if (isNaN(id)) notFound();
 
-  const event = await prisma.event.findUnique({
+  const event: EditEventData | null = await prisma.event.findUnique({
     where: { id },
-    include: {
-      location: true,
-      products: {
-        orderBy: { createdAt: "asc" }
-      },
-    },
+    include: editEventInclude,
   });
 
   if (!event) notFound();

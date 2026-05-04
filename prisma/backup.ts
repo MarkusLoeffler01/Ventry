@@ -1,8 +1,9 @@
-import { PrismaClient } from "../src/generated/prisma";
+import "dotenv/config";
+import { createPrismaClient } from "../src/lib/prisma/client";
 import fs from "fs";
 import path from "path";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
