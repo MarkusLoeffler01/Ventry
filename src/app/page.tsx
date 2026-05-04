@@ -1,8 +1,9 @@
 import EventCard from "@/components/events/EventCard";
 import { Container, Grid, Typography, Box } from "@mui/material";
-import { cacheLife } from "next/cache";
 import { prisma } from "@/lib/prisma/prisma";
 import type { Prisma } from "@/generated/prisma";
+import { Suspense } from "react";
+import { connection } from "next/server";
 
 interface SerializedEventForCard {
   id: number;
@@ -30,9 +31,7 @@ type HomeEventRow = Prisma.EventGetPayload<{
 }>;
 
 async function getHomeEvents(): Promise<SerializedEventForCard[]> {
-  "use cache";
-
-  cacheLife("minutes");
+  await connection();
 
   const events = await prisma.event.findMany({
     where: { status: "PUBLISHED" },
@@ -55,9 +54,37 @@ async function getHomeEvents(): Promise<SerializedEventForCard[]> {
   }));
 }
 
-export default async function Home() {
+async function HomeEventGrid() {
   const serializedEvents = await getHomeEvents();
 
+  return serializedEvents.length > 0 ? (
+    <Grid container spacing={4}>
+      {serializedEvents.map((event, index) => (
+        <Grid key={event.id} size={{ xs: 12, sm: 6, md: 4 }}>
+          <EventCard event={event} priority={index === 0} />
+        </Grid>
+      ))}
+    </Grid>
+  ) : (
+    <Box sx={{ textAlign: 'center', py: 10 }}>
+      <Typography variant="h6" color="text.secondary">
+        No upcoming events found. Check back soon!
+      </Typography>
+    </Box>
+  );
+}
+
+function HomeEventsFallback() {
+  return (
+    <Box sx={{ textAlign: 'center', py: 10 }}>
+      <Typography variant="h6" color="text.secondary">
+        Loading events...
+      </Typography>
+    </Box>
+  );
+}
+
+export default function Home() {
   return (
     <Container maxWidth="lg" sx={{ py: 8 }}>
       <Box sx={{ mb: 6, textAlign: 'center' }}>
@@ -69,21 +96,9 @@ export default async function Home() {
         </Typography>
       </Box>
 
-      {serializedEvents.length > 0 ? (
-        <Grid container spacing={4}>
-          {serializedEvents.map((event, index) => (
-            <Grid key={event.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <EventCard event={event} priority={index === 0} />
-            </Grid>
-          ))}
-        </Grid>
-      ) : (
-        <Box sx={{ textAlign: 'center', py: 10 }}>
-          <Typography variant="h6" color="text.secondary">
-            No upcoming events found. Check back soon!
-          </Typography>
-        </Box>
-      )}
+      <Suspense fallback={<HomeEventsFallback />}>
+        <HomeEventGrid />
+      </Suspense>
     </Container>
   );
 }

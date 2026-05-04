@@ -1,4 +1,3 @@
-import { AddPasskeyButton } from "@/components/auth/AddPasskey";
 import StripeCheckout from "@/components/stripe/checkout";
 import { prisma } from "@/lib/prisma/prisma";
 import { Suspense } from "react";
@@ -33,9 +32,6 @@ async function DummyPageContent({
 
     return (
         <div>
-            <h1>Add Passkey</h1>
-            <AddPasskeyButton />
-
             <h1>Stripe Checkout</h1>
             <StripeCheckout
                 canceled={params?.canceled === "true"}
