@@ -47,6 +47,19 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
       setError(null);
       const { confirmPassword: _, ...payload } = data;
 
+      // Pre-check: better-auth silently returns 200 for duplicate emails when
+      // requireEmailVerification is enabled (anti-enumeration). Check first.
+      const checkRes = await fetch("/api/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: payload.email }),
+      });
+      const { exists } = await checkRes.json() as { exists: boolean };
+      if (exists) {
+        setError("An account with this email address already exists. Please sign in or reset your password.");
+        return;
+      }
+
       const { error } = await authClient.signUp.email({
         email: payload.email,
         name: payload.username,
