@@ -62,7 +62,7 @@ async function HomeEventGrid() {
     <Grid container spacing={4}>
       {serializedEvents.map((event, index) => (
         <Grid key={event.id} size={{ xs: 12, sm: 6, md: 4 }}>
-          <EventCard event={event} priority={index === 0} />
+          <EventCard event={event} priority={index < 3} />
         </Grid>
       ))}
     </Grid>
