@@ -10,6 +10,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Link from "next/link";
 import { useSession } from "@/lib/auth/client";
+import { usePathname } from "next/navigation";
 
 /**
  * AppHeader – persistent sticky navigation bar.
@@ -23,6 +24,8 @@ export default function AppHeader() {
     const { data: session } = useSession();
     const user = session?.user ?? null;
 
+    const pathname = usePathname();
+
     const [visible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
 
@@ -34,8 +37,12 @@ export default function AppHeader() {
         };
 
         window.addEventListener("scroll", handleScroll, { passive: true });
+
+        
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
+    
+    const isOnLoginOrLogout =  pathname === "/login" || pathname === "/logout"
 
     const initials = user?.name
         ? user.name
@@ -81,15 +88,15 @@ export default function AppHeader() {
                 </Link>
 
                 {/* Right side */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Button
+                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    {!isOnLoginOrLogout && <Button
                         component={Link}
                         href={user ? "/logout" : "/login"}
                         variant="outlined"
                         size="small"
                     >
                         {user ? "Logout" : "Login"}
-                    </Button>
+                    </Button>}
 
                     {user ? (
                         <Link href="/profile" style={{ textDecoration: "none" }}>
