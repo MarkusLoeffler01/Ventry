@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/prisma";
 import type { Prisma } from "@/generated/prisma";
 import { Suspense } from "react";
 import { connection } from "next/server";
+import StatusSnackbar from "@/components/common/StatusSnackbar";
 
 interface SerializedEventForCard {
   id: number;
@@ -87,6 +88,9 @@ function HomeEventsFallback() {
 export default function Home() {
   return (
     <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Suspense fallback={null}>
+        <StatusSnackbar />
+      </Suspense>
       <Box sx={{ mb: 6, textAlign: 'center' }}>
         <Typography variant="h2" component="h1" gutterBottom fontWeight="bold">
           Upcoming Events
