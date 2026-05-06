@@ -1,8 +1,9 @@
 "use client";
 
-import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, AppBar, Typography, Divider } from "@mui/material";
-import { Event, Dashboard, People, Settings, Home, SupportAgent } from "@mui/icons-material";
+import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Divider } from "@mui/material";
+import { Event, Dashboard, People, Settings, Home, SupportAgent, Payments } from "@mui/icons-material";
 import Link from "next/link";
+import AppHeader from "@/components/common/AppHeader/AppHeader";
 
 const drawerWidth = 240;
 
@@ -13,13 +14,6 @@ export default function AdminLayout({
 }) {
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar>
-          <Typography variant="h6" noWrap component="div">
-            Ventry Admin Dashboard
-          </Typography>
-        </Toolbar>
-      </AppBar>
       <Drawer
         variant="permanent"
         sx={{
@@ -28,6 +22,7 @@ export default function AdminLayout({
           "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: 'border-box' },
         }}
       >
+        <AppHeader />
         <Toolbar />
         <Box sx={{ overflow: 'auto' }}>
           <List>
@@ -53,6 +48,12 @@ export default function AdminLayout({
               <ListItemButton component={Link} href="/admin/tickets">
                 <ListItemIcon><SupportAgent /></ListItemIcon>
                 <ListItemText primary="Tickets" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={Link} href="/admin/billing">
+                <ListItemIcon><Payments /></ListItemIcon>
+                <ListItemText primary="Billing" />
               </ListItemButton>
             </ListItem>
           </List>
