@@ -42,7 +42,8 @@ export default function AppHeader() {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
     
-    const isOnLoginOrLogout =  pathname === "/login" || pathname === "/logout"
+    const isOnLoginOrLogout = pathname === "/login" || pathname === "/logout";
+    const isInAdminArea = pathname.startsWith("/admin");
 
     const initials = user?.name
         ? user.name
@@ -71,21 +72,37 @@ export default function AppHeader() {
         >
             <Toolbar sx={{ justifyContent: "space-between" }}>
                 {/* Brand */}
-                <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
-                    <Typography
-                        variant="h5"
-                        component="span"
-                        fontWeight={700}
-                        letterSpacing={2}
-                        sx={{
-                            userSelect: "none",
-                            "&:hover": { opacity: 0.8 },
-                            transition: "opacity 0.2s",
-                        }}
-                    >
-                        Ventry
-                    </Typography>
-                </Link>
+                
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+
+                    <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
+                        <Typography
+                            variant="h5"
+                            component="span"
+                            fontWeight={700}
+                            letterSpacing={2}
+                            sx={{
+                                userSelect: "none",
+                                "&:hover": { opacity: 0.8 },
+                                transition: "opacity 0.2s",
+                            }}
+                            >
+                            Ventry
+                        </Typography>
+                    </Link>
+
+                    {user?.isAdmin && (
+                        <Typography
+                            component={Link}
+                            href={isInAdminArea ? "/" : "/admin"}
+                            variant="h6"
+                            sx={{ color: "#f50057", fontWeight: "bold", textDecoration: "none", "&:hover": { opacity: 0.8 }, transition: "opacity 0.2s", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }}
+                        >
+                            {isInAdminArea ? "← Leave admin area" : "Admin"}
+                        </Typography>
+                    )}
+                </Box>
+                
 
                 {/* Right side */}
                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -97,6 +114,8 @@ export default function AppHeader() {
                     >
                         {user ? "Logout" : "Login"}
                     </Button>}
+
+                    
 
                     {user ? (
                         <Link href="/profile" style={{ textDecoration: "none" }}>

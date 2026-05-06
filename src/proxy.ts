@@ -6,6 +6,8 @@ type SubMW = (req: NextRequest, res: NextResponse) => Promise<undefined | NextRe
 const routes: Array<{ pattern: URLPattern, mw: SubMW }> = [
     // Removed auth middleware for /api/user routes since they use NextAuth internally
     { pattern: new URLPattern({ pathname: "/api/admin/:path*" }), mw: mws.admin.middleware },
+    { pattern: new URLPattern({ pathname: "/admin" }), mw: mws.admin.middleware },
+    { pattern: new URLPattern({ pathname: "/admin/:path*" }), mw: mws.admin.middleware },
 ];
 
 export async function proxy(req: NextRequest) {
@@ -42,6 +44,8 @@ export async function proxy(req: NextRequest) {
 export const config = {
     matcher: [
         "/api/admin/:path*",
+        "/admin",
+        "/admin/:path*",
         // Match all API routes (we filter out auth and user routes in the middleware function)
         "/api/:path*"
     ]
