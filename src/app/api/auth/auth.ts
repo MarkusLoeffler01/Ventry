@@ -45,8 +45,16 @@ export const auth = betterAuth({
             }
         })
     ],
-    session: {
-
+    session: {},
+    user: {
+        additionalFields: {
+            isAdmin: {
+                type: "boolean",
+                required: false,
+                defaultValue: false,
+                input: false, // not settable by users
+            }
+        }
     },
     account: {
         accountLinking: {
@@ -55,7 +63,7 @@ export const auth = betterAuth({
         }
     },
     emailVerification: {
-        sendOnSignUp: false, // TODO: Set to true
+        sendOnSignUp: true, // TODO: Set to true
         sendOnSignIn: false,
         expiresIn: 24 * 60 * 60, // 24 hours (correct property name)
 
@@ -63,11 +71,16 @@ export const auth = betterAuth({
         autoSignInAfterVerification: true,
 
         sendVerificationEmail: async ({ user, url }) => {
+            // Rewrite the callbackURL so users land on /?status=email_verified after verification
+            const verificationUrl = url.replace(
+                /callbackURL=[^&]*/,
+                `callbackURL=${encodeURIComponent("/?status=email_verified")}`
+            );
             // Send email verification using proper template
             try {
                 const verificationHTML = await renderComponentToHTML(EmailVerificationMail, {
                     userName: user.name,
-                    verificationUrl: url,
+                    verificationUrl,
                     expiryHours: 24
                 });
 
@@ -79,9 +92,11 @@ export const auth = betterAuth({
                 
                 if (!success) {
                     console.error("Failed to send verification email:", error);
+                    throw new Error(`Failed to send verification email: ${error}`);
                 }
             } catch (err) {
                 console.error("Error sending verification email:", err);
+                throw err; // Rethrow to let better-auth handle retries if needed
             }
         }
     },

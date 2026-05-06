@@ -15,19 +15,25 @@ export const mailTransport = nodemailer.createTransport({
 
 
 export async function sendMail(to: string, subject: string, html: string) {
-    const sentMail = await mailTransport.sendMail({
-        from: process.env.SMTP_FROM,
-        to,
-        subject,
-        html
-    });
+    try {
+        console.log(`📮 SMTP send attempt -> host=${process.env.SMTP_HOST}:${process.env.SMTP_PORT} to=${to} subject=${subject}`);
+        const sentMail = await mailTransport.sendMail({
+            from: process.env.SMTP_FROM,
+            to,
+            subject,
+            html
+        });
 
-    if(sentMail.messageId) console.log(`Mail sent to ${to}: ${sentMail.messageId}`);
+        if (sentMail.messageId) console.log(`Mail sent to ${to}: ${sentMail.messageId}`);
 
-    sentMail.rejected.forEach(r => {
-        console.error(`Mail to ${r} was rejected`);
-    });
+        sentMail.rejected.forEach(r => {
+            console.error(`Mail to ${r} was rejected`);
+        });
 
-    const error = sentMail.rejected.find(r => r === to);
-    return { success: !error, error };
+        const error = sentMail.rejected.find(r => r === to);
+        return { success: !error, error };
+    } catch (err) {
+        console.error(`Mail transport error sending to ${to}:`, err);
+        return { success: false, error: err };
+    }
 }

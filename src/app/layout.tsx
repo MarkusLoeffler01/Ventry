@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { Providers } from "./providers";
+import AppHeader from "@/components/common/AppHeader/AppHeader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +35,9 @@ export default function RootLayout({
         <AppRouterCacheProvider>
           <Suspense fallback={null}>
             <Providers>
+              <AppHeader />
+              {/* Spacer so page content is never hidden under the fixed AppBar */}
+              <div style={{ height: 64 }} />
               {children}
             </Providers>
           </Suspense>
