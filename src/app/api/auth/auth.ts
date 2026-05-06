@@ -45,8 +45,16 @@ export const auth = betterAuth({
             }
         })
     ],
-    session: {
-
+    session: {},
+    user: {
+        additionalFields: {
+            isAdmin: {
+                type: "boolean",
+                required: false,
+                defaultValue: false,
+                input: false, // not settable by users
+            }
+        }
     },
     account: {
         accountLinking: {
