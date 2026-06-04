@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Create board management token
         id: board-token
@@ -31,7 +31,6 @@ jobs:
           app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
           private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
           owner: MarkusLoeffler01
-          repositories: Ventry
 
       - name: Collect linked issues
         id: issues

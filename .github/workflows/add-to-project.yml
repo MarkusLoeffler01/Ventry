@@ -17,7 +17,6 @@ jobs:
           app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
           private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
           owner: MarkusLoeffler01
-          repositories: Ventry
 
       - uses: actions/add-to-project@v1.0.2
         with:
