@@ -7,32 +7,142 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   release:
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      - name: Create release automation token
+        id: release-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
+          private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
+          owner: Ventry-io
+
       - uses: actions/checkout@v4
         with:
+          token: ${{ steps.release-token.outputs.token }}
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: main
 
       - name: Fetch tags
         run: git fetch origin --tags --prune
 
+      - name: Check whether merge commit is already released
+        id: existing-release
+        env:
+          MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          existing_tag="$(git tag --contains "$MERGE_COMMIT_SHA" --list 'v[0-9]*' --sort=-v:refname | head -n 1)"
+          echo "tag=$existing_tag" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$existing_tag" ]; then
+            echo "Merge commit $MERGE_COMMIT_SHA is already contained in $existing_tag."
+          fi
+
       - name: Generate semantic release notes
+        if: steps.existing-release.outputs.tag == ''
         id: release
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ steps.release-token.outputs.token }}
           RELEASE_RANGE: ${{ github.event.pull_request.merge_commit_sha }}^1..${{ github.event.pull_request.merge_commit_sha }}
           RELEASE_NOTES_FILE: release-notes.md
         run: node .github/scripts/generate-release-notes.mjs
 
-      - name: Create GitHub release
+      - name: Bump package metadata
+        if: steps.existing-release.outputs.tag == '' && steps.release.outputs.has_release == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: node .github/scripts/set-package-version.mjs "$VERSION"
+
+      - name: Commit version bump to main
+        if: steps.existing-release.outputs.tag == '' && steps.release.outputs.has_release == 'true'
+        id: version-bump
+        env:
           TAG_NAME: ${{ steps.release.outputs.tag_name }}
-          MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
-        run: gh release create "$TAG_NAME" --target "$MERGE_COMMIT_SHA" --title "$TAG_NAME" --notes-file release-notes.md
+        run: |
+          git config user.name "ventry-gh-actions-board-management[bot]"
+          git config user.email "ventry-gh-actions-board-management[bot]@users.noreply.github.com"
+          git config commit.gpgsign false
+
+          git add package.json package-lock.json
+
+          if git diff --cached --quiet; then
+            echo "No package metadata changes were needed."
+          else
+            git commit -m "chore(release): $TAG_NAME"
+            git push origin HEAD:main
+          fi
+
+          release_sha="$(git rev-parse HEAD)"
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        if: steps.existing-release.outputs.tag == '' && steps.release.outputs.has_release == 'true'
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          RELEASE_SHA: ${{ steps.version-bump.outputs.release_sha }}
+        run: |
+          existing_sha="$(git rev-list -n 1 "$TAG_NAME" 2>/dev/null || true)"
+
+          if [ -n "$existing_sha" ] && [ "$existing_sha" != "$RELEASE_SHA" ]; then
+            echo "Tag $TAG_NAME already points at $existing_sha, not $RELEASE_SHA."
+            exit 1
+          fi
+
+          if [ -z "$existing_sha" ]; then
+            git tag "$TAG_NAME" "$RELEASE_SHA"
+            git push origin "refs/tags/$TAG_NAME"
+          else
+            echo "Tag $TAG_NAME already points at $RELEASE_SHA."
+          fi
+
+      - name: Create GitHub release
+        if: steps.existing-release.outputs.tag == '' && steps.release.outputs.has_release == 'true'
+        env:
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          RELEASE_SHA: ${{ steps.version-bump.outputs.release_sha }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" --target "$RELEASE_SHA" --title "$TAG_NAME" --notes-file release-notes.md
+          else
+            gh release create "$TAG_NAME" --target "$RELEASE_SHA" --title "$TAG_NAME" --notes-file release-notes.md
+          fi
+
+      - name: Create sync-back PR into dev
+        if: steps.existing-release.outputs.tag == '' && steps.release.outputs.has_release == 'true'
+        env:
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+          RELEASE_SHA: ${{ steps.version-bump.outputs.release_sha }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          sync_branch="release/sync-main-$TAG_NAME"
+          title="chore(release): sync $TAG_NAME back into dev"
+          body="Syncs the $TAG_NAME version bump from main back into dev so the next dev-to-main release PR does not conflict on package metadata."
+
+          git switch -C "$sync_branch" "$RELEASE_SHA"
+          git push --force-with-lease origin "HEAD:$sync_branch"
+
+          pr_number="$(gh api "repos/$REPOSITORY/pulls" \
+            --method GET \
+            -f state=open \
+            -f base=dev \
+            -f head="$REPOSITORY_OWNER:$sync_branch" \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" --repo "$REPOSITORY" --title "$title" --body "$body"
+            echo "Updated sync-back PR #$pr_number."
+          else
+            gh pr create --repo "$REPOSITORY" --base dev --head "$sync_branch" --title "$title" --body "$body"
+          fi
+
+      - name: Skip release
+        if: steps.existing-release.outputs.tag == '' && steps.release.outputs.has_release == 'false'
+        run: echo "No release-relevant commits were detected. Skipping version bump, tag, release, and sync-back PR."

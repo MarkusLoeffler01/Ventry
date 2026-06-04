@@ -49,5 +49,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+/backups/
 
-.github/instructions
+.github/instructions/
+# Snyk Security Extension - AI Rules (auto-generated)
+.github/instructions/snyk_rules.instructions.md
+.playwright-mcp
+/*.md
+/.*
+!/.github/
+!/.github/scripts/
+!/.github/scripts/*.mjs
+!/.github/workflows/
+!/.github/workflows/*.yml
+!/.github/pull_request_template.md

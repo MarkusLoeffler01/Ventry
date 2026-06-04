@@ -101,3 +101,19 @@ test("collects issue numbers from merged branch names as a fallback", () => {
   assert.match(notes, /^- #12 `/m);
   assert.match(notes, /^Closes #21$/m);
 });
+
+test("ignores release bump and sync-back commits", () => {
+  const cwd = createRepo();
+
+  emptyCommit(cwd, "chore(release): v1.2.4");
+  emptyCommit(cwd, "Merge pull request #99 from Ventry-io/release/sync-main-v1.2.4");
+
+  const { notes, output } = generate(cwd);
+
+  assert.match(output, /^version=1\.2\.3$/m);
+  assert.match(output, /^tag_name=v1\.2\.3$/m);
+  assert.match(output, /^release_type=none$/m);
+  assert.match(output, /^has_release=false$/m);
+  assert.match(notes, /^Has release: no$/m);
+  assert.doesNotMatch(notes, /^- #99 `/m);
+});

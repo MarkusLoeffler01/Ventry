@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "check": "biome check",
     "test": "vitest --run",
-    "test:release-notes": "node --test .github/scripts/*.test.mjs",
+    "test:release-notes": "node --test .github/scripts/*.node-test.mjs",
     "test:watch": "vitest --watch"
   },
   "dependencies": {
