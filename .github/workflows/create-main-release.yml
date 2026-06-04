@@ -1,0 +1,38 @@
+name: Create main release
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Fetch tags
+        run: git fetch origin --tags --prune
+
+      - name: Generate semantic release notes
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_RANGE: ${{ github.event.pull_request.merge_commit_sha }}^1..${{ github.event.pull_request.merge_commit_sha }}
+          RELEASE_NOTES_FILE: release-notes.md
+        run: node .github/scripts/generate-release-notes.mjs
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: gh release create "$TAG_NAME" --target "$MERGE_COMMIT_SHA" --title "$TAG_NAME" --notes-file release-notes.md

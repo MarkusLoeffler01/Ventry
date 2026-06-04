@@ -1,0 +1,65 @@
+name: Update main release PR description
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  update:
+    if: github.event.pull_request.head.ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: dev
+
+      - name: Fetch release branches
+        run: git fetch origin main dev --tags --prune
+
+      - name: Generate semantic release notes
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_RANGE: origin/main..origin/dev
+          RELEASE_NOTES_FILE: release-notes.md
+        run: node .github/scripts/generate-release-notes.mjs
+
+      - name: Update PR description
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { readFileSync } = require("node:fs");
+
+            const pr = context.payload.pull_request;
+            const startMarker = "<!-- ventry:release-description:start -->";
+            const endMarker = "<!-- ventry:release-description:end -->";
+            const generated = [
+              startMarker,
+              readFileSync("release-notes.md", "utf8").trim(),
+              endMarker,
+            ].join("\n");
+            const body = pr.body || "";
+            const markedRegex = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`, "m");
+            const nextBody = markedRegex.test(body)
+              ? body.replace(markedRegex, generated)
+              : `${generated}\n\n${body.trim()}`.trim();
+
+            if (nextBody === body) {
+              core.info("Release PR description is already up to date.");
+              return;
+            }
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body: nextBody,
+            });
+
+            core.info(`Updated release PR #${pr.number}.`);

@@ -1,0 +1,29 @@
+name: Move closed issues to Done
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  PROJECT_URL: https://github.com/users/MarkusLoeffler01/projects/4
+  PROJECT_STATUS_FIELD: Status
+  PROJECT_DONE_STATUS: Done
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Move issue to Done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN_PROJECT || github.token }}
+          ISSUE_NUMBERS: ${{ github.event.issue.number }}
+          PROJECT_URL: ${{ env.PROJECT_URL }}
+          PROJECT_STATUS_FIELD: ${{ env.PROJECT_STATUS_FIELD }}
+          PROJECT_STATUS_NAME: ${{ env.PROJECT_DONE_STATUS }}
+        run: node .github/scripts/move-project-issue-status.mjs
