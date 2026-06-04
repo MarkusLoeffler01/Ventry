@@ -1,3 +1,5 @@
+name: ventry-main
+
 services:
   ventry:
     image: harbor.m-loeffler.de/ventry/app:main
