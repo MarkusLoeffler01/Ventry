@@ -107,6 +107,7 @@ test("ignores release bump and sync-back commits", () => {
 
   emptyCommit(cwd, "chore(release): v1.2.4");
   emptyCommit(cwd, "Merge pull request #99 from Ventry-io/release/sync-main-v1.2.4");
+  emptyCommit(cwd, "Merge branch 'main' into dev");
 
   const { notes, output } = generate(cwd);
 
@@ -116,4 +117,5 @@ test("ignores release bump and sync-back commits", () => {
   assert.match(output, /^has_release=false$/m);
   assert.match(notes, /^Has release: no$/m);
   assert.doesNotMatch(notes, /^- #99 `/m);
+  assert.doesNotMatch(notes, /Merge branch 'main' into dev/);
 });
