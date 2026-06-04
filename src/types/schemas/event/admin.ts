@@ -75,10 +75,12 @@ const makeParticipationDecisionSchema = (policy: StayPolicy) =>
         }).strict()
     }).strict().superRefine((data, ctx) => {
         const d = data.decisions ?? {};
-        if(d.early && !policy.earlyArrival.enabled && d.early.status !== "NONE") {
+        const activePolicy = policy.hotels.find(hotel => hotel.isPrimary)?.stayPolicy || policy.hotels[0]?.stayPolicy;
+
+        if(d.early && !activePolicy?.earlyArrival.enabled && d.early.status !== "NONE") {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decisions", "early", "status"], message: "Early-arrival is disabled for this event" })
         }
-        if (d.late && !policy.lateDeparture.enabled && d.late.status !== "NONE") {
+        if (d.late && !activePolicy?.lateDeparture.enabled && d.late.status !== "NONE") {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decisions", "late", "status"], message: "Late-departure is disabled for this event" })
         }
 });

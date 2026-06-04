@@ -7,7 +7,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Box, Paper, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Grid } from '@mui/material';
 
-interface ScheduleItem {
+export interface ScheduleItem {
   id?: string;
   title: string;
   startTime: string;
