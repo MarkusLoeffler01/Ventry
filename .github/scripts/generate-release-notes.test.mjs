@@ -93,7 +93,7 @@ test("generates a minor release and groups conventional commits", () => {
 test("collects issue numbers from merged branch names as a fallback", () => {
   const cwd = createRepo();
 
-  emptyCommit(cwd, "Merge pull request #12 from MarkusLoeffler01/21-fix-names");
+  emptyCommit(cwd, "Merge pull request #12 from Ventry-io/21-fix-names");
 
   const { notes, output } = generate(cwd);
 

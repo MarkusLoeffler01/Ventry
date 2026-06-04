@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
 
 env:
-  PROJECT_URL: https://github.com/users/MarkusLoeffler01/projects/4
+  PROJECT_URL: https://github.com/orgs/Ventry-io/projects/1
   PROJECT_STATUS_FIELD: Status
   PROJECT_TESTING_STATUS: Testing
 
@@ -30,7 +30,7 @@ jobs:
         with:
           app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
           private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
-          owner: MarkusLoeffler01
+          owner: Ventry-io
 
       - name: Collect linked issues
         id: issues

@@ -1,4 +1,4 @@
-const projectUrl = process.env.PROJECT_URL || "https://github.com/users/MarkusLoeffler01/projects/4";
+const projectUrl = process.env.PROJECT_URL || "https://github.com/orgs/Ventry-io/projects/1";
 const statusFieldName = process.env.PROJECT_STATUS_FIELD || "Status";
 const statusName = process.env.PROJECT_STATUS_NAME;
 const token = process.env.GITHUB_TOKEN;
