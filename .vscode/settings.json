@@ -6,4 +6,7 @@
         "/src/app//layout.tsx": "(${dirname})/layout.${extname}",
         "/src/app//index.tsx": "(${dirname})/index.${extname}"
     },
+    "snyk.advanced.organization": "e57467f6-d08d-43a0-8da6-ed74d3483192",
+    "snyk.advanced.autoSelectOrganization": true,
+    "prisma.pinToPrisma6": true,
 }

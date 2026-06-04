@@ -3,8 +3,18 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
 import { Container, Box, Typography, Paper } from "@mui/material";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
-export default async function ProfilePage() {
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}
+
+async function ProfilePageContent() {
   const session = await getSession();
 
   if (!session?.user?.id) {
@@ -18,6 +28,7 @@ export default async function ProfilePage() {
       id: true,
       name: true,
       email: true,
+      country: true,
       profilePictures: {
         orderBy: [
           { order: 'asc' },

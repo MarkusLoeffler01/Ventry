@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import VerifyLinkingClient from "@/app/link-account/verify/VerifyLinkingClient";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
 interface VerifyLinkingPageProps {
   searchParams: Promise<{
@@ -9,7 +11,15 @@ interface VerifyLinkingPageProps {
   }>;
 }
 
-export default async function VerifyLinkingPage({ searchParams }: VerifyLinkingPageProps) {
+export default function VerifyLinkingPage({ searchParams }: VerifyLinkingPageProps) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <VerifyLinkingPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function VerifyLinkingPageContent({ searchParams }: VerifyLinkingPageProps) {
   const session = await getSession();
   const params = await searchParams;
 

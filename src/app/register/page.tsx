@@ -5,8 +5,28 @@ import {
   Paper
 } from '@mui/material';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { Suspense } from 'react';
+import PageLoadingState from '@/components/common/PageLoadingState';
 
-export default function RegisterPage() {
+export default function RegisterPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ callbackUrl?: string }> 
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <RegisterPageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function RegisterPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ 
@@ -30,7 +50,7 @@ export default function RegisterPage() {
             Sign up
           </Typography>
           
-          <RegisterForm/>
+          <RegisterForm callbackUrl={callbackUrl}/>
         </Paper>
       </Box>
     </Container>

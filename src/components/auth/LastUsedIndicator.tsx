@@ -1,17 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Chip } from "@mui/material";
 import { CheckCircle } from "@mui/icons-material";
+import { isLastUsedLoginMethod } from "@/lib/auth/client";
 
 interface LastUsedIndicatorProps {
-  isLastUsed: boolean;
+  loginMethod: string;
   className?: string;
 }
 
 export default function LastUsedIndicator({
-  isLastUsed,
+  loginMethod,
   className,
 }: LastUsedIndicatorProps) {
+  const [isLastUsed, setIsLastUsed] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage access must run in effect
+    setIsLastUsed(isLastUsedLoginMethod(loginMethod));
+  }, [loginMethod]);
+
   if (!isLastUsed) {
     return null;
   }

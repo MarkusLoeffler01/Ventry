@@ -22,7 +22,7 @@ import PasswordStrengthMeter from "./PasswordStrengthMeter";
 import { registerSchema } from "@/types/schemas/client/register";
 import type { RegisterSchema } from "@/types/schemas/client/register";
 
-export default function RegisterForm() {
+export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<{ message: string | null; suggestions: string[] } | null>(null);
@@ -38,6 +38,7 @@ export default function RegisterForm() {
     mode: "onBlur",
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
   const password = watch("password");
 
   const onSubmit = async (data: RegisterSchema, e?: React.BaseSyntheticEvent) => {
@@ -45,6 +46,19 @@ export default function RegisterForm() {
     try {
       setError(null);
       const { confirmPassword: _, ...payload } = data;
+
+      // Pre-check: better-auth silently returns 200 for duplicate emails when
+      // requireEmailVerification is enabled (anti-enumeration). Check first.
+      const checkRes = await fetch("/api/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: payload.email }),
+      });
+      const { exists } = await checkRes.json() as { exists: boolean };
+      if (exists) {
+        setError("An account with this email address already exists. Please sign in or reset your password.");
+        return;
+      }
 
       const { error } = await authClient.signUp.email({
         email: payload.email,
@@ -57,7 +71,11 @@ export default function RegisterForm() {
         return;
       }
 
-      router.push("/login?registered=true");
+      const loginRedirectUrl = callbackUrl 
+        ? `/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/login?registered=true";
+        
+      router.push(loginRedirectUrl);
     } catch (err) {
       console.error("Registration error:", err);
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten");

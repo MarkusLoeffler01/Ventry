@@ -1,12 +1,28 @@
+import { checkAdminAuth } from "@/lib/auth/admin";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const middleware = async (req: NextRequest) => {
     const { pathname } = req.nextUrl;
-    if(!pathname.startsWith("/api/admin")) return NextResponse.next();
+    console.log(pathname);
+    if(!pathname.startsWith("/api/admin") && !pathname.startsWith("/admin")) return NextResponse.next();
+
+    if(pathname.startsWith("/admin")) {
+
+        const { adminId } = await checkAdminAuth(req.headers);
+        console.log("Admin auth result:", adminId);
+        if(!adminId) {
+            // Rewrite to the unauthorized page while keeping the URL unchanged in the browser
+            return NextResponse.rewrite(new URL("/unauthorized", req.url));
+        }
+        return NextResponse.next();
+    }
 
     // Security: Check for better-auth session token
-    const sessionToken = req.cookies.get("better-auth.session_token")?.value || 
+    // Note: We use VENTRY prefix as defined in auth.ts
+    const sessionToken = req.cookies.get("VENTRY.session_token")?.value || 
+                        req.cookies.get("__Secure-VENTRY.session_token")?.value ||
+                        req.cookies.get("better-auth.session_token")?.value || 
                         req.cookies.get("__Secure-better-auth.session_token")?.value;
     
     if (!sessionToken) {

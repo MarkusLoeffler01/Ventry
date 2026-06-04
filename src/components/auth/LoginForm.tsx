@@ -17,7 +17,7 @@ import { Visibility, VisibilityOff, CheckCircle } from "@mui/icons-material";
 import AuthTemplate from "./template";
 import { green } from "@mui/material/colors";
 import type { PendingAccountLink } from "@/generated/prisma";
-import authClient, { isLastUsedLoginMethod } from "@/lib/auth/client";
+import authClient from "@/lib/auth/client";
 import LastUsedIndicator from "./LastUsedIndicator";
 
 export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
@@ -37,9 +37,18 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     const router = useRouter();
 
     const doPasskeyLogin = async () => {
+        setError("");
         try {
             setLoading(true);
-            await authClient.signIn.passkey();
+
+            const { error } = await authClient.signIn.passkey();
+            if (error) {
+                const message = error.message || error.statusText || "Passkey authentication failed";
+                const status = error.status ? ` (${error.status})` : "";
+                setError(`${message}${status}`);
+                return;
+            }
+
             // After successful passkey login, redirect
             router.push(callbackUrl ?? "/");
         } catch (err) {
@@ -101,8 +110,8 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                 console.error("Error checking pending links:", fetchError);
             }
 
-            // No pending links, go to home
-            router.push("/");
+            // No pending links, go to home or callback URL
+            router.push(callbackUrl || "/");
 
         } catch(err: unknown) {
             if(err instanceof Error) {
@@ -140,7 +149,6 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
 
     return (
         <AuthTemplate form="login" error={error} onClose={handlePasswordForgetClose} resetPasswordOpen={passwordForgetOpen}>
-            {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <Box component="form" onSubmit={handleSubmit} noValidate sx={{ width: '100%' }}>
                 <TextField
                     margin="normal"
@@ -181,7 +189,7 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                         }
                     }}
                 />
-                <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("email")} />
+                <LastUsedIndicator loginMethod="email" />
                 <Button
                     // type={(loading || success) ? "button" : "submit"}
                     type="submit"
@@ -206,15 +214,11 @@ export default function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
                 </Button>
 
                 <LoginMethodBox>
-                    <Button onClick={() => {
-                        void doPasskeyLogin().catch(() => {
-                            console.error("Passkey login failed");
-                        });
-                    }} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
+                    <Button onClick={() => void doPasskeyLogin()} disabled={loading || success} className="w-full rounded-xl border px-4 py-2">
                     <Icon className="fa-solid fa-fingerprint" sx={{ mr: 1 }} />
                         Login with Passkey
                     </Button>
-                    {!success && <LastUsedIndicator isLastUsed={isLastUsedLoginMethod("passkey")} />}
+                    {!success && <LastUsedIndicator loginMethod="passkey" />}
                 </LoginMethodBox>
             </Box>
         </AuthTemplate>

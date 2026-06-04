@@ -1,6 +1,5 @@
 import { Box, Container, AppBar, Toolbar, Typography, IconButton } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import Link from 'next/link';
 
 export default function PasswordTestLayout({
   children,
@@ -17,7 +16,6 @@ export default function PasswordTestLayout({
             color="inherit"
             aria-label="back"
             sx={{ mr: 2 }}
-            component={Link}
             href="/"
           >
             <ArrowBackIcon />

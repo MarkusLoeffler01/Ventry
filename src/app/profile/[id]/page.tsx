@@ -12,6 +12,8 @@ import PersonalInfo from "@/components/profile/PersonalInfo";
 import PhotoGallery from "@/components/profile/PhotoGallery";
 import EmptyState from "@/components/profile/EmptyState";
 import { getSignedUrl } from "@/lib/supabase";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
 interface ProfilePicture {
   id: string;
@@ -76,7 +78,15 @@ function calculateAge(birthDate: Date): number {
   return age;
 }
 
-export default async function ProfileViewPage({ params }: { params: { id: string }}) {
+export default function ProfileViewPage({ params }: { params: Promise<{ id: string }>}) {
+    return (
+        <Suspense fallback={<PageLoadingState />}>
+            <ProfileViewPageContent params={params} />
+        </Suspense>
+    );
+}
+
+async function ProfileViewPageContent({ params }: { params: Promise<{ id: string }>}) {
     const { id } = await params;
     
     const user = await prisma.user.findUnique({

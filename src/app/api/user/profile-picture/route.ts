@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { USER_CONFIG } from "@/lib/config";
 import { getUserIdFromRequest } from "@/lib/helpers/user";
 import { uploadProfilePicture, getSignedUrl } from "@/lib/supabase";
@@ -94,8 +95,15 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Upload to Supabase
-        const uploadResult = await uploadProfilePicture(file, userId);
+        // Process image with sharp: remove metadata, convert to jpeg, quality 70%
+        const processedBuffer = await sharp(bytes)
+            .toFormat('jpeg', { quality: 70 })
+            .toBuffer();
+
+        // Upload to Supabase using the processed buffer
+        // We generate a new filename since we converted to jpeg
+        const fileName = `profile-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const uploadResult = await uploadProfilePicture(processedBuffer, userId, fileName);
         
         // Generate signed URL with 24h expiry
         const signedUrlData = await getSignedUrl(uploadResult.path, 24 * 60 * 60); // 24 hours

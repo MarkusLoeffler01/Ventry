@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
+        country: true,
         profilePictures: {
           orderBy: [
             { order: 'asc' },
@@ -57,6 +58,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
+        country: true,
         profilePictures: {
           orderBy: [
             { order: 'asc' },
@@ -151,6 +153,7 @@ export async function POST(req: NextRequest) {
         id: true,
         name: true,
         email: true,
+        country: true,
         profilePictures: true,
         createdAt: true,
         updatedAt: true,
@@ -259,6 +262,7 @@ export async function PATCH(req: NextRequest) {
         id: true,
         name: true,
         email: true,
+        country: true,
         profilePictures: true,
         createdAt: true,
         updatedAt: true,

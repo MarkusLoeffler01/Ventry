@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Paper, Box, Typography } from "@mui/material";
 import { Key, GitHub, Google } from "@mui/icons-material";
 import { prisma } from "@/lib/prisma/prisma";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
 
 interface SuccessPageProps {
     searchParams: Promise<{
@@ -12,7 +14,15 @@ interface SuccessPageProps {
     }>;
 }
 
-export default async function SuccessPage({ searchParams }: SuccessPageProps) {
+export default function SuccessPage({ searchParams }: SuccessPageProps) {
+    return (
+        <Suspense fallback={<PageLoadingState />}>
+            <SuccessPageContent searchParams={searchParams} />
+        </Suspense>
+    );
+}
+
+async function SuccessPageContent({ searchParams }: SuccessPageProps) {
     // Get the current session
     const session = await getSession();
     

@@ -1,7 +1,10 @@
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { Providers } from "./providers";
+import AppHeader from "@/components/common/AppHeader/AppHeader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,18 +23,24 @@ export const metadata: Metadata = {
   authors: [{ name: "Markus Löffler", url: "https://github.com/MarkusLoeffler01/Ventry"}]
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <InitColorSchemeScript attribute="class" />
         <AppRouterCacheProvider>
-          <Providers>
-            {children}
-          </Providers>
+          <Suspense fallback={null}>
+            <Providers>
+              <AppHeader />
+              {/* Spacer so page content is never hidden under the fixed AppBar */}
+              <div style={{ height: 64 }} />
+              {children}
+            </Providers>
+          </Suspense>
         </AppRouterCacheProvider>
       </body>
     </html>

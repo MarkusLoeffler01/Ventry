@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventBaseSchema, type EventEntitySchema, EventIdSchema, LocationSchema, type StayPolicy } from "./base";
+import { type EventEntitySchema, EventIdSchema, LocationSchema, type StayPolicy, EventBaseObject, checkDateOrder } from "./base";
 
 
 /**
@@ -17,7 +17,7 @@ const AdminOnlySchema = z.object({
  * @body EventBase + AdminOnly (without id/createdAt/updatedAt)
  * @who server-side, to create a new event
  */
-const adminCreateEventSchema = EventBaseSchema.extend(AdminOnlySchema.shape).strict();
+const adminCreateEventSchema = EventBaseObject.extend(AdminOnlySchema.shape).superRefine(checkDateOrder).strict();
 type AdminCreateEventInput = z.input<typeof adminCreateEventSchema>;
 
 
@@ -41,7 +41,9 @@ type AdminGetEventInput = z.infer<typeof adminGetEventSchema>;
  *  - Stay-Policy adjustments
  * @who server-side for updates. All fields optional
  */
-const adminUpdateEventSchema = EventBaseSchema.extend(AdminOnlySchema.shape).partial().strict();
+// Apply `.partial()` to the base schema first, then safe-extend with admin-only fields.
+// This avoids attempting to extend an object that already contains refinements.
+const adminUpdateEventSchema = EventBaseObject.partial().extend(AdminOnlySchema.shape).superRefine(checkDateOrder).strict();
 type AdminUpdateEventInput = z.input<typeof adminUpdateEventSchema>;
 
 
@@ -73,10 +75,12 @@ const makeParticipationDecisionSchema = (policy: StayPolicy) =>
         }).strict()
     }).strict().superRefine((data, ctx) => {
         const d = data.decisions ?? {};
-        if(d.early && !policy.earlyArrival.enabled && d.early.status !== "NONE") {
+        const activePolicy = policy.hotels.find(hotel => hotel.isPrimary)?.stayPolicy || policy.hotels[0]?.stayPolicy;
+
+        if(d.early && !activePolicy?.earlyArrival.enabled && d.early.status !== "NONE") {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decisions", "early", "status"], message: "Early-arrival is disabled for this event" })
         }
-        if (d.late && !policy.lateDeparture.enabled && d.late.status !== "NONE") {
+        if (d.late && !activePolicy?.lateDeparture.enabled && d.late.status !== "NONE") {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decisions", "late", "status"], message: "Late-departure is disabled for this event" })
         }
 });

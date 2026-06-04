@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
+import MyRegistrations from './MyRegistrations';
 
 interface ProfilePicture {
   id: string;
@@ -43,6 +44,7 @@ interface User {
   id: string;
   name?: string | null;
   email: string;
+  country?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
     providerId: string;  // Changed from 'provider' for better-auth
@@ -62,10 +64,12 @@ interface ProfilePageClientProps {
 
 interface ProfileFormData {
   name: string;
+  country: string;
   bio: string;
   dateOfBirth: string;
   pronouns: string;
   showAge: boolean;
+  customPronouns?: string;
 }
 
 const PRONOUN_OPTIONS = [
@@ -76,16 +80,19 @@ const PRONOUN_OPTIONS = [
   'he/they',
   'any pronouns',
   'ask me',
-  'prefer not to say'
+  'prefer not to say',
+  'choose my own pronouns'
 ];
 
 export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
+    country: user.country || '',
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
-    showAge: user.showAge ?? true
+    showAge: user.showAge ?? true,
+    customPronouns: user.pronouns && !PRONOUN_OPTIONS.includes(user.pronouns) ? user.pronouns : undefined
   });
 
   // Manage profile pictures state locally
@@ -115,6 +122,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('linked') === 'success') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- URL param check must run in effect
       setLinkSuccess(true);
       // Clean URL
       window.history.replaceState({}, '', '/profile');
@@ -139,8 +147,9 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         body: JSON.stringify({
           id: user.id,
           name: formData.name,
+          country: formData.country || null,
           bio: formData.bio,
-          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : null,
+          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
           pronouns: formData.pronouns,
           showAge: formData.showAge
         })
@@ -265,6 +274,14 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             />
 
             <TextField
+              label="Country"
+              value={formData.country}
+              onChange={handleInputChange('country')}
+              fullWidth
+              helperText="Optional, shown on attendee cards if enabled"
+            />
+
+            <TextField
               label="Bio"
               value={formData.bio}
               onChange={handleInputChange('bio')}
@@ -286,7 +303,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               InputLabelProps={{ shrink: true }}
             />
 
-            {formData.dateOfBirth && (
+            {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Chip 
                   label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
@@ -313,6 +330,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                 </MenuItem>
               ))}
             </TextField>
+            { formData.pronouns === "choose my own pronouns" && <Box sx={{ mt: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Custom Pronouns
+              </Typography>
+              <TextField type='text' value={formData.customPronouns} onChange={handleInputChange('customPronouns')} />
+            </Box> }
           </Stack>
         </Box>
 
@@ -339,6 +362,16 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               When enabled, your age will be visible to other users. When disabled, only you can see your age.
             </Typography>
           </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* My Registrations */}
+        <Box>
+          <Typography variant="h5" gutterBottom>
+            My Registrations
+          </Typography>
+          <MyRegistrations userId={user.id} />
         </Box>
 
         <Divider />
@@ -387,7 +420,10 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                   Delete Account
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Permanently delete your account and all associated data. This action cannot be undone.
+                  Permanently delete your account and all associated data.
+                </Typography>
+                <Typography variant="h4" color="error" sx={{ mt: 1 }}>
+                  ⚠️This action cannot be undone⚠️
                 </Typography>
               </CardContent>
               <CardActions>
