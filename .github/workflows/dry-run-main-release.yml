@@ -1,0 +1,70 @@
+name: Dry-run main release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_range:
+        description: Git range to inspect
+        required: true
+        default: origin/main..origin/dev
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Fetch release refs
+        run: git fetch origin main dev --tags --prune
+
+      - name: Generate release preview
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_RANGE: ${{ inputs.release_range }}
+          RELEASE_NOTES_FILE: release-notes.md
+        run: node .github/scripts/generate-release-notes.mjs
+
+      - name: Print dry-run summary
+        env:
+          HAS_RELEASE: ${{ steps.release.outputs.has_release }}
+          RELEASE_TYPE: ${{ steps.release.outputs.release_type }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          RELEASE_RANGE: ${{ inputs.release_range }}
+        run: |
+          {
+            echo "# Main release dry run"
+            echo
+            echo "- Range: \`$RELEASE_RANGE\`"
+            echo "- Has release: \`$HAS_RELEASE\`"
+            echo "- Release type: \`$RELEASE_TYPE\`"
+            echo "- Planned version: \`$VERSION\`"
+            echo "- Planned tag: \`$TAG_NAME\`"
+            echo "- Planned sync branch: \`release/sync-main-$TAG_NAME\`"
+            echo
+            echo "## What this dry run did not do"
+            echo
+            echo "- No package files were changed."
+            echo "- No commit was created."
+            echo "- No tag was created."
+            echo "- No GitHub Release was created."
+            echo "- No sync-back pull request was opened."
+            echo
+            echo "## Generated release notes"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-release-notes
+          path: release-notes.md

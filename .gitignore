@@ -59,3 +59,9 @@ next-env.d.ts
 .playwright-mcp
 /*.md
 /.*
+!/.github/
+!/.github/scripts/
+!/.github/scripts/*.mjs
+!/.github/workflows/
+!/.github/workflows/*.yml
+!/.github/pull_request_template.md

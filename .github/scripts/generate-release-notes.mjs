@@ -104,6 +104,11 @@ function parseConventionalCommit(subject) {
   };
 }
 
+function isReleaseAutomationCommit(subject) {
+  return /^chore\(release\)!?:\s+/i.test(subject)
+    || /^Merge pull request #\d+\b.*\/release\/sync-main-v\d+\.\d+\.\d+\b/i.test(subject);
+}
+
 function issueNumbersFrom(text) {
   const numbers = new Set();
   const regex = /\b(?:fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+(?:https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/|(?:[\w.-]+\/[\w.-]+)?#)(\d+)\b/gi;
@@ -192,9 +197,10 @@ const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const packageVersion = parseVersion(packageJson.version);
 const latestVersion = latestTagVersion();
 const baseVersion = latestVersion ? maxVersion(packageVersion, latestVersion) : packageVersion;
-const commits = readCommits();
-const releaseType = commits.length > 0 ? releaseTypeFor(commits) : "patch";
-const nextVersion = incrementVersion(baseVersion, releaseType);
+const commits = readCommits().filter((commit) => !isReleaseAutomationCommit(commit.subject));
+const hasRelease = commits.length > 0;
+const releaseType = hasRelease ? releaseTypeFor(commits) : "none";
+const nextVersion = hasRelease ? incrementVersion(baseVersion, releaseType) : baseVersion;
 const tagName = `v${formatVersion(nextVersion)}`;
 
 const grouped = Object.fromEntries(groupOrder.map((group) => [group, []]));
@@ -239,6 +245,7 @@ if (latestVersion) {
 }
 
 lines.push(`Release type: ${releaseType}`);
+lines.push(`Has release: ${hasRelease ? "yes" : "no"}`);
 lines.push("");
 
 if (includedPullRequests.length > 0) {
@@ -291,6 +298,7 @@ if (process.env.GITHUB_OUTPUT) {
   appendFileSync(process.env.GITHUB_OUTPUT, `version=${formatVersion(nextVersion)}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `tag_name=${tagName}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `release_type=${releaseType}\n`);
+  appendFileSync(process.env.GITHUB_OUTPUT, `has_release=${hasRelease ? "true" : "false"}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `notes_path=${outputPath}\n`);
 }
 
