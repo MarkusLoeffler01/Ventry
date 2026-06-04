@@ -106,7 +106,8 @@ function parseConventionalCommit(subject) {
 
 function isReleaseAutomationCommit(subject) {
   return /^chore\(release\)!?:\s+/i.test(subject)
-    || /^Merge pull request #\d+\b.*\/release\/sync-main-v\d+\.\d+\.\d+\b/i.test(subject);
+    || /^Merge pull request #\d+\b.*\/release\/sync-main-v\d+\.\d+\.\d+\b/i.test(subject)
+    || /^Merge (?:remote-tracking )?branch ['"](?:origin\/)?main['"] into dev$/i.test(subject);
 }
 
 function issueNumbersFrom(text) {
