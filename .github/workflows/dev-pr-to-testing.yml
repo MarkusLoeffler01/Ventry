@@ -24,6 +24,15 @@ jobs:
         with:
           ref: dev
 
+      - name: Create board management token
+        id: board-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.VENTRY_BOARD_APP_ID || '3959877' }}
+          private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
+          owner: MarkusLoeffler01
+          repositories: Ventry
+
       - name: Collect linked issues
         id: issues
         uses: actions/github-script@v7
@@ -55,7 +64,7 @@ jobs:
       - name: Move issues to Testing
         if: steps.issues.outputs.issue_numbers != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN_PROJECT || github.token }}
+          GITHUB_TOKEN: ${{ steps.board-token.outputs.token }}
           ISSUE_NUMBERS: ${{ steps.issues.outputs.issue_numbers }}
           PROJECT_URL: ${{ env.PROJECT_URL }}
           PROJECT_STATUS_FIELD: ${{ env.PROJECT_STATUS_FIELD }}
