@@ -38,6 +38,15 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
+      - name: Resolve build metadata
+        id: build_metadata
+        run: |
+          tag="$(git describe --tags --abbrev=0 2>/dev/null || node -p "'v' + JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+
+          echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Resolve deployment target
         id: target
         env:
@@ -96,6 +105,9 @@ jobs:
           build-args: |
             BETTER_AUTH_URL=${{ steps.target.outputs.better_auth_url }}
             NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ steps.target.outputs.stripe_publishable_key }}
+            NEXT_PUBLIC_GIT_COMMIT=${{ steps.build_metadata.outputs.commit }}
+            NEXT_PUBLIC_GIT_TAG=${{ steps.build_metadata.outputs.tag }}
+            NEXT_PUBLIC_BUILD_DATE=${{ steps.build_metadata.outputs.build_date }}
 
       - name: Run database migrations
         env:
