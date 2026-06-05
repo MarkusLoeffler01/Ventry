@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { Providers } from "./providers";
+import AppFooter from "@/components/common/AppFooter";
 import AppHeader from "@/components/common/AppHeader/AppHeader";
 import "./globals.css";
 
@@ -30,15 +31,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
+      >
         <InitColorSchemeScript attribute="class" />
         <AppRouterCacheProvider>
           <Suspense fallback={null}>
             <Providers>
               <AppHeader />
-              {/* Spacer so page content is never hidden under the fixed AppBar */}
-              <div style={{ height: 64 }} />
-              {children}
+              <main style={{ display: "flex", flex: "1 0 auto", flexDirection: "column" }}>
+                {/* Spacer so page content is never hidden under the fixed AppBar */}
+                <div style={{ height: 64 }} />
+                {children}
+              </main>
+              <AppFooter />
             </Providers>
           </Suspense>
         </AppRouterCacheProvider>
