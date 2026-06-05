@@ -57,8 +57,7 @@ export default function AppFooter() {
 
           <Stack alignItems="center" direction="row" spacing={1.25}>
             <Typography component="p" variant="caption">
-              Version {buildInfo.version} · {buildInfo.tag} · {buildInfo.commit} · Built{" "}
-              {buildInfo.buildDate}
+              Version {buildInfo.version} · {buildInfo.commit} · Built {buildInfo.buildDate}
             </Typography>
             <Tooltip title="Open Ventry on GitHub">
               <IconButton
