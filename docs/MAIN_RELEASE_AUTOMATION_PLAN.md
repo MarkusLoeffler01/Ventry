@@ -49,6 +49,18 @@ Important constraints:
 
 The release pull request is only a preview until it is merged.
 
+### Main Target Guard
+
+A pull request targeting `main` is expected to use:
+
+```text
+dev -> main
+```
+
+The `Guard main PR target` workflow fails for pull requests targeting `main` from any other branch. This makes accidental feature-branch-to-`main` pull requests visible in GitHub checks and can block merging when branch protection requires the check to pass.
+
+For an intentional emergency or hotfix pull request directly into `main`, a maintainer can add the `confirmed-main-target` label. With that label present, the guard passes but still emits a warning in the check summary.
+
 ### 3. Merge `dev -> main`
 
 Expected behavior when the release pull request is merged into `main`:
@@ -267,4 +279,3 @@ After release, `dev` receives:
 - a sync-back pull request from released `main`,
 - the same package version metadata as `main`,
 - no release-note noise from the sync commit itself.
-
