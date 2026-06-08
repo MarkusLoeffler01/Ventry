@@ -51,13 +51,17 @@ The release pull request is only a preview until it is merged.
 
 ### Release Version Override
 
-The release workflow calculates the next semantic version from the commits in `dev -> main`. A maintainer can override the calculated version by adding a line like this to the release pull request body:
+The release workflow calculates the next semantic version from the commits in `dev -> main`. The preview workflow adds or updates a `Release controls` comment on the release pull request.
+
+The comment contains the calculated version as the editable template:
 
 ```text
-Release version override: 0.2.1
+<!-- ventry:release-controls -->
+- [x] Override release version
+Release version: 0.2.1
 ```
 
-The override is used by both the release preview and the final post-merge release workflow. It must be a valid `X.Y.Z` semantic version and must be greater than the base version selected from `package.json` and the latest `v*` tag.
+To override the version, edit that comment, check the box, and set `Release version` to the desired value. If GitHub does not allow editing the bot comment, add a new comment containing the same marker block. Editing or adding a control comment reruns the preview workflow, updates the release preview, and updates the comment's effective version status. To disable the override, uncheck the box. The override is used by both the release preview and the final post-merge release workflow. It must be a valid `X.Y.Z` semantic version and must be greater than the base version selected from `package.json` and the latest `v*` tag.
 
 ### Main Target Guard
 
