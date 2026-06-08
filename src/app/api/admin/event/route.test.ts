@@ -73,6 +73,7 @@ describe("App Router: /api/admin/event", () => {
             schedule: [],
             status: "DRAFT",
             requireApproval: false,
+            scanOnce: true,
             location: {
                 name: "Venue",
                 address: "Street 1",
@@ -125,6 +126,7 @@ describe("App Router: /api/admin/event", () => {
             expect.objectContaining({
                 data: expect.objectContaining({
                     ownerId: "admin-1",
+                    scanOnce: true,
                     products: {
                         create: [
                             {
