@@ -11,7 +11,7 @@ import ProfileBio from "@/components/profile/ProfileBio";
 import PersonalInfo from "@/components/profile/PersonalInfo";
 import PhotoGallery from "@/components/profile/PhotoGallery";
 import EmptyState from "@/components/profile/EmptyState";
-import { getSignedUrl } from "@/lib/supabase";
+import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
 
@@ -24,46 +24,6 @@ interface ProfilePicture {
   cachedUntil: Date | null;
   order: number;
 }
-
-async function validateAndRefreshSignedUrls(profilePictures: ProfilePicture[]) {
-  const now = new Date();
-  
-  const validatedPictures = await Promise.all(
-    profilePictures.map(async (picture) => {
-      // Only refresh if URL is missing or expired
-      if (!picture.signedUrl || !picture.cachedUntil || new Date(picture.cachedUntil) <= now) {
-        try {
-          const { signedUrl, expiresIn } = await getSignedUrl(picture.storagePath, 24 * 60 * 60);
-          
-          await prisma.profilePicture.update({
-            where: { id: picture.id },
-            data: {
-              signedUrl,
-              cachedUntil: new Date(Date.now() + expiresIn * 1000)
-            }
-          });
-          
-          return {
-            ...picture,
-            signedUrl,
-            cachedUntil: new Date(Date.now() + expiresIn * 1000)
-          };
-        } catch (error) {
-          console.error(`Failed to refresh signed URL for picture ${picture.id}:`, error);
-          return picture;
-        }
-      }
-      
-      return picture;
-    })
-  );
-  
-  return validatedPictures;
-}
-
-
-
-
 
 function calculateAge(birthDate: Date): number {
   const today = new Date();
@@ -112,7 +72,7 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ id: string
     }
 
     // Validate and refresh signed URLs if needed
-    const validatedPictures = await validateAndRefreshSignedUrls(user.profilePictures as ProfilePicture[]);
+    const validatedPictures = await refreshSignedUrls(user.profilePictures as ProfilePicture[]);
 
     const age = user.dateOfBirth ? calculateAge(user.dateOfBirth) : null;
 

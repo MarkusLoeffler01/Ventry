@@ -20,6 +20,53 @@ type AddProfilePictureParams = Omit<ProfilePicture, "id"> & {
     expiresIn: number; // in seconds
 }
 
+type RefreshableProfilePicture = {
+    id: string;
+    signedUrl: string | null;
+    storagePath: string;
+    cachedUntil: Date | string | null;
+}
+
+export async function refreshSignedUrls<T extends RefreshableProfilePicture>(
+    profilePictures: T[],
+    expiresInSeconds: number = 24 * 60 * 60
+): Promise<T[]> {
+    const now = new Date();
+
+    return Promise.all(
+        profilePictures.map(async (picture) => {
+            if (picture.signedUrl && picture.cachedUntil && new Date(picture.cachedUntil) > now) {
+                return picture;
+            }
+
+            try {
+                const { signedUrl, expiresIn } = await supa.getSignedUrl(
+                    picture.storagePath,
+                    expiresInSeconds
+                );
+                const cachedUntil = new Date(Date.now() + expiresIn * 1000);
+
+                await prisma.profilePicture.update({
+                    where: { id: picture.id },
+                    data: {
+                        signedUrl,
+                        cachedUntil
+                    }
+                });
+
+                return {
+                    ...picture,
+                    signedUrl,
+                    cachedUntil
+                };
+            } catch (error) {
+                console.error(`Failed to refresh signed URL for picture ${picture.id}:`, error);
+                return picture;
+            }
+        })
+    );
+}
+
 export async function add(props: AddProfilePictureParams) {
 
     const { userId, signedUrl, expiresIn, path } = props;

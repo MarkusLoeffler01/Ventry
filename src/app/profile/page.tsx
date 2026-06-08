@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
+import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
 import { Container, Box, Typography, Paper } from "@mui/material";
 import { Suspense } from "react";
@@ -55,6 +56,8 @@ async function ProfilePageContent() {
     redirect("/login");
   }
 
+  const profilePictures = await refreshSignedUrls(user.profilePictures);
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
@@ -63,7 +66,7 @@ async function ProfilePageContent() {
         </Typography>
         
         <Paper elevation={2} sx={{ p: 4, mt: 3 }}>
-          <ProfilePageClient user={user} />
+          <ProfilePageClient user={{ ...user, profilePictures }} />
         </Paper>
       </Box>
     </Container>

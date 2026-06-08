@@ -9,6 +9,7 @@ import {
   Button,
   Box,
   IconButton,
+  Tooltip,
   Avatar,
   Typography,
   Alert,
@@ -17,7 +18,8 @@ import {
   Chip,
   Stack,
   Fade,
-  Paper
+  Paper,
+  useMediaQuery
 } from '@mui/material';
 import {
   Close,
@@ -28,7 +30,8 @@ import {
   StarBorder,
   ChevronLeft,
   ChevronRight,
-  DragIndicator
+  DragIndicator,
+  PhotoLibrary
 } from '@mui/icons-material';
 import Image from 'next/image';
 import {
@@ -73,6 +76,15 @@ interface SortableItemProps {
   isSelected: boolean;
   onImageClick: (index: number) => void;
   onSelectForAction: (id: string) => void;
+  getInitials: () => string;
+}
+
+interface MobileGalleryItemProps {
+  picture: ProfilePicture;
+  index: number;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onPreview: (index: number) => void;
   getInitials: () => string;
 }
 
@@ -197,6 +209,121 @@ function SortableItem({
   );
 }
 
+function MobileGalleryItem({
+  picture,
+  index,
+  isSelected,
+  onSelect,
+  onPreview,
+  getInitials
+}: MobileGalleryItemProps) {
+  return (
+    <Box
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(picture.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect(picture.id);
+        }
+      }}
+      sx={{
+        flex: '0 0 132px',
+        border: '2px solid',
+        borderColor: isSelected ? 'primary.main' : 'divider',
+        borderRadius: 2,
+        bgcolor: isSelected ? 'action.selected' : 'background.paper',
+        p: 0.75,
+        textAlign: 'left',
+        cursor: 'pointer',
+        minWidth: 0,
+        appearance: 'none'
+      }}
+    >
+      <Box
+        sx={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '1',
+          borderRadius: 1.5,
+          overflow: 'hidden',
+          bgcolor: 'grey.200'
+        }}
+      >
+        {picture.signedUrl ? (
+          <Image
+            src={picture.signedUrl}
+            alt={`Profile picture ${index + 1}`}
+            fill
+            sizes="132px"
+            style={{ objectFit: 'cover' }}
+            unoptimized={true}
+          />
+        ) : (
+          <Box
+            sx={{
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Typography variant="h4">{getInitials()}</Typography>
+          </Box>
+        )}
+        {picture.isPrimary && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 6,
+              right: 6,
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Star sx={{ fontSize: 18 }} />
+          </Box>
+        )}
+      </Box>
+
+      <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, justifyContent: 'center' }}>
+        <Tooltip title="View">
+          <IconButton
+            size="small"
+            aria-label={`View profile picture ${index + 1}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPreview(index);
+            }}
+          >
+            <PhotoLibrary fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={picture.isPrimary ? 'Primary photo' : 'Select'}>
+          <IconButton
+            size="small"
+            aria-label={picture.isPrimary ? 'Primary photo' : `Select profile picture ${index + 1}`}
+            color={isSelected ? 'primary' : 'default'}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect(picture.id);
+            }}
+          >
+            {picture.isPrimary ? <Star fontSize="small" /> : <StarBorder fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </Box>
+  );
+}
+
 export default function ProfilePictureGallery({ 
   userId: _userId,
   profilePictures,
@@ -222,6 +349,7 @@ export default function ProfilePictureGallery({
   // Cropper state
   const [cropOpen, setCropOpen] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   // Update ordered pictures when profilePictures changes
   useEffect(() => {
@@ -469,6 +597,12 @@ export default function ProfilePictureGallery({
     return '?';
   };
 
+  const mobileSelectedPicture = selectedPicture || currentPicture || orderedPictures[0];
+  const mobileSelectedIndex = Math.max(
+    0,
+    orderedPictures.findIndex((picture) => picture.id === mobileSelectedPicture?.id)
+  );
+
   return (
     <>
       {/* Profile Picture Display */}
@@ -518,15 +652,41 @@ export default function ProfilePictureGallery({
       </Box>
 
       {/* Profile Picture Gallery Dialog */}
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Profile Picture Gallery
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth={isMobile ? false : 'md'}
+        fullWidth
+        fullScreen={isMobile}
+        sx={{
+          '& .MuiDialog-paper': {
+            ...(isMobile
+              ? {
+                  m: 0,
+                  height: '100dvh',
+                  maxHeight: '100dvh',
+                  borderRadius: 0
+                }
+              : {})
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            px: { xs: 2, sm: 3 },
+            py: { xs: 1.5, sm: 2 }
+          }}
+        >
+          {isMobile ? 'Pictures' : 'Profile Picture Gallery'}
           <IconButton onClick={handleClose}>
             <Close />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent>
+        <DialogContent sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 1, sm: 2 } }}>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
               {error}
@@ -534,7 +694,7 @@ export default function ProfilePictureGallery({
           )}
 
           {/* Helper text for drag-and-drop */}
-          {orderedPictures.length > 1 && (
+          {!isMobile && orderedPictures.length > 1 && (
             <>
             
             <Box sx={{ p: 1.5, bgcolor: 'info.lighter', borderRadius: 1 }}>
@@ -552,7 +712,95 @@ export default function ProfilePictureGallery({
           )}
 
           {/* Gallery Grid with Drag-and-Drop */}
-          {orderedPictures.length > 0 ? (
+          {isMobile && orderedPictures.length > 0 ? (
+            <Stack spacing={2}>
+              <Box
+                onClick={() => handleImageClick(mobileSelectedIndex)}
+                sx={{
+                  position: 'relative',
+                  width: '100%',
+                  aspectRatio: '1',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  bgcolor: 'grey.200',
+                  cursor: 'pointer'
+                }}
+              >
+                {mobileSelectedPicture?.signedUrl ? (
+                  <Image
+                    src={mobileSelectedPicture.signedUrl}
+                    alt={`Selected profile picture ${mobileSelectedIndex + 1}`}
+                    fill
+                    sizes="100vw"
+                    style={{ objectFit: 'cover' }}
+                    unoptimized={true}
+                    priority
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Typography variant="h2">{getInitials()}</Typography>
+                  </Box>
+                )}
+
+                {mobileSelectedPicture?.isPrimary && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Star />
+                  </Box>
+                )}
+              </Box>
+
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{
+                  overflowX: 'auto',
+                  pb: 0.5,
+                  mx: -2,
+                  px: 2,
+                  scrollSnapType: 'x proximity',
+                  '& > *': {
+                    scrollSnapAlign: 'start'
+                  }
+                }}
+              >
+                {orderedPictures.map((picture, index) => (
+                  <MobileGalleryItem
+                    key={picture.id}
+                    picture={picture}
+                    index={index}
+                    isSelected={picture.id === mobileSelectedPicture?.id}
+                    onSelect={(id) => {
+                      setSelectedPictureId(id);
+                      setCurrentIndex(index);
+                    }}
+                    onPreview={handleImageClick}
+                    getInitials={getInitials}
+                  />
+                ))}
+              </Stack>
+            </Stack>
+          ) : orderedPictures.length > 0 ? (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -597,7 +845,7 @@ export default function ProfilePictureGallery({
           )}
 
           {/* Selected Picture Info */}
-          {selectedPicture && (
+          {!isMobile && selectedPicture && (
             <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mb: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Selected Picture
@@ -612,57 +860,129 @@ export default function ProfilePictureGallery({
           )}
         </DialogContent>
 
-        <DialogActions sx={{ flexDirection: 'column', gap: 2, p: 3 }}>
+        <DialogActions
+          sx={{
+            flexDirection: 'column',
+            gap: { xs: 1.5, sm: 2 },
+            p: { xs: 2, sm: 3 },
+            pt: { xs: 1, sm: 3 },
+            pb: { xs: 'calc(16px + env(safe-area-inset-bottom))', sm: 3 }
+          }}
+        >
           {/* Action Buttons */}
-          <Stack direction="row" spacing={2} sx={{ width: '100%' }}>
-            {/* Upload New Picture */}
-            <Button
-              variant="contained"
-              component="label"
-              startIcon={<CloudUpload />}
-              disabled={uploading}
-              sx={{ flex: 1 }}
+          {isMobile ? (
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                width: '100%',
+                justifyContent: 'space-around',
+                '& .MuiIconButton-root': {
+                  width: 48,
+                  height: 48
+                }
+              }}
             >
-              {uploading ? 'Uploading...' : 'Upload New'}
-              <input
-                type="file"
-                hidden
-                accept="image/*"
-                onChange={handleFileSelect}
-              />
-            </Button>
+              <Tooltip title={uploading ? 'Uploading' : 'Upload new'}>
+                <span>
+                  <IconButton
+                    component="label"
+                    color="primary"
+                    disabled={uploading}
+                    aria-label={uploading ? 'Uploading picture' : 'Upload new picture'}
+                  >
+                    <CloudUpload />
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                    />
+                  </IconButton>
+                </span>
+              </Tooltip>
 
-            {/* Set as Primary */}
-            <Button
-              variant="outlined"
-              startIcon={<StarBorder />}
-              disabled={!selectedPictureId || selectedPicture?.isPrimary || settingPrimary}
-              onClick={() => void handleSetPrimary()}
-              sx={{ flex: 1 }}
-            >
-              {settingPrimary ? 'Setting...' : 'Set Primary'}
-            </Button>
+              <Tooltip title={mobileSelectedPicture?.isPrimary ? 'Primary photo' : 'Set primary'}>
+                <span>
+                  <IconButton
+                    color="primary"
+                    disabled={!mobileSelectedPicture?.id || mobileSelectedPicture.isPrimary || settingPrimary}
+                    onClick={() => void handleSetPrimary(mobileSelectedPicture?.id)}
+                    aria-label="Set selected picture as primary"
+                  >
+                    {mobileSelectedPicture?.isPrimary ? <Star /> : <StarBorder />}
+                  </IconButton>
+                </span>
+              </Tooltip>
 
-            {/* Delete Picture */}
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Delete />}
-              disabled={!selectedPictureId || deleting || profilePictures.length <= 1}
-              onClick={() => void handleDeletePicture()}
-              sx={{ flex: 1 }}
-            >
-              {deleting ? 'Deleting...' : 'Delete'}
-            </Button>
-          </Stack>
+              <Tooltip title="Delete">
+                <span>
+                  <IconButton
+                    color="error"
+                    disabled={!mobileSelectedPicture?.id || deleting || profilePictures.length <= 1}
+                    onClick={() => void handleDeletePicture(mobileSelectedPicture?.id)}
+                    aria-label="Delete selected picture"
+                  >
+                    <Delete />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
+          ) : (
+            <Stack direction="row" spacing={2} sx={{ width: '100%' }}>
+              {/* Upload New Picture */}
+              <Button
+                variant="contained"
+                component="label"
+                startIcon={<CloudUpload />}
+                disabled={uploading}
+                sx={{ flex: 1 }}
+              >
+                {uploading ? 'Uploading...' : 'Upload New'}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                />
+              </Button>
+
+              {/* Set as Primary */}
+              <Button
+                variant="outlined"
+                startIcon={<StarBorder />}
+                disabled={!selectedPictureId || selectedPicture?.isPrimary || settingPrimary}
+                onClick={() => void handleSetPrimary()}
+                sx={{ flex: 1 }}
+              >
+                {settingPrimary ? 'Setting...' : 'Set Primary'}
+              </Button>
+
+              {/* Delete Picture */}
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<Delete />}
+                disabled={!selectedPictureId || deleting || profilePictures.length <= 1}
+                onClick={() => void handleDeletePicture()}
+                sx={{ flex: 1 }}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </Stack>
+          )}
 
           {/* Help Text */}
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ textAlign: 'center', display: { xs: 'none', sm: 'block' } }}
+          >
             Supported formats: JPG, PNG, GIF (max 5MB) • Click to view • Ctrl+Click to select
           </Typography>
 
           {/* Close Button */}
-          <Button onClick={handleClose} sx={{ mt: 1 }}>
+          <Button onClick={handleClose} sx={{ mt: 1, display: { xs: 'none', sm: 'inline-flex' } }}>
             Close
           </Button>
         </DialogActions>
@@ -679,7 +999,7 @@ export default function ProfilePictureGallery({
             bgcolor: 'rgba(0, 0, 0, 0.95)',
             boxShadow: 'none',
             maxWidth: '100vw',
-            maxHeight: '100vh',
+            maxHeight: '100dvh',
             margin: 0,
             borderRadius: 0
           },
@@ -695,7 +1015,7 @@ export default function ProfilePictureGallery({
             justifyContent: 'center',
             position: 'relative',
             p: 0,
-            height: '100vh',
+            height: '100dvh',
             overflow: 'hidden'
           }}
         >
@@ -703,8 +1023,8 @@ export default function ProfilePictureGallery({
           <Box
             sx={{
               position: 'absolute',
-              top: 20,
-              left: 20,
+              top: { xs: 'calc(env(safe-area-inset-top) + 12px)', sm: 20 },
+              left: { xs: 12, sm: 20 },
               display: 'flex',
               gap: 1,
               zIndex: 1
@@ -754,8 +1074,8 @@ export default function ProfilePictureGallery({
             onClick={handleOverlayClose}
             sx={{
               position: 'absolute',
-              top: 20,
-              right: 20,
+              top: { xs: 'calc(env(safe-area-inset-top) + 12px)', sm: 20 },
+              right: { xs: 12, sm: 20 },
               color: 'white',
               bgcolor: 'rgba(0, 0, 0, 0.5)',
               zIndex: 1,
@@ -772,7 +1092,9 @@ export default function ProfilePictureGallery({
             onClick={handlePrevious}
             sx={{
               position: 'absolute',
-              left: 20,
+              top: '50%',
+              left: { xs: 8, sm: 20 },
+              transform: 'translateY(-50%)',
               color: 'white',
               bgcolor: 'rgba(0, 0, 0, 0.5)',
               zIndex: 1,
@@ -789,7 +1111,9 @@ export default function ProfilePictureGallery({
             onClick={handleNext}
             sx={{
               position: 'absolute',
-              right: 20,
+              top: '50%',
+              right: { xs: 8, sm: 20 },
+              transform: 'translateY(-50%)',
               color: 'white',
               bgcolor: 'rgba(0, 0, 0, 0.5)',
               zIndex: 1,
@@ -817,8 +1141,11 @@ export default function ProfilePictureGallery({
                 <Box
                   sx={{
                     position: 'relative',
-                    width: '90vw',
-                    height: '90vh',
+                    width: { xs: '100vw', sm: '90vw' },
+                    height: {
+                      xs: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 150px)',
+                      sm: '90vh'
+                    },
                     maxWidth: '90vw',
                     maxHeight: '90vh'
                   }}
@@ -841,7 +1168,7 @@ export default function ProfilePictureGallery({
                       elevation={3}
                       sx={{
                         position: 'absolute',
-                        top: 16,
+                        top: { xs: 56, sm: 16 },
                         left: 16,
                         px: 2,
                         py: 1,
@@ -886,7 +1213,10 @@ export default function ProfilePictureGallery({
             elevation={3}
             sx={{
               position: 'absolute',
-              bottom: 20,
+              bottom: {
+                xs: 'calc(env(safe-area-inset-bottom) + 12px)',
+                sm: 20
+              },
               left: '50%',
               transform: 'translateX(-50%)',
               px: 2,
@@ -907,7 +1237,10 @@ export default function ProfilePictureGallery({
             spacing={1}
             sx={{
               position: 'absolute',
-              bottom: 80,
+              bottom: {
+                xs: 'calc(env(safe-area-inset-bottom) + 64px)',
+                sm: 80
+              },
               left: '50%',
               transform: 'translateX(-50%)',
               bgcolor: 'rgba(0, 0, 0, 0.5)',
