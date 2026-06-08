@@ -49,6 +49,16 @@ Important constraints:
 
 The release pull request is only a preview until it is merged.
 
+### Release Version Override
+
+The release workflow calculates the next semantic version from the commits in `dev -> main`. A maintainer can override the calculated version by adding a line like this to the release pull request body:
+
+```text
+Release version override: 0.2.1
+```
+
+The override is used by both the release preview and the final post-merge release workflow. It must be a valid `X.Y.Z` semantic version and must be greater than the base version selected from `package.json` and the latest `v*` tag.
+
 ### Main Target Guard
 
 A pull request targeting `main` is expected to use:

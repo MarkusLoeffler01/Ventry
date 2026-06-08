@@ -50,6 +50,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.release-token.outputs.token }}
           RELEASE_RANGE: ${{ github.event.pull_request.merge_commit_sha }}^1..${{ github.event.pull_request.merge_commit_sha }}
           RELEASE_NOTES_FILE: release-notes.md
+          RELEASE_VERSION_OVERRIDE_TEXT: ${{ github.event.pull_request.body }}
         run: node .github/scripts/generate-release-notes.mjs
 
       - name: Bump package metadata
