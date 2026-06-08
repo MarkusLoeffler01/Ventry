@@ -1,0 +1,59 @@
+name: Guard main PR target
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate main target
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const confirmationLabel = "confirmed-main-target";
+            const labels = pr.labels.map((label) => label.name);
+            const isReleasePr = pr.head.ref === "dev" && pr.head.repo.full_name === context.payload.repository.full_name;
+            const isConfirmed = labels.includes(confirmationLabel);
+
+            const summary = [
+              "# Main target guard",
+              "",
+              `- Base branch: \`${pr.base.ref}\``,
+              `- Head branch: \`${pr.head.ref}\``,
+              `- Expected release path: \`dev -> main\``,
+              `- Confirmation label: \`${confirmationLabel}\``,
+              "",
+            ];
+
+            if (isReleasePr) {
+              summary.push("This is the expected release PR from `dev` to `main`.");
+              await core.summary.addRaw(summary.join("\n")).write();
+              return;
+            }
+
+            if (isConfirmed) {
+              summary.push(
+                "This PR does not come from `dev`, but a maintainer confirmed the `main` target with the label."
+              );
+              await core.summary.addRaw(summary.join("\n")).write();
+              core.warning(`PR targets main from '${pr.head.ref}'. Confirmation label '${confirmationLabel}' is present.`);
+              return;
+            }
+
+            summary.push(
+              "This PR targets `main` from a branch other than `dev`.",
+              "",
+              "Normal feature branches should target `dev`. If this PR intentionally targets `main`, add the maintainer confirmation label before merging."
+            );
+            await core.summary.addRaw(summary.join("\n")).write();
+            core.setFailed(
+              `PRs targeting main must come from dev, or carry the '${confirmationLabel}' label.`
+            );

@@ -1,5 +1,6 @@
 const DEFAULT_ORIGINS = [
   "https://local.dev:3443",
+  "https://ventry.localhost:3443",
   "http://localhost:3000",
   "https://ventry.m-loeffler.de",
   "https://dev-ventry.m-loeffler.de",
