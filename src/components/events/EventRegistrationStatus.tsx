@@ -27,6 +27,8 @@ import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
 import { stripePromise } from "@/lib/stripeClient";
 import PaymentForm from "./registration/PaymentForm";
+import QRCode from "react-qr-code";
+import { formatTicketQrPayload } from "@/lib/tickets/qr";
 
 interface EventRegistrationStatusProps {
   registration: {
@@ -54,8 +56,9 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
   const router = useRouter();
   const latestPayment = registration.payments[0];
   const hasCompletedPayment = registration.payments.some((payment) => payment.paymentStatus === 'COMPLETED');
-
   const isExpired = registration.expiresAt && new Date(registration.expiresAt) < new Date() && registration.status === 'PENDING';
+  const hasBlockingPayment = registration.payments.some((payment) => payment.paymentStatus === 'PENDING' || payment.paymentStatus === 'FAILED');
+  const canShowQr = registration.status !== 'CANCELLED' && registration.status !== 'WAITLISTED' && !hasBlockingPayment && !isExpired;
 
   const handleStartPayment = async () => {
     if (!latestPayment || isExpired) return;
@@ -176,6 +179,15 @@ export default function EventRegistrationStatus({ registration, event }: EventRe
           <Typography variant="body2" color="text.secondary">Ticket ID:</Typography>
           <Chip label={`#${registration.ticketId}`} size="small" variant="outlined" />
         </Box>
+
+        {canShowQr && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2, bgcolor: 'background.paper' }}>
+            <QRCode
+              value={formatTicketQrPayload({ eventId: event.id, ticketId: registration.ticketId })}
+              size={180}
+            />
+          </Box>
+        )}
         
         {registration.expiresAt && registration.status === 'PENDING' && !isExpired && (
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

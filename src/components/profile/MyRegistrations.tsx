@@ -18,6 +18,8 @@ import {
   LocationOn 
 } from '@mui/icons-material';
 import Link from 'next/link';
+import QRCode from 'react-qr-code';
+import { formatTicketQrPayload } from '@/lib/tickets/qr';
 
 interface Registration {
   id: string;
@@ -74,6 +76,14 @@ export default function MyRegistrations({ userId }: MyRegistrationsProps) {
     </Box>
   );
 
+  const canShowQr = (reg: Registration) => {
+    if (reg.status === 'CANCELLED' || reg.status === 'WAITLISTED') {
+      return false;
+    }
+
+    return !reg.payments.some(payment => payment.paymentStatus === 'PENDING' || payment.paymentStatus === 'FAILED');
+  };
+
   return (
     <Stack spacing={3}>
       {registrations.map((reg) => (
@@ -109,8 +119,8 @@ export default function MyRegistrations({ userId }: MyRegistrationsProps) {
               
               <Box sx={{ minWidth: 150, textAlign: { sm: 'right' } }}>
                 <Typography variant="subtitle2" gutterBottom>Payment</Typography>
-                {reg.payments.map((p, idx) => (
-                  <Box key={idx} sx={{ mb: 1 }}>
+                {reg.payments.map((p) => (
+                  <Box key={`${p.amount}-${p.currency}-${p.paymentStatus}`} sx={{ mb: 1 }}>
                     <Typography variant="h6">{p.amount}{p.currency}</Typography>
                     <Chip 
                       label={p.paymentStatus} 
@@ -128,6 +138,14 @@ export default function MyRegistrations({ userId }: MyRegistrationsProps) {
                 >
                   Event Details
                 </Button>
+                {canShowQr(reg) && (
+                  <Box sx={{ mt: 2, p: 1, bgcolor: 'background.paper', display: 'inline-block' }}>
+                    <QRCode
+                      value={formatTicketQrPayload({ eventId: reg.event.id, ticketId: reg.ticketId })}
+                      size={128}
+                    />
+                  </Box>
+                )}
               </Box>
             </Stack>
           </CardContent>
