@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
                     create: toPersistedProducts(validatedData.products)
                 },
                 requireApproval: validatedData.requireApproval,
+                scanOnce: validatedData.scanOnce,
             },
             include: {
                 location: true,

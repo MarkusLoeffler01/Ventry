@@ -238,6 +238,8 @@ export const EventBaseObject = z.object({
   requiresHotel: z.boolean().default(false),
   /** Require organizer approval before payment can be made */
   requireApproval: z.boolean().default(false),
+  /** Allow a ticket to be accepted only once at check-in */
+  scanOnce: z.boolean().default(false),
   /** Fixed deadline for all payments */
   paymentDeadline: z.coerce.date().nullable().optional(),
 

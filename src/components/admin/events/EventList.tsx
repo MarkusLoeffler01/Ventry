@@ -23,10 +23,11 @@ import {
   Edit, 
   Delete, 
   Add, 
-  Visibility 
+  Visibility,
+  QrCodeScanner
 } from '@mui/icons-material';
 import Link from 'next/link';
-import { type SerializedEvent } from '@/types/event';
+import type { SerializedEvent } from '@/types/event';
 
 interface EventListProps {
   initialEvents: SerializedEvent[];
@@ -93,7 +94,7 @@ export default function EventList({ initialEvents }: EventListProps) {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 150,
+      width: 190,
       sortable: false,
       renderCell: (params: GridRenderCellParams) => (
         <Stack direction="row" spacing={1}>
@@ -111,6 +112,14 @@ export default function EventList({ initialEvents }: EventListProps) {
             title="View Public"
           >
             <Visibility fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            component={Link}
+            href={`/admin/events/${params.row.id}/check-in`}
+            title="Check-in"
+          >
+            <QrCodeScanner fontSize="small" />
           </IconButton>
           <IconButton 
             size="small" 

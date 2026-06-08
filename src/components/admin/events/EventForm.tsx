@@ -49,6 +49,7 @@ export interface InitialData {
   maxRegistrations?: number | null;
   requiresHotel?: boolean;
   requireApproval?: boolean;
+  scanOnce?: boolean;
   paymentDeadline?: string | Date | null;
   status?: "DRAFT" | "PUBLISHED" | "CANCELLED";
   imageUrl?: string | null;
@@ -211,6 +212,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       maxRegistrations: initialData?.maxRegistrations || null,
       requiresHotel: initialData?.requiresHotel || false,
       requireApproval: initialData?.requireApproval || false,
+      scanOnce: initialData?.scanOnce || false,
       paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || "DRAFT",
       imageUrl: initialData?.imageUrl || null,
@@ -1115,6 +1117,24 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                 />
                 <Typography variant="caption" display="block" color="text.secondary">
                   If enabled, attendees can submit registration but payment remains locked until an admin approves it.
+                </Typography>
+              </Box>
+
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Controller
+                      name="scanOnce"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch checked={field.value} onChange={event => field.onChange(event.target.checked)} />
+                      )}
+                    />
+                  }
+                  label="Expire tickets after first check-in scan"
+                />
+                <Typography variant="caption" display="block" color="text.secondary">
+                  If enabled, repeat scans of a checked-in ticket will be rejected at the door.
                 </Typography>
               </Box>
 
