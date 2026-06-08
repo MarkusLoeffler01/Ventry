@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, type CSSProperties, type HTMLAttributes } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -48,7 +48,8 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  rectSortingStrategy
+  rectSortingStrategy,
+  horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ImageCropper from './ImageCropper';
@@ -86,6 +87,11 @@ interface MobileGalleryItemProps {
   onSelect: (id: string) => void;
   onPreview: (index: number) => void;
   getInitials: () => string;
+  dragAttributes?: HTMLAttributes<HTMLElement>;
+  dragListeners?: Record<string, unknown>;
+  isDragging?: boolean;
+  style?: CSSProperties;
+  setNodeRef?: (node: HTMLElement | null) => void;
 }
 
 function SortableItem({ 
@@ -215,10 +221,16 @@ function MobileGalleryItem({
   isSelected,
   onSelect,
   onPreview,
-  getInitials
+  getInitials,
+  dragAttributes,
+  dragListeners,
+  isDragging,
+  style,
+  setNodeRef
 }: MobileGalleryItemProps) {
   return (
     <Box
+      ref={setNodeRef}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(picture.id)}
@@ -228,6 +240,8 @@ function MobileGalleryItem({
           onSelect(picture.id);
         }
       }}
+      {...dragAttributes}
+      {...dragListeners}
       sx={{
         flex: '0 0 132px',
         border: '2px solid',
@@ -236,10 +250,13 @@ function MobileGalleryItem({
         bgcolor: isSelected ? 'action.selected' : 'background.paper',
         p: 0.75,
         textAlign: 'left',
-        cursor: 'pointer',
+        cursor: isDragging ? 'grabbing' : 'grab',
         minWidth: 0,
-        appearance: 'none'
+        appearance: 'none',
+        opacity: isDragging ? 0.6 : 1,
+        touchAction: 'none'
       }}
+      style={style}
     >
       <Box
         sx={{
@@ -291,6 +308,37 @@ function MobileGalleryItem({
             <Star sx={{ fontSize: 18 }} />
           </Box>
         )}
+        <Tooltip title="Move">
+          <Box
+            component="button"
+            type="button"
+            aria-label={`Move profile picture ${index + 1}`}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            sx={{
+              position: 'absolute',
+              left: 6,
+              bottom: 6,
+              width: 28,
+              height: 28,
+              border: 0,
+              borderRadius: '50%',
+              bgcolor: 'rgba(0, 0, 0, 0.55)',
+              color: 'common.white',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: 0,
+              '&:hover': {
+                bgcolor: 'rgba(0, 0, 0, 0.7)'
+              }
+            }}
+          >
+            <DragIndicator sx={{ fontSize: 18 }} />
+          </Box>
+        </Tooltip>
       </Box>
 
       <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, justifyContent: 'center' }}>
@@ -321,6 +369,33 @@ function MobileGalleryItem({
         </Tooltip>
       </Stack>
     </Box>
+  );
+}
+
+function SortableMobileGalleryItem(props: Omit<MobileGalleryItemProps, "dragAttributes" | "dragListeners" | "isDragging" | "style" | "setNodeRef">) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.picture.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <MobileGalleryItem
+      {...props}
+      dragAttributes={attributes}
+      dragListeners={listeners}
+      isDragging={isDragging}
+      setNodeRef={setNodeRef}
+      style={style}
+    />
   );
 }
 
@@ -770,35 +845,46 @@ export default function ProfilePictureGallery({
                 )}
               </Box>
 
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{
-                  overflowX: 'auto',
-                  pb: 0.5,
-                  mx: -2,
-                  px: 2,
-                  scrollSnapType: 'x proximity',
-                  '& > *': {
-                    scrollSnapAlign: 'start'
-                  }
-                }}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
               >
-                {orderedPictures.map((picture, index) => (
-                  <MobileGalleryItem
-                    key={picture.id}
-                    picture={picture}
-                    index={index}
-                    isSelected={picture.id === mobileSelectedPicture?.id}
-                    onSelect={(id) => {
-                      setSelectedPictureId(id);
-                      setCurrentIndex(index);
+                <SortableContext
+                  items={orderedPictures.map(pic => pic.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      overflowX: 'auto',
+                      pb: 0.5,
+                      mx: -2,
+                      px: 2,
+                      scrollSnapType: 'x proximity',
+                      '& > *': {
+                        scrollSnapAlign: 'start'
+                      }
                     }}
-                    onPreview={handleImageClick}
-                    getInitials={getInitials}
-                  />
-                ))}
-              </Stack>
+                  >
+                    {orderedPictures.map((picture, index) => (
+                      <SortableMobileGalleryItem
+                        key={picture.id}
+                        picture={picture}
+                        index={index}
+                        isSelected={picture.id === mobileSelectedPicture?.id}
+                        onSelect={(id) => {
+                          setSelectedPictureId(id);
+                          setCurrentIndex(index);
+                        }}
+                        onPreview={handleImageClick}
+                        getInitials={getInitials}
+                      />
+                    ))}
+                  </Stack>
+                </SortableContext>
+              </DndContext>
             </Stack>
           ) : orderedPictures.length > 0 ? (
             <DndContext
