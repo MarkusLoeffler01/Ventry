@@ -44,7 +44,7 @@ function emptyCommit(cwd, subject, body) {
   exec("git", args, cwd);
 }
 
-function generate(cwd, range = "main..dev") {
+function generate(cwd, range = "main..dev", env = {}) {
   const notesPath = join(cwd, "release-notes.md");
   const outputPath = join(cwd, "github-output.txt");
 
@@ -52,6 +52,7 @@ function generate(cwd, range = "main..dev") {
     GITHUB_OUTPUT: outputPath,
     RELEASE_NOTES_FILE: notesPath,
     RELEASE_RANGE: range,
+    ...env,
   });
 
   return {
@@ -118,4 +119,55 @@ test("ignores release bump and sync-back commits", () => {
   assert.match(notes, /^Has release: no$/m);
   assert.doesNotMatch(notes, /^- #99 `/m);
   assert.doesNotMatch(notes, /Merge branch 'main' into dev/);
+});
+
+test("allows a PR body version override", () => {
+  const cwd = createRepo();
+
+  emptyCommit(cwd, "feat(ui): add dashboard");
+
+  const { notes, output } = generate(cwd, "main..dev", {
+    RELEASE_VERSION_OVERRIDE_TEXT: "Release version override: 1.2.4",
+  });
+
+  assert.match(notes, /^# ventry v1\.2\.4$/m);
+  assert.match(notes, /^Release type: minor$/m);
+  assert.match(notes, /^Calculated version: 1\.3\.0$/m);
+  assert.match(notes, /^Version override: 1\.2\.4$/m);
+  assert.match(output, /^version=1\.2\.4$/m);
+  assert.match(output, /^tag_name=v1\.2\.4$/m);
+  assert.match(output, /^calculated_version=1\.3\.0$/m);
+  assert.match(output, /^version_override=1\.2\.4$/m);
+});
+
+test("rejects version overrides that are not greater than the base version", () => {
+  const cwd = createRepo();
+
+  emptyCommit(cwd, "fix(api): repair status");
+
+  assert.throws(
+    () => generate(cwd, "main..dev", {
+      RELEASE_VERSION_OVERRIDE_TEXT: "Release version override: 1.2.3",
+    }),
+    /must be greater than base version 1\.2\.3/
+  );
+});
+
+test("ignores version override text inside the generated release description block", () => {
+  const cwd = createRepo();
+
+  emptyCommit(cwd, "feat(ui): add dashboard");
+
+  const { notes, output } = generate(cwd, "main..dev", {
+    RELEASE_VERSION_OVERRIDE_TEXT: [
+      "<!-- ventry:release-description:start -->",
+      "Version override: 1.2.4",
+      "<!-- ventry:release-description:end -->",
+    ].join("\n"),
+  });
+
+  assert.match(notes, /^# ventry v1\.3\.0$/m);
+  assert.doesNotMatch(notes, /^Version override: 1\.2\.4$/m);
+  assert.match(output, /^version=1\.3\.0$/m);
+  assert.match(output, /^version_override=$/m);
 });

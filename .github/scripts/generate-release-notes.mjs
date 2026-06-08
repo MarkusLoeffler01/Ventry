@@ -43,6 +43,18 @@ function formatVersion(version) {
   return `${version.major}.${version.minor}.${version.patch}`;
 }
 
+function versionFromEnvironment() {
+  const explicitVersion = process.env.RELEASE_VERSION_OVERRIDE?.trim();
+  if (explicitVersion) {
+    return parseVersion(explicitVersion);
+  }
+
+  const source = (process.env.RELEASE_VERSION_OVERRIDE_TEXT || "")
+    .replace(/<!-- ventry:release-description:start -->[\s\S]*?<!-- ventry:release-description:end -->/g, "");
+  const match = source.match(/(?:release[ -]?version[ -]?override|version[ -]?override|release[ -]?override)\s*:\s*v?(\d+\.\d+\.\d+)/i);
+  return match ? parseVersion(match[1]) : null;
+}
+
 function compareVersions(left, right) {
   for (const key of ["major", "minor", "patch"]) {
     if (left[key] !== right[key]) return left[key] - right[key];
@@ -201,7 +213,15 @@ const baseVersion = latestVersion ? maxVersion(packageVersion, latestVersion) : 
 const commits = readCommits().filter((commit) => !isReleaseAutomationCommit(commit.subject));
 const hasRelease = commits.length > 0;
 const releaseType = hasRelease ? releaseTypeFor(commits) : "none";
-const nextVersion = hasRelease ? incrementVersion(baseVersion, releaseType) : baseVersion;
+const calculatedVersion = hasRelease ? incrementVersion(baseVersion, releaseType) : baseVersion;
+const versionOverride = hasRelease ? versionFromEnvironment() : null;
+if (versionOverride && compareVersions(versionOverride, baseVersion) <= 0) {
+  throw new Error(
+    `Release version override ${formatVersion(versionOverride)} must be greater than base version ${formatVersion(baseVersion)}`
+  );
+}
+
+const nextVersion = versionOverride || calculatedVersion;
 const tagName = `v${formatVersion(nextVersion)}`;
 
 const grouped = Object.fromEntries(groupOrder.map((group) => [group, []]));
@@ -247,6 +267,12 @@ if (latestVersion) {
 
 lines.push(`Release type: ${releaseType}`);
 lines.push(`Has release: ${hasRelease ? "yes" : "no"}`);
+
+if (versionOverride) {
+  lines.push(`Calculated version: ${formatVersion(calculatedVersion)}`);
+  lines.push(`Version override: ${formatVersion(versionOverride)}`);
+}
+
 lines.push("");
 
 if (includedPullRequests.length > 0) {
@@ -299,6 +325,8 @@ if (process.env.GITHUB_OUTPUT) {
   appendFileSync(process.env.GITHUB_OUTPUT, `version=${formatVersion(nextVersion)}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `tag_name=${tagName}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `release_type=${releaseType}\n`);
+  appendFileSync(process.env.GITHUB_OUTPUT, `calculated_version=${formatVersion(calculatedVersion)}\n`);
+  appendFileSync(process.env.GITHUB_OUTPUT, `version_override=${versionOverride ? formatVersion(versionOverride) : ""}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `has_release=${hasRelease ? "true" : "false"}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `notes_path=${outputPath}\n`);
 }
