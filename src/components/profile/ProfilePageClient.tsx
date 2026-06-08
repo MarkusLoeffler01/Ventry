@@ -45,6 +45,13 @@ interface User {
   name?: string | null;
   email: string;
   country?: string | null;
+  legalName?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  addressCity?: string | null;
+  addressState?: string | null;
+  addressPostalCode?: string | null;
+  addressCountry?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
     providerId: string;  // Changed from 'provider' for better-auth
@@ -65,6 +72,13 @@ interface ProfilePageClientProps {
 interface ProfileFormData {
   name: string;
   country: string;
+  legalName: string;
+  addressLine1: string;
+  addressLine2: string;
+  addressCity: string;
+  addressState: string;
+  addressPostalCode: string;
+  addressCountry: string;
   bio: string;
   dateOfBirth: string;
   pronouns: string;
@@ -88,6 +102,13 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
     country: user.country || '',
+    legalName: user.legalName || '',
+    addressLine1: user.addressLine1 || '',
+    addressLine2: user.addressLine2 || '',
+    addressCity: user.addressCity || '',
+    addressState: user.addressState || '',
+    addressPostalCode: user.addressPostalCode || '',
+    addressCountry: user.addressCountry || '',
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
@@ -148,6 +169,13 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
           id: user.id,
           name: formData.name,
           country: formData.country || null,
+          legalName: formData.legalName || null,
+          addressLine1: formData.addressLine1 || null,
+          addressLine2: formData.addressLine2 || null,
+          addressCity: formData.addressCity || null,
+          addressState: formData.addressState || null,
+          addressPostalCode: formData.addressPostalCode || null,
+          addressCountry: formData.addressCountry || null,
           bio: formData.bio,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
           pronouns: formData.pronouns,
@@ -280,6 +308,70 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               fullWidth
               helperText="Optional, shown on attendee cards if enabled"
             />
+
+            <Divider />
+
+            <Typography variant="h6">
+              Check-in Identity
+            </Typography>
+
+            <TextField
+              label="Legal Name"
+              value={formData.legalName}
+              onChange={handleInputChange('legalName')}
+              fullWidth
+              helperText="Used by event staff for ID checks."
+            />
+
+            <TextField
+              label="Address"
+              value={formData.addressLine1}
+              onChange={handleInputChange('addressLine1')}
+              fullWidth
+              autoComplete="street-address"
+            />
+
+            <TextField
+              label="Address line 2"
+              value={formData.addressLine2}
+              onChange={handleInputChange('addressLine2')}
+              fullWidth
+              autoComplete="address-line2"
+            />
+
+            <TextField
+              label="City"
+              value={formData.addressCity}
+              onChange={handleInputChange('addressCity')}
+              fullWidth
+              autoComplete="address-level2"
+            />
+
+            <TextField
+              label="State/Region"
+              value={formData.addressState}
+              onChange={handleInputChange('addressState')}
+              fullWidth
+              autoComplete="address-level1"
+            />
+
+            <TextField
+              label="Postal code"
+              value={formData.addressPostalCode}
+              onChange={handleInputChange('addressPostalCode')}
+              fullWidth
+              autoComplete="postal-code"
+            />
+
+            <TextField
+              label="Address country"
+              value={formData.addressCountry}
+              onChange={handleInputChange('addressCountry')}
+              fullWidth
+              autoComplete="country-name"
+            />
+
+            <Divider />
 
             <TextField
               label="Bio"

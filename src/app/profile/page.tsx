@@ -30,6 +30,13 @@ async function ProfilePageContent() {
       name: true,
       email: true,
       country: true,
+      legalName: true,
+      addressLine1: true,
+      addressLine2: true,
+      addressCity: true,
+      addressState: true,
+      addressPostalCode: true,
+      addressCountry: true,
       profilePictures: {
         orderBy: [
           { order: 'asc' },
