@@ -32,6 +32,7 @@ src/generated/prisma
 # misc
 .DS_Store
 *.pem
+*.srl
 
 # debug
 npm-debug.log*

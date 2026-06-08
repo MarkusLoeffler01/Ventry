@@ -9,7 +9,8 @@
   "engineStrict": true,
   "scripts": {
     "dev:nossl": "next dev -H 127.0.0.1 -p 3000",
-    "dev": "next dev -H local.dev -p 3443 --experimental-https --experimental-https-key=certs/local.dev+1-key.pem --experimental-https-cert=certs/local.dev+1.pem",
+    "dev": "next dev -H local.dev -p 3443 --experimental-https --experimental-https-key=certs/dev-local-key.pem --experimental-https-cert=certs/dev-local.pem",
+    "dev:ventry": "BETTER_AUTH_URL=https://ventry.localhost:3443 NEXTAUTH_URL=https://ventry.localhost:3443 DEV_URL=https://ventry.localhost:3443 next dev -H ventry.localhost -p 3443 --experimental-https --experimental-https-key=certs/dev-local-key.pem --experimental-https-cert=certs/dev-local.pem",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -17,6 +18,8 @@
     "test": "vitest --run",
     "test:release-notes": "node --test .github/scripts/*.node-test.mjs",
     "test:watch": "vitest --watch",
+    "certs:local": "bash scripts/generate-local-certs.sh",
+    "certs:local:ca": "bash scripts/generate-local-certs.sh --ca",
     "db:backup": "bash scripts/db-backup.sh",
     "db:restore": "bash scripts/db-restore.sh",
     "db:reset": "bash scripts/db-reset.sh"
