@@ -73,7 +73,7 @@ export async function PATCH(
         const preferences = (body.preferences || {}) as RegistrationPreferences;
         const requestedProductIds = uniqueIds(body.productIds || (body.productId ? [body.productId] : []));
 
-        if (requestedProductIds.length === 0) {
+        if (requestedProductIds.length === 0 && mode !== "extras") {
             return NextResponse.json({ error: "No products selected" }, { status: 400 });
         }
 
@@ -83,24 +83,6 @@ export async function PATCH(
         }) as UpdatableEvent | null;
 
         if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
-
-        const validProducts = event.products.filter((product) => requestedProductIds.includes(product.id));
-        if (validProducts.length !== requestedProductIds.length) {
-            return NextResponse.json({ error: "One or more invalid products selected" }, { status: 400 });
-        }
-
-        const requestedTicketIds = validProducts.filter((product) => product.type === "TICKET").map((product) => product.id);
-        if (requestedTicketIds.length !== 1) {
-            return NextResponse.json({ error: "Exactly one ticket must be selected" }, { status: 400 });
-        }
-
-        const requestedAccommodationIds = validProducts
-            .filter((product) => product.type === "ACCOMMODATION")
-            .map((product) => product.id);
-
-        if (requestedAccommodationIds.length > 1) {
-            return NextResponse.json({ error: "Only one accommodation can be selected" }, { status: 400 });
-        }
 
         const productById = new Map(event.products.map((product) => [product.id, product]));
         const serializedProducts = event.products.map((product) => ({
@@ -137,6 +119,7 @@ export async function PATCH(
 
             const existingPreferences = (existingRegistration.preferences || {}) as RegistrationPreferences;
             const hasCompletedPayment = existingRegistration.payments.some((payment) => payment.paymentStatus === "COMPLETED");
+            const preservePaidCorePreferences = hasCompletedPayment && mode === "extras";
             const pendingPayment = existingRegistration.payments.find((payment) => payment.paymentStatus === "PENDING") || null;
             const approvalPending = Boolean(event.requireApproval) && existingRegistration.status === "PENDING" && !hasCompletedPayment;
 
@@ -144,10 +127,82 @@ export async function PATCH(
             const existingWaitlistedIds = existingRegistration.waitlistEntries.map((item) => item.productId);
             const existingSelectedIds = uniqueIds([...existingConfirmedIds, ...existingWaitlistedIds]);
 
+            let effectiveRequestedProductIds = requestedProductIds;
+            if (preservePaidCorePreferences) {
+                const requestedNewIds = requestedProductIds.filter((id) => !existingSelectedIds.includes(id));
+                const invalidNewIds = requestedNewIds.filter((id) => !productById.has(id));
+
+                if (invalidNewIds.length > 0) {
+                    return NextResponse.json({ error: "One or more invalid products selected" }, { status: 400 });
+                }
+
+                if (requestedNewIds.some((id) => productById.get(id)?.type !== "ADDON")) {
+                    return NextResponse.json({
+                        error: "Only additional add-ons can be added after payment."
+                    }, { status: 409 });
+                }
+
+                effectiveRequestedProductIds = uniqueIds([...existingSelectedIds, ...requestedProductIds]);
+            } else {
+                const invalidRequestedIds = requestedProductIds.filter((id) => !productById.has(id));
+                if (invalidRequestedIds.length > 0) {
+                    return NextResponse.json({ error: "One or more invalid products selected" }, { status: 400 });
+                }
+            }
+
+            const validProducts = effectiveRequestedProductIds
+                .map((id) => productById.get(id))
+                .filter((product): product is NonNullable<typeof event.products[number]> => Boolean(product));
+            const requestedTicketIds = validProducts
+                .filter((product) => product.type === "TICKET")
+                .map((product) => product.id);
+            const existingTicketId =
+                existingPreferences.productId ||
+                existingPreferences.productIds?.find((id) => productById.get(id)?.type === "TICKET") ||
+                existingSelectedIds.find((id) => productById.get(id)?.type === "TICKET");
+            const selectedTicketId =
+                preservePaidCorePreferences
+                    ? existingTicketId || requestedTicketIds[0]
+                    : requestedTicketIds[0];
+
+            if ((!hasCompletedPayment || mode !== "extras") && requestedTicketIds.length !== 1) {
+                return NextResponse.json({ error: "Exactly one ticket must be selected" }, { status: 400 });
+            }
+
+            const requestedAccommodationIds = validProducts
+                .filter((product) => product.type === "ACCOMMODATION")
+                .map((product) => product.id);
+
+            if (requestedAccommodationIds.length > 1) {
+                return NextResponse.json({ error: "Only one accommodation can be selected" }, { status: 400 });
+            }
+
             const existingCoreIds = existingSelectedIds.filter((id) => productById.get(id)?.type !== "ADDON");
-            const requestedCoreIds = requestedProductIds.filter((id) => productById.get(id)?.type !== "ADDON");
-            const removedIds = existingSelectedIds.filter((id) => !requestedProductIds.includes(id));
-            const addedIds = requestedProductIds.filter((id) => !existingSelectedIds.includes(id));
+            const requestedCoreIds = effectiveRequestedProductIds.filter((id) => productById.get(id)?.type !== "ADDON");
+            const removedIds = existingSelectedIds.filter((id) => !effectiveRequestedProductIds.includes(id));
+            const addedIds = effectiveRequestedProductIds.filter((id) => !existingSelectedIds.includes(id));
+            const nextNeedsHotel =
+                preservePaidCorePreferences ? existingPreferences.needsHotel ?? preferences.needsHotel : preferences.needsHotel;
+            const nextAccommodationPreference =
+                preservePaidCorePreferences
+                    ? existingPreferences.accommodationId ?? preferences.accommodationId
+                    : preferences.accommodationId;
+            const nextEarlyArrival =
+                preservePaidCorePreferences
+                    ? existingPreferences.earlyArrival ?? preferences.earlyArrival
+                    : preferences.earlyArrival;
+            const nextLateDeparture =
+                preservePaidCorePreferences
+                    ? existingPreferences.lateDeparture ?? preferences.lateDeparture
+                    : preferences.lateDeparture;
+            const nextCustomFieldsData =
+                preservePaidCorePreferences
+                    ? preferences.customFieldsData ?? existingPreferences.customFieldsData
+                    : preferences.customFieldsData;
+            const nextShowOnAttendees =
+                preservePaidCorePreferences
+                    ? preferences.showOnAttendees ?? existingPreferences.showOnAttendees
+                    : preferences.showOnAttendees;
 
             if (hasCompletedPayment) {
                 if (mode !== "extras") {
@@ -174,16 +229,9 @@ export async function PATCH(
                     }, { status: 409 });
                 }
 
-                if (
-                    existingPreferences.needsHotel !== preferences.needsHotel ||
-                    existingPreferences.accommodationId !== preferences.accommodationId ||
-                    existingPreferences.earlyArrival !== preferences.earlyArrival ||
-                    existingPreferences.lateDeparture !== preferences.lateDeparture
-                ) {
-                    return NextResponse.json({
-                        error: "Stay changes after payment require organizer support."
-                    }, { status: 409 });
-                }
+                // In extras mode, the locked product set above is the source of truth for
+                // preventing ticket and hotel changes. Preserve existing stay preferences
+                // instead of rejecting form payloads that omit derived hotel fields.
             }
 
             if (removedIds.length > 0) {
@@ -305,7 +353,7 @@ export async function PATCH(
                 .filter((product): product is NonNullable<typeof event.products[number]> => Boolean(product));
 
             const selectedAccommodationId =
-                preferences.accommodationId ||
+                nextAccommodationPreference ||
                 finalConfirmedProducts.find((product) => product.type === "ACCOMMODATION")?.id;
             const selectedRoom = finalConfirmedProducts.find((product) => product.id === selectedAccommodationId);
             const selectedHotel = findHotelByRoomProductId(
@@ -409,9 +457,14 @@ export async function PATCH(
                     status: nextStatus as "PENDING" | "APPROVED" | "CONFIRMED" | "CANCELLED" | "WAITLISTED",
                     expiresAt: nextExpiresAt,
                     preferences: {
-                        ...preferences,
-                        productId: requestedTicketIds[0],
-                        productIds: requestedProductIds,
+                        ...(preservePaidCorePreferences ? existingPreferences : preferences),
+                        needsHotel: nextNeedsHotel,
+                        earlyArrival: nextEarlyArrival,
+                        lateDeparture: nextLateDeparture,
+                        customFieldsData: nextCustomFieldsData,
+                        showOnAttendees: nextShowOnAttendees,
+                        productId: selectedTicketId,
+                        productIds: uniqueIds([...finalConfirmedIds, ...finalWaitlistIds]),
                         accommodationId: selectedAccommodationId || undefined
                     } as Prisma.InputJsonValue
                 }
