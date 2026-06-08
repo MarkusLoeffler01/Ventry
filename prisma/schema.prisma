@@ -37,6 +37,13 @@ model User {
   twoFactorBackupCodes String?
   image                String?
   country              String?
+  legalName            String?
+  addressLine1         String?
+  addressLine2         String?
+  addressCity          String?
+  addressState         String?
+  addressPostalCode    String?
+  addressCountry       String?
   adminProfile         Admin?
   payments             Payment[]
   profilePictures      ProfilePicture[]
@@ -59,6 +66,8 @@ model Admin {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkedInRegistrations Registration[]      @relation("RegistrationCheckedInByAdmin")
+  checkInLogs          RegistrationCheckInLog[]
   eventsOwned          Event[]
   history              RegistrationHistory[]
   supportTicketUpdates SupportTicket[]       @relation("AdminSupportTicketUpdates")
@@ -130,7 +139,9 @@ model Event {
   schedule            Json            @default("[]")
   requiresHotel       Boolean         @default(false)
   requireApproval     Boolean         @default(false)
+  scanOnce            Boolean         @default(false)
   owner               Admin?          @relation(fields: [ownerId], references: [id])
+  checkInLogs         RegistrationCheckInLog[]
   location            Location?
   products            Product[]
   registrations       Registration[]
@@ -163,7 +174,12 @@ model Registration {
   customFieldData   Json                  @default("{}")
   expiresAt         DateTime?
   notes             String?
+  checkedInAt       DateTime?
+  checkedInByAdminId String?
+  checkInCount      Int                   @default(0)
   payments          Payment[]
+  checkInLogs       RegistrationCheckInLog[]
+  checkedInBy       Admin?                @relation("RegistrationCheckedInByAdmin", fields: [checkedInByAdminId], references: [id])
   event             Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   history           RegistrationHistory[]
@@ -172,6 +188,8 @@ model Registration {
   waitlistEntries   WaitlistEntry[]
 
   @@unique([userId, eventId])
+  @@index([eventId, ticketId])
+  @@index([checkedInByAdminId])
 }
 
 model RegistrationItem {
@@ -196,6 +214,26 @@ model RegistrationHistory {
   createdAt        DateTime     @default(now())
   changedBy        Admin?       @relation(fields: [changedByAdminId], references: [id])
   registration     Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+}
+
+model RegistrationCheckInLog {
+  id                String       @id @default(cuid())
+  registrationId    String?
+  eventId           Int
+  adminId           String?
+  ticketId          Int
+  clientOperationId String       @unique
+  clientScannedAt   DateTime?
+  serverProcessedAt DateTime     @default(now())
+  result            String
+  notes             Json         @default("{}")
+  admin             Admin?       @relation(fields: [adminId], references: [id])
+  event             Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration      Registration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, ticketId])
+  @@index([registrationId])
+  @@index([adminId])
 }
 
 model Payment {
