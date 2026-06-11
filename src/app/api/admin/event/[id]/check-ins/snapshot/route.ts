@@ -85,11 +85,15 @@ export async function GET(
       });
       const resolvedProducts = resolveCheckInProducts(registration.registrationItems, registration.preferences, event.products);
       const ticketProduct = resolveTicketTier(registration.registrationItems, registration.preferences, event.products);
+      const displayName = registration.user.name || registration.user.legalName || "Unnamed attendee";
+      const legalName = registration.user.legalName || null;
 
       return {
         id: registration.id,
         ticketId: registration.ticketId,
-        attendeeName: registration.user.legalName || registration.user.name || "Unnamed attendee",
+        attendeeName: displayName,
+        displayName,
+        legalName,
         status: registration.status,
         checkedInAt: registration.checkedInAt?.toISOString() || null,
         checkInCount: registration.checkInCount,

@@ -82,6 +82,7 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerControls = useRef<IScannerControls | null>(null);
   const lastScanRef = useRef<{ value: string; at: number } | null>(null);
+  const successTimeoutRef = useRef<number | null>(null);
 
   const [snapshot, setSnapshot] = useState<CheckInSnapshot | null>(null);
   const [selectedRegistration, setSelectedRegistration] = useState<CheckInSnapshotRegistration | null>(null);
@@ -89,13 +90,20 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
   const [pendingCount, setPendingCount] = useState(0);
   const [loadingSnapshot, setLoadingSnapshot] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
   const [scannerActive, setScannerActive] = useState(false);
+  const [resumeScannerAfterDialog, setResumeScannerAfterDialog] = useState(false);
+  const [showCheckInSuccess, setShowCheckInSuccess] = useState(false);
   const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [message, setMessage] = useState<{ severity: "success" | "info" | "warning" | "error"; text: string } | null>(null);
 
   const registrationsByTicket = useMemo(() => {
     return new Map(snapshot?.registrations.map(registration => [registration.ticketId, registration]) || []);
   }, [snapshot]);
+
+  const selectedDisplayName =
+    selectedRegistration?.displayName || selectedRegistration?.attendeeName || "Unnamed attendee";
+  const selectedLegalName = selectedRegistration?.legalName || null;
 
   const refreshPendingCount = useCallback(async () => {
     const operations = await listPendingOperations(eventId);
@@ -195,6 +203,9 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+      if (successTimeoutRef.current !== null) {
+        window.clearTimeout(successTimeoutRef.current);
+      }
       scannerControls.current?.stop();
     };
   }, [refreshSnapshot, syncPending]);
@@ -213,6 +224,7 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
     }
 
     if (source === "scan") {
+      setResumeScannerAfterDialog(true);
       stopScannerControls(scannerControls);
       setScannerActive(false);
     }
@@ -265,8 +277,33 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
   };
 
   const stopScanner = () => {
+    setResumeScannerAfterDialog(false);
     stopScannerControls(scannerControls);
     setScannerActive(false);
+  };
+
+  const closeRegistrationDialog = () => {
+    const shouldResumeScanner = resumeScannerAfterDialog;
+    setSelectedRegistration(null);
+    if (shouldResumeScanner) {
+      setResumeScannerAfterDialog(false);
+      void startScanner();
+    }
+  };
+
+  const showSuccessAndResume = (shouldResumeScanner: boolean) => {
+    if (successTimeoutRef.current !== null) {
+      window.clearTimeout(successTimeoutRef.current);
+    }
+
+    setShowCheckInSuccess(true);
+    successTimeoutRef.current = window.setTimeout(() => {
+      setShowCheckInSuccess(false);
+      successTimeoutRef.current = null;
+      if (shouldResumeScanner) {
+        void startScanner();
+      }
+    }, 800);
   };
 
   const handleManualLookup = () => {
@@ -284,6 +321,8 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
       return;
     }
 
+    setCheckingIn(true);
+    const shouldResumeScanner = resumeScannerAfterDialog;
     const operation: PendingCheckInOperation = {
       clientOperationId: createOperationId(),
       eventId,
@@ -291,14 +330,22 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
       scannedAt: new Date().toISOString(),
     };
 
-    const nextSnapshot = applyLocalCheckIn(snapshot, selectedRegistration.ticketId);
-    setSnapshot(nextSnapshot);
-    setSelectedRegistration(nextSnapshot.registrations.find(registration => registration.ticketId === selectedRegistration.ticketId) || null);
-    await saveSnapshot(nextSnapshot);
-    await addPendingOperation(operation);
-    await refreshPendingCount();
-    setMessage({ severity: online ? "info" : "warning", text: online ? "Check-in queued for sync." : "Offline check-in queued." });
-    void syncPending();
+    try {
+      const nextSnapshot = applyLocalCheckIn(snapshot, selectedRegistration.ticketId);
+      setSnapshot(nextSnapshot);
+      await saveSnapshot(nextSnapshot);
+      await addPendingOperation(operation);
+      await refreshPendingCount();
+      setSelectedRegistration(null);
+      setResumeScannerAfterDialog(false);
+      showSuccessAndResume(shouldResumeScanner);
+      setMessage({ severity: online ? "info" : "warning", text: online ? "Check-in queued for sync." : "Offline check-in queued." });
+      void syncPending();
+    } catch (error) {
+      setMessage({ severity: "error", text: error instanceof Error ? error.message : "Could not queue check-in." });
+    } finally {
+      setCheckingIn(false);
+    }
   };
 
   return (
@@ -328,6 +375,33 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
       </Paper>
 
       {message ? <Alert severity={message.severity} onClose={() => setMessage(null)}>{message.text}</Alert> : null}
+
+      {showCheckInSuccess ? (
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            zIndex: theme => theme.zIndex.modal + 2,
+            bgcolor: "success.main",
+            color: "success.contrastText",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            "@keyframes ventry-check-success": {
+              "0%": { opacity: 0, transform: "scale(0.65)" },
+              "45%": { opacity: 1, transform: "scale(1.08)" },
+              "100%": { opacity: 1, transform: "scale(1)" },
+            },
+          }}
+        >
+          <CheckCircle
+            sx={{
+              fontSize: { xs: 132, md: 180 },
+              animation: "ventry-check-success 650ms ease-out",
+            }}
+          />
+        </Box>
+      ) : null}
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 } }}>
         <Stack spacing={2}>
@@ -382,7 +456,7 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
         </Stack>
       </Paper>
 
-      <Dialog open={!!selectedRegistration} onClose={() => setSelectedRegistration(null)} fullScreen>
+      <Dialog open={!!selectedRegistration} onClose={closeRegistrationDialog} fullScreen>
         <DialogTitle>
           Ticket #{selectedRegistration?.ticketId}
         </DialogTitle>
@@ -390,9 +464,14 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
           {selectedRegistration ? (
             <Stack spacing={3}>
               <Box>
-                <Typography variant="h4" fontWeight={700}>
-                  {selectedRegistration.attendeeName}
+                <Typography variant="h3" fontWeight={800} sx={{ fontSize: { xs: "2rem", md: "3rem" } }}>
+                  {selectedDisplayName}
                 </Typography>
+                {selectedLegalName ? (
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Legal name: {selectedLegalName}
+                  </Typography>
+                ) : null}
                 <Typography variant="body1" color="text.secondary">
                   {selectedRegistration.ticketTier || "No ticket tier"}
                 </Typography>
@@ -432,14 +511,14 @@ export default function AdminCheckInScanner({ eventId }: AdminCheckInScannerProp
           ) : null}
         </DialogContent>
         <DialogActions sx={{ position: "sticky", bottom: 0, bgcolor: "background.paper", p: 2 }}>
-          <Button onClick={() => setSelectedRegistration(null)}>Close</Button>
+          <Button onClick={closeRegistrationDialog}>Close</Button>
           <Button
             variant="contained"
             startIcon={<CheckCircle />}
             onClick={() => void handleQueueCheckIn()}
-            disabled={!selectedRegistration?.eligible}
+            disabled={!selectedRegistration?.eligible || checkingIn}
           >
-            Check In
+            {checkingIn ? "Checking in..." : "Check In"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -202,8 +202,12 @@ async function processOperation(
 
   const clientScannedAt = parseClientDate(operation.scannedAt);
   const ticketProduct = resolveTicketTier(registration.registrationItems, registration.preferences, registration.event.products);
+  const displayName = registration.user.name || registration.user.legalName || "Unnamed attendee";
+  const legalName = registration.user.legalName || null;
   const baseNotes = {
-    attendeeName: registration.user.legalName || registration.user.name || "Unnamed attendee",
+    attendeeName: displayName,
+    displayName,
+    legalName,
     ticketTier: ticketProduct?.name || null,
   };
 

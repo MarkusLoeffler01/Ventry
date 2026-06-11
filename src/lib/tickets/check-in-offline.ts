@@ -9,6 +9,8 @@ export type CheckInSnapshotRegistration = {
   id: string;
   ticketId: number;
   attendeeName: string;
+  displayName?: string;
+  legalName?: string | null;
   status: string;
   checkedInAt: string | null;
   checkInCount: number;

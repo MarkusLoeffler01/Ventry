@@ -10,12 +10,16 @@ import {
   Chip, 
   Button, 
   Alert,
-  CircularProgress
+  CircularProgress,
+  Collapse,
+  Divider
 } from '@mui/material';
 import { 
   Event, 
   ConfirmationNumber, 
-  LocationOn 
+  LocationOn,
+  ExpandLess,
+  ExpandMore
 } from '@mui/icons-material';
 import Link from 'next/link';
 import QRCode from 'react-qr-code';
@@ -49,6 +53,7 @@ export default function MyRegistrations({ userId }: MyRegistrationsProps) {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRegistrationIds, setExpandedRegistrationIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     const fetchRegistrations = async () => {
@@ -84,73 +89,135 @@ export default function MyRegistrations({ userId }: MyRegistrationsProps) {
     return !reg.payments.some(payment => payment.paymentStatus === 'PENDING' || payment.paymentStatus === 'FAILED');
   };
 
+  const toggleRegistration = (registrationId: string) => {
+    setExpandedRegistrationIds((current) => {
+      const next = new Set(current);
+      if (next.has(registrationId)) {
+        next.delete(registrationId);
+      } else {
+        next.add(registrationId);
+      }
+      return next;
+    });
+  };
+
   return (
     <Stack spacing={3}>
-      {registrations.map((reg) => (
-        <Card key={reg.id} variant="outlined">
-          <CardContent>
-            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2}>
-              <Box>
-                <Typography variant="h6" gutterBottom>{reg.event.name}</Typography>
-                <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Event fontSize="small" color="action" />
-                    <Typography variant="body2">{new Date(reg.event.startDate).toLocaleDateString()}</Typography>
+      {registrations.map((reg) => {
+        const isExpanded = expandedRegistrationIds.has(reg.id);
+        const ticketDetailsId = `registration-ticket-${reg.id}`;
+
+        return (
+          <Card key={reg.id} variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2}>
+                  <Box>
+                    <Typography variant="h6" gutterBottom>{reg.event.name}</Typography>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.5, sm: 2 }} sx={{ mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Event fontSize="small" color="action" />
+                        <Typography variant="body2">{new Date(reg.event.startDate).toLocaleDateString()}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <LocationOn fontSize="small" color="action" />
+                        <Typography variant="body2">{reg.event.location?.city || 'TBD'}</Typography>
+                      </Box>
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
+                      <Chip
+                        label={`Status: ${reg.status}`}
+                        color={reg.status === 'CONFIRMED' ? 'success' : 'warning'}
+                        size="small"
+                      />
+                      <Chip
+                        icon={<ConfirmationNumber />}
+                        label={`Ticket ID: #${reg.ticketId}`}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Stack>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <LocationOn fontSize="small" color="action" />
-                    <Typography variant="body2">{reg.event.location?.city || 'TBD'}</Typography>
-                  </Box>
+
+                  <Stack
+                    alignItems={{ xs: 'stretch', sm: 'flex-end' }}
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1}
+                  >
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      component={Link}
+                      href={`/events/${reg.event.id}`}
+                    >
+                      Event Details
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => toggleRegistration(reg.id)}
+                      aria-controls={ticketDetailsId}
+                      aria-expanded={isExpanded}
+                      endIcon={isExpanded ? <ExpandLess /> : <ExpandMore />}
+                    >
+                      {isExpanded ? 'Hide ticket' : 'Show ticket'}
+                    </Button>
+                  </Stack>
                 </Stack>
-                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                  <Chip 
-                    label={`Status: ${reg.status}`} 
-                    color={reg.status === 'CONFIRMED' ? 'success' : 'warning'} 
-                    size="small" 
-                  />
-                  <Chip 
-                    icon={<ConfirmationNumber />} 
-                    label={`Ticket ID: #${reg.ticketId}`} 
-                    variant="outlined" 
-                    size="small" 
-                  />
-                </Stack>
-              </Box>
-              
-              <Box sx={{ minWidth: 150, textAlign: { sm: 'right' } }}>
-                <Typography variant="subtitle2" gutterBottom>Payment</Typography>
-                {reg.payments.map((p) => (
-                  <Box key={`${p.amount}-${p.currency}-${p.paymentStatus}`} sx={{ mb: 1 }}>
-                    <Typography variant="h6">{p.amount}{p.currency}</Typography>
-                    <Chip 
-                      label={p.paymentStatus} 
-                      size="small" 
-                      color={p.paymentStatus === 'COMPLETED' ? 'success' : 'default'}
-                    />
-                  </Box>
-                ))}
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  sx={{ mt: 2 }}
-                  component={Link}
-                  href={`/events/${reg.event.id}`}
-                >
-                  Event Details
-                </Button>
-                {canShowQr(reg) && (
-                  <Box sx={{ mt: 2, p: 1, bgcolor: 'background.paper', display: 'inline-block' }}>
-                    <QRCode
-                      value={formatTicketQrPayload({ eventId: reg.event.id, ticketId: reg.ticketId })}
-                      size={128}
-                    />
-                  </Box>
-                )}
-              </Box>
-            </Stack>
-          </CardContent>
-        </Card>
-      ))}
+
+                <Collapse in={isExpanded}>
+                  <Divider sx={{ mb: 2 }} />
+                  <Stack
+                    id={ticketDetailsId}
+                    direction={{ xs: 'column', sm: 'row' }}
+                    justifyContent="space-between"
+                    spacing={2}
+                  >
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>Payment</Typography>
+                      {reg.payments.length > 0 ? (
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {reg.payments.map((p) => (
+                            <Box key={`${p.amount}-${p.currency}-${p.paymentStatus}`}>
+                              <Typography variant="h6">{p.amount}{p.currency}</Typography>
+                              <Chip
+                                label={p.paymentStatus}
+                                size="small"
+                                color={p.paymentStatus === 'COMPLETED' ? 'success' : 'default'}
+                              />
+                            </Box>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No payment required.</Typography>
+                      )}
+                    </Box>
+
+                    {canShowQr(reg) ? (
+                      <Box
+                        sx={{
+                          alignSelf: { xs: 'center', sm: 'flex-start' },
+                          bgcolor: 'background.paper',
+                          p: 1,
+                        }}
+                      >
+                        <QRCode
+                          value={formatTicketQrPayload({ eventId: reg.event.id, ticketId: reg.ticketId })}
+                          size={128}
+                        />
+                      </Box>
+                    ) : (
+                      <Typography color="text.secondary" variant="body2">
+                        QR ticket is available after the registration is confirmed and paid.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Collapse>
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+      })}
     </Stack>
   );
 }

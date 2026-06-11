@@ -1136,6 +1136,9 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                 <Typography variant="caption" display="block" color="text.secondary">
                   If enabled, repeat scans of a checked-in ticket will be rejected at the door.
                 </Typography>
+                <Typography variant="caption" display="block" color="text.secondary">
+                  Regardless of this setting, the UI will always show how many times a ticket has been scanned.
+                </Typography>
               </Box>
 
               <Box>

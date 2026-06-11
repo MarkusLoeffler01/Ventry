@@ -118,7 +118,9 @@ describe("App Router: admin event check-ins", () => {
     const payload = await response.json();
     expect(payload.registrations[0]).toMatchObject({
       ticketId: 42,
-      attendeeName: "Legal Name",
+      attendeeName: "Display Name",
+      displayName: "Display Name",
+      legalName: "Legal Name",
       eligible: true,
       ticketTier: "Basic",
     });
@@ -245,6 +247,11 @@ describe("App Router: admin event check-ins", () => {
           result: "ACCEPTED",
           registrationId: "reg-1",
           clientOperationId: "operation-1",
+          notes: expect.objectContaining({
+            attendeeName: "Display Name",
+            displayName: "Display Name",
+            legalName: "Legal Name",
+          }),
         }),
       }),
     );
