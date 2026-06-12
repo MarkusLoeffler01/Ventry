@@ -71,6 +71,7 @@ export interface SerializedEvent {
   endDate: string;
   imageUrl: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
+  scanOnce?: boolean;
   stayPolicy: SerializedStayPolicy;
   schedule: SerializedScheduleItem[];
   location?: SerializedLocation | null;

@@ -64,6 +64,13 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
         email: payload.email,
         name: payload.username,
         password: payload.password,
+        legalName: payload.legalName,
+        addressLine1: payload.addressLine1,
+        addressLine2: payload.addressLine2 || null,
+        addressCity: payload.addressCity,
+        addressState: payload.addressState || null,
+        addressPostalCode: payload.addressPostalCode,
+        addressCountry: payload.addressCountry,
       });
 
       if (error) {
@@ -110,6 +117,85 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           {...register("username")}
           error={!!errors.username}
           helperText={errors.username?.message || " "}
+        />
+
+        <Alert severity="info" sx={{ mt: 2, mb: 1 }}>
+          Your legal name and address are protected personal data. They are not shown to other attendees or organizers in normal event views; check-in staff may see your legal name only when verifying your ID at the door.
+        </Alert>
+
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          label="Legal name"
+          autoComplete="name"
+          {...register("legalName")}
+          error={!!errors.legalName}
+          helperText={errors.legalName?.message || " "}
+        />
+
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          label="Address"
+          autoComplete="street-address"
+          {...register("addressLine1")}
+          error={!!errors.addressLine1}
+          helperText={errors.addressLine1?.message || " "}
+        />
+
+        <TextField
+          margin="normal"
+          fullWidth
+          label="Address line 2"
+          autoComplete="address-line2"
+          {...register("addressLine2")}
+          error={!!errors.addressLine2}
+          helperText={errors.addressLine2?.message || " "}
+        />
+
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          label="City"
+          autoComplete="address-level2"
+          {...register("addressCity")}
+          error={!!errors.addressCity}
+          helperText={errors.addressCity?.message || " "}
+        />
+
+        <TextField
+          margin="normal"
+          fullWidth
+          label="State/Region"
+          autoComplete="address-level1"
+          {...register("addressState")}
+          error={!!errors.addressState}
+          helperText={errors.addressState?.message || " "}
+        />
+
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          label="Postal code"
+          autoComplete="postal-code"
+          {...register("addressPostalCode")}
+          error={!!errors.addressPostalCode}
+          helperText={errors.addressPostalCode?.message || " "}
+        />
+
+        <TextField
+          margin="normal"
+          required
+          fullWidth
+          label="Country"
+          autoComplete="country-name"
+          {...register("addressCountry")}
+          error={!!errors.addressCountry}
+          helperText={errors.addressCountry?.message || " "}
         />
 
         <TextField

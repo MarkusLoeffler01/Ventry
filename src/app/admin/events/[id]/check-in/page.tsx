@@ -1,0 +1,45 @@
+import { Suspense } from "react";
+import { notFound, redirect } from "next/navigation";
+import PageLoadingState from "@/components/common/PageLoadingState";
+import AdminCheckInScanner from "@/components/admin/check-ins/AdminCheckInScanner";
+import { checkAdminAuth } from "@/lib/auth/admin";
+import { prisma } from "@/lib/prisma/prisma";
+
+export default function AdminEventCheckInPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageLoadingState />}>
+      <AdminEventCheckInPageContent params={params} />
+    </Suspense>
+  );
+}
+
+async function AdminEventCheckInPageContent({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const authResult = await checkAdminAuth();
+  if (!authResult.authorized) {
+    redirect("/login?callbackUrl=/admin/events");
+  }
+
+  const eventId = Number((await params).id);
+  if (Number.isNaN(eventId)) {
+    notFound();
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true },
+  });
+
+  if (!event) {
+    notFound();
+  }
+
+  return <AdminCheckInScanner eventId={event.id} />;
+}
