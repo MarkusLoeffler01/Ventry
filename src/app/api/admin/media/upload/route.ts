@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
         // 2. Parse Form Data
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
+        const mode = formData.get("mode") === "badge-photo" ? "badge-photo" : "banner";
 
         if (!file) {
             return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
@@ -22,12 +23,12 @@ export async function POST(req: NextRequest) {
         // 3. Process with Sharp
         const bytes = Buffer.from(await file.arrayBuffer());
         const processedBuffer = await sharp(bytes)
-            .resize(1200, 630, { fit: 'cover' }) // Standard OpenGraph / Banner size
+            .resize(mode === "badge-photo" ? 900 : 1200, mode === "badge-photo" ? 900 : 630, { fit: 'cover' })
             .toFormat('jpeg', { quality: 75 })
             .toBuffer();
 
         // 4. Upload to Supabase
-        const fileName = `event-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const fileName = `${mode === "badge-photo" ? "badge-photo" : "event"}-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
         const uploadResult = await uploadEventImage(processedBuffer, fileName);
 
         // 5. Get Signed URL (valid for 1 year for banners, or just return path if public)

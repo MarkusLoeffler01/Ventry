@@ -17,7 +17,7 @@ type EventAdminAuthResult = {
 
 /**
  * Authorizes admin users for a specific event.
- * If an event has an owner, only that owner can manage event-specific support tickets.
+ * If an event has an owner, only that owner can manage event-specific admin data.
  */
 export async function checkEventAdminAuth(
   eventId: number,
@@ -46,7 +46,7 @@ export async function checkEventAdminAuth(
   }
 
   if (event.ownerId && event.ownerId !== adminAuth.adminId) {
-    return { authorized: false, error: "Only this event's admin can manage these support tickets" };
+    return { authorized: false, error: "Only this event's admin can manage this event" };
   }
 
   return {

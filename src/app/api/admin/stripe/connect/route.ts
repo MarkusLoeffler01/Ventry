@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma/prisma";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
 export async function POST(_req: NextRequest) {
     try {

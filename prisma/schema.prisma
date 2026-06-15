@@ -140,12 +140,30 @@ model Event {
   requiresHotel       Boolean         @default(false)
   requireApproval     Boolean         @default(false)
   scanOnce            Boolean         @default(false)
+  badgeTemplates      BadgeTemplate[]
   owner               Admin?          @relation(fields: [ownerId], references: [id])
   checkInLogs         RegistrationCheckInLog[]
   location            Location?
   products            Product[]
   registrations       Registration[]
   supportTickets      SupportTicket[]
+}
+
+model BadgeTemplate {
+  id         String   @id @default(cuid())
+  eventId    Int
+  name       String
+  isDefault  Boolean  @default(false)
+  widthMm    Float    @default(85)
+  heightMm   Float    @default(55)
+  background Json     @default("{}")
+  elements   Json     @default("[]")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([eventId, isDefault])
 }
 
 model Location {

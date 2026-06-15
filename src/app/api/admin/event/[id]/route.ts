@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
-import { Prisma } from "@/generated/prisma";
+import type { Prisma } from "@/generated/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 import { adminUpdateEventSchema } from "@/types/schemas/event/admin";
 import { z } from "zod";

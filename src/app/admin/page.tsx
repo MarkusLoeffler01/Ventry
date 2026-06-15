@@ -148,14 +148,10 @@ export default async function AdminDashboardPage() {
             </Typography>
             <Grid container spacing={2} alignItems="stretch">
                 <Suspense
-                    fallback={
-                        <>
-                            {Array.from({ length: 7 }).map((_, i) => (
-                                // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
-                                <StatSkeleton key={i} />
-                            ))}
-                        </>
-                    }
+                    fallback={Array.from({ length: 7 }).map((_, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
+                        <StatSkeleton key={i} />
+                    ))}
                 >
                     <DashboardStats />
                 </Suspense>

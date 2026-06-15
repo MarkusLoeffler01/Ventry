@@ -24,7 +24,8 @@ import {
   Delete, 
   Add, 
   Visibility,
-  QrCodeScanner
+  QrCodeScanner,
+  Badge
 } from '@mui/icons-material';
 import Link from 'next/link';
 import type { SerializedEvent } from '@/types/event';
@@ -94,7 +95,7 @@ export default function EventList({ initialEvents }: EventListProps) {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 190,
+      width: 230,
       sortable: false,
       renderCell: (params: GridRenderCellParams) => (
         <Stack direction="row" spacing={1}>
@@ -120,6 +121,14 @@ export default function EventList({ initialEvents }: EventListProps) {
             title="Check-in"
           >
             <QrCodeScanner fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            component={Link}
+            href={`/admin/events/${params.row.id}/badges`}
+            title="Badges"
+          >
+            <Badge fontSize="small" />
           </IconButton>
           <IconButton 
             size="small" 
