@@ -754,8 +754,8 @@ export default function RegistrationManager() {
                   )}
 
                   <Box sx={{ bgcolor: 'grey.50', p: 1, borderRadius: 1 }}>
-                    {item.changes.map((change, idx) => (
-                      <Grid container key={idx} spacing={1} sx={{ py: 0.5 }}>
+                    {item.changes.map((change) => (
+                      <Grid container key={`${change.label}:${change.old}:${change.new}`} spacing={1} sx={{ py: 0.5 }}>
                         <Grid size={{ xs: 4 }}>
                           <Typography variant="caption" fontWeight="bold">{change.label}:</Typography>
                         </Grid>
@@ -787,7 +787,7 @@ export default function RegistrationManager() {
         <DialogTitle>Payment Details: #{selectedReg?.payments[0]?.id.slice(-8)}</DialogTitle>
         <DialogContent dividers>
           {selectedReg?.payments[0] && (
-            <Stack spacing={3} id="invoice-content">
+            <Stack spacing={3}>
               <Box sx={{ textAlign: 'center', mb: 2 }}>
                 <Typography variant="h5" color="primary" fontWeight="bold">INVOICE</Typography>
                 <Typography variant="caption" color="text.secondary">Ventry Event Management</Typography>

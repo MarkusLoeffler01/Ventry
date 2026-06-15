@@ -197,16 +197,12 @@ export default async function AdminBillingPage() {
             </Typography>
             <Grid container spacing={2} alignItems="stretch">
                 <Suspense
-                    fallback={
-                        <>
-                            {Array.from({ length: 6 }).map((_, i) => (
-                                // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
-                                <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
-                                    <Skeleton variant="rounded" height={110} />
-                                </Grid>
-                            ))}
-                        </>
-                    }
+                    fallback={Array.from({ length: 6 }).map((_, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
+                        <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
+                            <Skeleton variant="rounded" height={110} />
+                        </Grid>
+                    ))}
                 >
                     <BillingContent />
                 </Suspense>

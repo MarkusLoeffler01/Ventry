@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma/prisma";
 import * as supa from "../supabase";
 
-
-
+const SIGNED_URL_REFRESH_SKEW_MS = 5 * 60 * 1000;
 
 type ProfilePicture = {
     userId: string;
@@ -27,6 +26,31 @@ type RefreshableProfilePicture = {
     cachedUntil: Date | string | null;
 }
 
+function getSignedUrlExpiry(signedUrl: string | null) {
+    if (!signedUrl) return null;
+
+    try {
+        const token = new URL(signedUrl).searchParams.get("token");
+        const payload = token?.split(".")[1];
+        if (!payload) return null;
+
+        const normalized = payload.replaceAll("-", "+").replaceAll("_", "/");
+        const decoded = JSON.parse(Buffer.from(normalized, "base64").toString("utf8")) as { exp?: unknown };
+        return typeof decoded.exp === "number" ? new Date(decoded.exp * 1000) : null;
+    } catch {
+        return null;
+    }
+}
+
+function hasUsableSignedUrl(picture: RefreshableProfilePicture, now: Date) {
+    if (!picture.signedUrl || !picture.cachedUntil || new Date(picture.cachedUntil) <= now) {
+        return false;
+    }
+
+    const tokenExpiry = getSignedUrlExpiry(picture.signedUrl);
+    return !tokenExpiry || tokenExpiry.getTime() > now.getTime() + SIGNED_URL_REFRESH_SKEW_MS;
+}
+
 export async function refreshSignedUrls<T extends RefreshableProfilePicture>(
     profilePictures: T[],
     expiresInSeconds: number = 24 * 60 * 60
@@ -35,7 +59,7 @@ export async function refreshSignedUrls<T extends RefreshableProfilePicture>(
 
     return Promise.all(
         profilePictures.map(async (picture) => {
-            if (picture.signedUrl && picture.cachedUntil && new Date(picture.cachedUntil) > now) {
+            if (hasUsableSignedUrl(picture, now)) {
                 return picture;
             }
 
