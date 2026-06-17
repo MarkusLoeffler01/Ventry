@@ -52,6 +52,21 @@ jobs:
           script: |
             const marker = "<!-- ventry:release-controls -->";
             const pr = context.payload.pull_request;
+            const allowedAssociations = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+            const trustedBotLogins = new Set(
+              (process.env.TRUSTED_RELEASE_CONTROL_BOTS || "github-actions[bot]")
+                .split(",")
+                .map((login) => login.trim())
+                .filter(Boolean)
+            );
+
+            function isTrustedControlComment(comment) {
+              return comment.body?.includes(marker)
+                && (
+                  allowedAssociations.has(comment.author_association)
+                  || trustedBotLogins.has(comment.user?.login)
+                );
+            }
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
@@ -61,7 +76,7 @@ jobs:
             });
 
             const controlComments = comments
-              .filter((comment) => comment.body?.includes(marker))
+              .filter(isTrustedControlComment)
               .sort((left, right) => new Date(right.updated_at) - new Date(left.updated_at));
 
             function parseControlComment(body = "") {
