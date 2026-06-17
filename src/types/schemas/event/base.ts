@@ -240,6 +240,14 @@ export const EventBaseObject = z.object({
   requireApproval: z.boolean().default(false),
   /** Allow a ticket to be accepted only once at check-in */
   scanOnce: z.boolean().default(false),
+  /** Enable the event community feed */
+  communityEnabled: z.boolean().default(false),
+  /** Keep posting/reactions open after the event end date */
+  communityOpenAfterEnd: z.boolean().default(true),
+  /** New posts require moderation before they appear publicly */
+  communityModerated: z.boolean().default(true),
+  /** Restrict community writes to active attendees */
+  communityAttendeesOnly: z.boolean().default(true),
   /** Fixed deadline for all payments */
   paymentDeadline: z.coerce.date().nullable().optional(),
 

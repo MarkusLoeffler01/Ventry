@@ -1,0 +1,240 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Box, Button, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
+import CommunityComposer from "./CommunityComposer";
+import CommunityPostCard from "./CommunityPostCard";
+import type { CommunityPostView, CommunityReactionKey } from "./types";
+
+function getErrorMessage(raw: unknown, fallback: string) {
+  if (!raw || typeof raw !== "object") {
+    return fallback;
+  }
+
+  const payload = raw as {
+    error?: string | Array<{ message?: string }>;
+  };
+
+  if (typeof payload.error === "string") {
+    return payload.error;
+  }
+
+  if (Array.isArray(payload.error)) {
+    return payload.error[0]?.message || fallback;
+  }
+
+  return fallback;
+}
+
+interface CommunitySectionProps {
+  eventId: number;
+  eventEnded: boolean;
+  communityOpenAfterEnd: boolean;
+  currentUserId?: string | null;
+  canModerate?: boolean;
+}
+
+export default function CommunitySection({
+  eventId,
+  eventEnded,
+  communityOpenAfterEnd,
+  currentUserId,
+  canModerate,
+}: CommunitySectionProps) {
+  const [posts, setPosts] = useState<CommunityPostView[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [actionPostId, setActionPostId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const composerDisabledReason = useMemo(() => {
+    if (!currentUserId) {
+      return "Sign in to post or react in this community.";
+    }
+
+    if (eventEnded && !communityOpenAfterEnd) {
+      return "This community is read-only because the event has ended.";
+    }
+
+    return null;
+  }, [communityOpenAfterEnd, currentUserId, eventEnded]);
+
+  const loadPosts = async (cursor?: string | null) => {
+    cursor ? setLoadingMore(true) : setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        eventId: String(eventId),
+        limit: "10",
+      });
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const response = await fetch(`/api/community/posts?${params.toString()}`);
+      const payload = (await response.json().catch(() => null)) as {
+        posts?: CommunityPostView[];
+        nextCursor?: string | null;
+        error?: unknown;
+      } | null;
+
+      if (!response.ok || !payload?.posts) {
+        throw new Error(getErrorMessage(payload, "Failed to load community posts"));
+      }
+
+      const loadedPosts = payload.posts;
+      setPosts(current => cursor ? [...current, ...loadedPosts] : loadedPosts);
+      setNextCursor(payload.nextCursor || null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load community posts");
+    } finally {
+      cursor ? setLoadingMore(false) : setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId]);
+
+  const handlePostCreated = (post: CommunityPostView, pending: boolean) => {
+    if (!pending) {
+      setPosts(current => [post, ...current]);
+    }
+  };
+
+  const handleReact = async (postId: string, reaction: CommunityReactionKey) => {
+    const snapshot = posts.find(p => p.id === postId);
+
+    setPosts(current =>
+      current.map(post => {
+        if (post.id !== postId) return post;
+        const hasReaction = post.viewerReactions.includes(reaction);
+        return {
+          ...post,
+          reactions: {
+            ...post.reactions,
+            [reaction]: post.reactions[reaction] + (hasReaction ? -1 : 1),
+          },
+          viewerReactions: hasReaction
+            ? post.viewerReactions.filter(r => r !== reaction)
+            : [...post.viewerReactions, reaction],
+        };
+      }),
+    );
+
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reaction }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        reactions?: CommunityPostView["reactions"];
+        viewerReactions?: string[];
+        error?: unknown;
+      } | null;
+
+      if (!response.ok || !payload?.reactions || !payload.viewerReactions) {
+        throw new Error(getErrorMessage(payload, "Failed to update reaction"));
+      }
+
+      const reactions = payload.reactions;
+      const viewerReactions = payload.viewerReactions;
+      setPosts(current =>
+        current.map(post => (post.id === postId ? { ...post, reactions, viewerReactions } : post)),
+      );
+    } catch (reactionError) {
+      if (snapshot) {
+        setPosts(current => current.map(post => (post.id === postId ? snapshot : post)));
+      }
+      setError(reactionError instanceof Error ? reactionError.message : "Failed to update reaction");
+    }
+  };
+
+  const handleDelete = async (postId: string) => {
+    setActionPostId(postId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json().catch(() => null)) as { deleted?: boolean; error?: unknown } | null;
+
+      if (!response.ok || !payload?.deleted) {
+        throw new Error(getErrorMessage(payload, "Failed to delete post"));
+      }
+
+      setPosts(current => current.filter(post => post.id !== postId));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete post");
+    } finally {
+      setActionPostId(null);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 3 }}>
+      <Stack spacing={3}>
+        <Box>
+          <Typography variant="h4" gutterBottom fontWeight="bold">
+            Community
+          </Typography>
+          {eventEnded ? (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              This is the post-event community space for attendees and organizers.
+            </Alert>
+          ) : null}
+        </Box>
+
+        <CommunityComposer
+          eventId={eventId}
+          disabledReason={composerDisabledReason}
+          onPostCreated={handlePostCreated}
+        />
+
+        <Divider />
+
+        {error ? <Alert severity="error">{error}</Alert> : null}
+
+        {loading ? (
+          <Box sx={{ py: 4, textAlign: "center" }}>
+            <CircularProgress />
+          </Box>
+        ) : posts.length === 0 ? (
+          <Alert severity="info">No community posts yet.</Alert>
+        ) : (
+          <Stack spacing={2}>
+            {posts.map(post => (
+              <CommunityPostCard
+                key={post.id}
+                post={post}
+                canDelete={Boolean(canModerate || post.authorId === currentUserId)}
+                deleteDisabled={!currentUserId || actionPostId === post.id}
+                reactionDisabled={!currentUserId || Boolean(composerDisabledReason)}
+                onDelete={handleDelete}
+                onReact={handleReact}
+              />
+            ))}
+          </Stack>
+        )}
+
+        {nextCursor ? (
+          <Button
+            variant="outlined"
+            onClick={() => void loadPosts(nextCursor)}
+            disabled={loadingMore}
+            sx={{ alignSelf: "center" }}
+          >
+            {loadingMore ? <CircularProgress size={20} /> : "Load More"}
+          </Button>
+        ) : null}
+      </Stack>
+    </Paper>
+  );
+}
