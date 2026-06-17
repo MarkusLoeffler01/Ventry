@@ -1,13 +1,17 @@
 name: Add issues to project
+
 on:
   issues:
     types: [opened, labeled]
+
 permissions:
-  issues: write
-  repository-projects: write
+  issues: read
   contents: read
+
 jobs:
   add:
+    # New issues are always added. Already-open issues can be backfilled by adding this label.
+    if: github.event.action == 'opened' || github.event.label.name == 'add-to-project'
     runs-on: ubuntu-latest
     steps:
       - name: Create board management token
@@ -18,7 +22,8 @@ jobs:
           private-key: ${{ secrets.VENTRY_BOARD_APP_PRIVATE_KEY }}
           owner: Ventry-io
 
-      - uses: actions/add-to-project@v1.0.2
+      - name: Add issue to project
+        uses: actions/add-to-project@v2
         with:
           project-url: https://github.com/orgs/Ventry-io/projects/1
           github-token: ${{ steps.board-token.outputs.token }}
