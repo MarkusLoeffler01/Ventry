@@ -21,12 +21,7 @@ export const auth = betterAuth({
         maxRequests: 100, // limit each IP to 100 requests per windowMs
     },
     advanced: {
-        // better-auth uses default cookie settings
-        // Cookies are prefixed with __Secure- and automatically use:
-        // - secure: true (required for https)
-        // - sameSite: 'lax' (allows OAuth redirects)
-        // - httpOnly: true (prevents XSS)
-        cookiePrefix: process.env.NODE_ENV === "production" ? `__Secure-${cookiePrefix}` : cookiePrefix,
+        cookiePrefix,
     },
     baseURL: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443",
     trustedOrigins: getTrustedOrigins(),
