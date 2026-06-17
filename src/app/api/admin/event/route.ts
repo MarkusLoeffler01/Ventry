@@ -74,6 +74,10 @@ function buildCreateEventArgs(
             },
             requireApproval: validatedData.requireApproval,
             scanOnce: validatedData.scanOnce,
+            communityEnabled: validatedData.communityEnabled ?? false,
+            communityOpenAfterEnd: validatedData.communityOpenAfterEnd ?? true,
+            communityModerated: validatedData.communityModerated ?? true,
+            communityAttendeesOnly: validatedData.communityAttendeesOnly ?? true,
         },
         include: {
             location: true,

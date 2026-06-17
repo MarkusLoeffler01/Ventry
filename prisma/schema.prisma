@@ -54,6 +54,9 @@ model User {
   pendingAccountLinks  PendingAccountLink[]
   sessions             Session[]
   twofactors           TwoFactor[]
+  communityPosts       CommunityPost[]
+  postReactions        PostReaction[]
+  postModerationLogs   PostModerationLog[] @relation("UserPostModerationLogs")
 
   @@map("user")
 }
@@ -71,6 +74,7 @@ model Admin {
   eventsOwned          Event[]
   history              RegistrationHistory[]
   supportTicketUpdates SupportTicket[]       @relation("AdminSupportTicketUpdates")
+  postModerationLogs   PostModerationLog[]   @relation("AdminPostModerationLogs")
 }
 
 model Account {
@@ -140,6 +144,10 @@ model Event {
   requiresHotel       Boolean         @default(false)
   requireApproval     Boolean         @default(false)
   scanOnce            Boolean         @default(false)
+  communityEnabled    Boolean         @default(false)
+  communityOpenAfterEnd Boolean       @default(true)
+  communityModerated  Boolean         @default(true)
+  communityAttendeesOnly Boolean      @default(true)
   badgeTemplates      BadgeTemplate[]
   owner               Admin?          @relation(fields: [ownerId], references: [id])
   checkInLogs         RegistrationCheckInLog[]
@@ -147,6 +155,67 @@ model Event {
   products            Product[]
   registrations       Registration[]
   supportTickets      SupportTicket[]
+  communityPosts      CommunityPost[]
+}
+
+model CommunityPost {
+  id             String              @id @default(cuid())
+  eventId        Int
+  authorId       String
+  type           CommunityPostType
+  tags           String[]            @default([])
+  content        String?
+  imageUrls      String[]            @default([])
+  linkUrl        String?
+  feedbackRating Int?
+  feedbackType   CommunityFeedbackType?
+  feedbackEntries Json                @default("[]")
+  muxAssetId     String?
+  muxPlaybackId  String?
+  status         PostStatus          @default(PENDING)
+  pinned         Boolean             @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  event          Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  author         User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions      PostReaction[]
+  moderationLogs PostModerationLog[]
+
+  @@index([eventId, status, pinned, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model PostReaction {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  reaction  String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, reaction])
+  @@index([postId])
+  @@index([userId])
+}
+
+model PostModerationLog {
+  id           String           @id @default(cuid())
+  postId       String
+  actorUserId  String?
+  actorAdminId String?
+  action       ModerationAction
+  reason       String?
+  metadata     Json             @default("{}")
+  createdAt    DateTime         @default(now())
+  post         CommunityPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  actorUser    User?            @relation("UserPostModerationLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorAdmin   Admin?           @relation("AdminPostModerationLogs", fields: [actorAdminId], references: [id], onDelete: SetNull)
+
+  @@index([postId, createdAt])
+  @@index([actorUserId])
+  @@index([actorAdminId])
 }
 
 model BadgeTemplate {
@@ -407,4 +476,33 @@ enum SupportTicketStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+}
+
+enum CommunityPostType {
+  TEXT
+  IMAGE
+  LINK
+  FEEDBACK
+  VIDEO
+}
+
+enum CommunityFeedbackType {
+  VENUE
+  ORGANIZATION
+  EVENTS
+  OVERALL_EXPERIENCE
+}
+
+enum PostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+enum ModerationAction {
+  CREATED
+  APPROVED
+  REJECTED
+  DELETED
 }
