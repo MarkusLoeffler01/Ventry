@@ -29,27 +29,14 @@ jobs:
     permissions:
       contents: read
     concurrency:
-      group: deploy-${{ github.ref_name }}
+      group: deploy-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || github.ref_name }}
       cancel-in-progress: true
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Resolve build metadata
-        id: build_metadata
-        run: |
-          tag="$(git describe --tags --abbrev=0 2>/dev/null || node -p "'v' + JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
-
-          echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "build_date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Resolve deployment target
         id: target
         env:
+          INPUT_TARGET: ${{ github.event.inputs.target }}
           DEV_BETTER_AUTH_URL: ${{ secrets.DEV_BETTER_AUTH_URL }}
           MAIN_BETTER_AUTH_URL: ${{ secrets.MAIN_BETTER_AUTH_URL }}
           DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
@@ -58,13 +45,14 @@ jobs:
           MAIN_DATABASE_URL: ${{ secrets.MAIN_DATABASE_URL }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            DEPLOY_TARGET="${{ github.event.inputs.target }}"
+            DEPLOY_TARGET="${INPUT_TARGET}"
           else
             DEPLOY_TARGET="${GITHUB_REF_NAME}"
           fi
 
           case "${DEPLOY_TARGET}" in
             dev)
+              echo "branch=dev" >> "$GITHUB_OUTPUT"
               echo "tag=dev" >> "$GITHUB_OUTPUT"
               echo "compose_file=docker-compose.dev.yml" >> "$GITHUB_OUTPUT"
               echo "better_auth_url=${DEV_BETTER_AUTH_URL:-https://dev-ventry.m-loeffler.de}" >> "$GITHUB_OUTPUT"
@@ -73,6 +61,7 @@ jobs:
               echo "database_url=${DEV_DATABASE_URL}" >> "$GITHUB_OUTPUT"
               ;;
             main)
+              echo "branch=main" >> "$GITHUB_OUTPUT"
               echo "tag=main" >> "$GITHUB_OUTPUT"
               echo "compose_file=docker-compose.main.yml" >> "$GITHUB_OUTPUT"
               echo "better_auth_url=${MAIN_BETTER_AUTH_URL:-https://ventry.m-loeffler.de}" >> "$GITHUB_OUTPUT"
@@ -85,6 +74,20 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.branch }}
+
+      - name: Resolve build metadata
+        id: build_metadata
+        run: |
+          tag="$(git describe --tags --abbrev=0 2>/dev/null || node -p "'v' + JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+
+          echo "commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

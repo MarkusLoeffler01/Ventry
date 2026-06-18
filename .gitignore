@@ -58,6 +58,9 @@ next-env.d.ts
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
 .playwright-mcp
+/*.json
+!/package.json
+!/package-lock.json
 /*.md
 /.*
 !/.github/
@@ -66,3 +69,4 @@ next-env.d.ts
 !/.github/workflows/
 !/.github/workflows/*.yml
 !/.github/pull_request_template.md
+scripts/migrate-project-issues.sh

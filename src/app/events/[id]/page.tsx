@@ -30,6 +30,7 @@ import RegistrationCountdown from "@/components/events/RegistrationCountdown";
 import EventSchedule from "@/components/events/EventSchedule";
 import EventLocationMap from "@/components/events/EventLocationMap";
 import SupportTicketPanel from "@/components/events/SupportTicketPanel";
+import CommunitySection from "@/components/events/community/CommunitySection";
 import type { SerializedEvent, SerializedProduct } from "@/types/event";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
@@ -147,6 +148,7 @@ async function EventDetailPageContent({
 
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
+  const eventEnded = endDate.getTime() < Date.now();
   const serializedProducts = event.products.map(p => ({
     id: p.id,
     name: p.name,
@@ -361,6 +363,18 @@ async function EventDetailPageContent({
                 )}
               </Paper>
             </Box>
+
+            {event.communityEnabled && (
+              <Box mb={6}>
+                <CommunitySection
+                  eventId={event.id}
+                  eventEnded={eventEnded}
+                  communityOpenAfterEnd={event.communityOpenAfterEnd}
+                  currentUserId={session?.user?.id || null}
+                  canModerate={canEdit}
+                />
+              </Box>
+            )}
           </Grid>
 
           {/* Registration Sidebar */}

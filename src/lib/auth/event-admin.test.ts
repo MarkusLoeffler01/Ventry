@@ -65,7 +65,7 @@ describe("checkEventAdminAuth", () => {
 
     await expect(checkEventAdminAuth(7)).resolves.toEqual({
       authorized: false,
-      error: "Only this event's admin can manage these support tickets",
+      error: "Only this event's admin can manage this event",
     });
   });
 

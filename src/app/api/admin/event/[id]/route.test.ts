@@ -119,6 +119,7 @@ describe("App Router: /api/admin/event/[id]", () => {
                 stayPolicy: {},
                 customFields: [],
                 schedule: [],
+                scanOnce: true,
                 location: {
                     name: "Venue",
                     address: "Street 1",
@@ -174,6 +175,7 @@ describe("App Router: /api/admin/event/[id]", () => {
                     where: { id: 7 },
                     data: expect.objectContaining({
                         name: "Updated Event",
+                        scanOnce: true,
                         location: {
                             upsert: {
                                 create: input.location,

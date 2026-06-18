@@ -21,12 +21,7 @@ export const auth = betterAuth({
         maxRequests: 100, // limit each IP to 100 requests per windowMs
     },
     advanced: {
-        // better-auth uses default cookie settings
-        // Cookies are prefixed with __Secure- and automatically use:
-        // - secure: true (required for https)
-        // - sameSite: 'lax' (allows OAuth redirects)
-        // - httpOnly: true (prevents XSS)
-        cookiePrefix: process.env.NODE_ENV === "production" ? `__Secure-${cookiePrefix}` : cookiePrefix,
+        cookiePrefix,
     },
     baseURL: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443",
     trustedOrigins: getTrustedOrigins(),
@@ -53,6 +48,40 @@ export const auth = betterAuth({
                 required: false,
                 defaultValue: false,
                 input: false, // not settable by users
+            },
+            legalName: {
+                type: "string",
+                required: false,
+            },
+            addressLine1: {
+                type: "string",
+                required: false,
+                returned: false,
+            },
+            addressLine2: {
+                type: "string",
+                required: false,
+                returned: false,
+            },
+            addressCity: {
+                type: "string",
+                required: false,
+                returned: false,
+            },
+            addressState: {
+                type: "string",
+                required: false,
+                returned: false,
+            },
+            addressPostalCode: {
+                type: "string",
+                required: false,
+                returned: false,
+            },
+            addressCountry: {
+                type: "string",
+                required: false,
+                returned: false,
             }
         }
     },

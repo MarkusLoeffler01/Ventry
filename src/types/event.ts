@@ -71,6 +71,11 @@ export interface SerializedEvent {
   endDate: string;
   imageUrl: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
+  scanOnce?: boolean;
+  communityEnabled?: boolean;
+  communityOpenAfterEnd?: boolean;
+  communityModerated?: boolean;
+  communityAttendeesOnly?: boolean;
   stayPolicy: SerializedStayPolicy;
   schedule: SerializedScheduleItem[];
   location?: SerializedLocation | null;

@@ -10,6 +10,34 @@ const registerSchema = z
       .string()
       .trim()
       .min(3, "Mindestens 3 Zeichen erforderlich"),
+    legalName: z
+      .string()
+      .trim()
+      .min(2, "Legal name is required"),
+    addressLine1: z
+      .string()
+      .trim()
+      .min(2, "Address is required"),
+    addressLine2: z
+      .string()
+      .trim()
+      .optional(),
+    addressCity: z
+      .string()
+      .trim()
+      .min(2, "City is required"),
+    addressState: z
+      .string()
+      .trim()
+      .optional(),
+    addressPostalCode: z
+      .string()
+      .trim()
+      .min(2, "Postal code is required"),
+    addressCountry: z
+      .string()
+      .trim()
+      .min(2, "Country is required"),
     password: z
       .string()
       .min(8, "Mindestens 8 Zeichen erforderlich")

@@ -36,7 +36,7 @@ async function SuccessContent({ searchParams }: { searchParams: Promise<{ sessio
 
   if (status === 'complete') {
     return (
-      <section id="success">
+      <section>
         <p>
           We appreciate your business! A confirmation email will be sent to{' '}
           {customerEmail}. If you have any questions, please email{' '}

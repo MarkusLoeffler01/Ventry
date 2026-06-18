@@ -44,6 +44,19 @@ export async function uploadEventImage(file: Buffer, fileName: string) {
     return data;
 }
 
+export async function uploadCommunityImage(file: Buffer, eventId: number, userId: string, fileName: string) {
+    const { data, error } = await getSupabaseClient().storage
+        .from(process.env.SUPABASE_BUCKET_ID)
+        .upload(`community/${eventId}/${userId}/${fileName}`, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: 'image/jpeg'
+    });
+
+    if(error) throw error;
+    return data;
+}
+
 
 export async function getSignedUrl(path: string, expiresIn: number = 300) {
     const { data, error } = await getSupabaseClient().storage

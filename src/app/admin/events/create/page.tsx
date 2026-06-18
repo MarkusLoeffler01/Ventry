@@ -3,7 +3,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EventForm from '@/components/admin/events/EventForm';
-import { type AdminCreateEventInput } from '@/types/schemas/event/admin';
+import type { AdminCreateEventInput } from '@/types/schemas/event/admin';
 import { Box } from '@mui/material';
 import PageLoadingState from '@/components/common/PageLoadingState';
 

@@ -22,6 +22,13 @@ export async function GET(req: NextRequest) {
         name: true,
         email: true,
         country: true,
+        legalName: true,
+        addressLine1: true,
+        addressLine2: true,
+        addressCity: true,
+        addressState: true,
+        addressPostalCode: true,
+        addressCountry: true,
         profilePictures: {
           orderBy: [
             { order: 'asc' },
@@ -59,6 +66,7 @@ export async function GET(req: NextRequest) {
         name: true,
         email: true,
         country: true,
+        legalName: true,
         profilePictures: {
           orderBy: [
             { order: 'asc' },
@@ -141,6 +149,13 @@ export async function POST(req: NextRequest) {
       data: { 
         name: parsed.data.name,
         email: parsed.data.email,
+        legalName: parsed.data.legalName,
+        addressLine1: parsed.data.addressLine1,
+        addressLine2: parsed.data.addressLine2,
+        addressCity: parsed.data.addressCity,
+        addressState: parsed.data.addressState,
+        addressPostalCode: parsed.data.addressPostalCode,
+        addressCountry: parsed.data.addressCountry,
         emailVerified: false,
         accounts: {
           create: {
@@ -154,6 +169,13 @@ export async function POST(req: NextRequest) {
         name: true,
         email: true,
         country: true,
+        legalName: true,
+        addressLine1: true,
+        addressLine2: true,
+        addressCity: true,
+        addressState: true,
+        addressPostalCode: true,
+        addressCountry: true,
         profilePictures: true,
         createdAt: true,
         updatedAt: true,
@@ -263,6 +285,13 @@ export async function PATCH(req: NextRequest) {
         name: true,
         email: true,
         country: true,
+        legalName: true,
+        addressLine1: true,
+        addressLine2: true,
+        addressCity: true,
+        addressState: true,
+        addressPostalCode: true,
+        addressCountry: true,
         profilePictures: true,
         createdAt: true,
         updatedAt: true,

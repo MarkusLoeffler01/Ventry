@@ -1,82 +1,123 @@
 "use client";
 
-import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Divider } from "@mui/material";
-import { Event, Dashboard, People, Settings, Home, SupportAgent, Payments } from "@mui/icons-material";
+import { useState } from "react";
+import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Divider, IconButton, Tooltip } from "@mui/material";
+import { Event, Dashboard, People, Settings, Home, SupportAgent, Payments, ChevronLeft, ChevronRight } from "@mui/icons-material";
 import Link from "next/link";
 import AppHeader from "@/components/common/AppHeader/AppHeader";
 
 const drawerWidth = 240;
+const collapsedDrawerWidth = 72;
+
+const primaryLinks = [
+  { href: "/admin", label: "Dashboard", Icon: Dashboard },
+  { href: "/admin/events", label: "Events", Icon: Event },
+  { href: "/admin/users", label: "Users", Icon: People },
+  { href: "/admin/tickets", label: "Tickets", Icon: SupportAgent },
+  { href: "/admin/billing", label: "Billing", Icon: Payments },
+];
+
+const secondaryLinks = [
+  { href: "/admin/settings", label: "Settings", Icon: Settings },
+  { href: "/", label: "Back to Site", Icon: Home },
+];
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const activeDrawerWidth = expanded ? drawerWidth : collapsedDrawerWidth;
+
+  const renderLink = ({ href, label, Icon }: { href: string; label: string; Icon: typeof Dashboard }) => (
+    <ListItem disablePadding key={href} sx={{ display: "block" }}>
+      <Tooltip title={expanded ? "" : label} placement="right">
+        <ListItemButton
+          component={Link}
+          href={href}
+          sx={{
+            minHeight: 48,
+            justifyContent: expanded ? "initial" : "center",
+            px: 2,
+          }}
+        >
+          <ListItemIcon
+            sx={{
+              minWidth: 0,
+              mr: expanded ? 2 : 0,
+              justifyContent: "center",
+            }}
+          >
+            <Icon />
+          </ListItemIcon>
+          {expanded ? <ListItemText primary={label} /> : null}
+        </ListItemButton>
+      </Tooltip>
+    </ListItem>
+  );
+
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box
+      sx={{
+        display: "flex",
+        "& ~ footer": {
+          ml: `${activeDrawerWidth}px`,
+          width: `calc(100% - ${activeDrawerWidth}px)`,
+          transition: theme => theme.transitions.create(["margin-left", "width"], {
+            duration: theme.transitions.duration.shorter,
+          }),
+        },
+      }}
+    >
       <Drawer
         variant="permanent"
         sx={{
-          width: drawerWidth,
+          width: activeDrawerWidth,
           flexShrink: 0,
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: 'border-box' },
+          "& .MuiDrawer-paper": {
+            width: activeDrawerWidth,
+            boxSizing: "border-box",
+            overflowX: "hidden",
+            transition: theme => theme.transitions.create("width", {
+              duration: theme.transitions.duration.shorter,
+            }),
+          },
         }}
       >
         <AppHeader />
         <Toolbar />
+        <Box sx={{ display: "flex", justifyContent: expanded ? "flex-end" : "center", px: 1, py: 1 }}>
+          <Tooltip title={expanded ? "Collapse navigation" : "Expand navigation"} placement="right">
+            <IconButton onClick={() => setExpanded(current => !current)} aria-label={expanded ? "Collapse admin navigation" : "Expand admin navigation"}>
+              {expanded ? <ChevronLeft /> : <ChevronRight />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Divider />
         <Box sx={{ overflow: 'auto' }}>
           <List>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/admin">
-                <ListItemIcon><Dashboard /></ListItemIcon>
-                <ListItemText primary="Dashboard" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/admin/events">
-                <ListItemIcon><Event /></ListItemIcon>
-                <ListItemText primary="Events" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/admin/users">
-                <ListItemIcon><People /></ListItemIcon>
-                <ListItemText primary="Users" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/admin/tickets">
-                <ListItemIcon><SupportAgent /></ListItemIcon>
-                <ListItemText primary="Tickets" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/admin/billing">
-                <ListItemIcon><Payments /></ListItemIcon>
-                <ListItemText primary="Billing" />
-              </ListItemButton>
-            </ListItem>
+            {primaryLinks.map(renderLink)}
           </List>
           <Divider />
           <List>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/admin/settings">
-                <ListItemIcon><Settings /></ListItemIcon>
-                <ListItemText primary="Settings" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={Link} href="/">
-                <ListItemIcon><Home /></ListItemIcon>
-                <ListItemText primary="Back to Site" />
-              </ListItemButton>
-            </ListItem>
+            {secondaryLinks.map(renderLink)}
           </List>
         </Box>
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          p: { xs: 1.5, md: 3 },
+          transition: theme => theme.transitions.create("padding", {
+            duration: theme.transitions.duration.shorter,
+          }),
+        }}
+      >
         <Toolbar />
-        <Container maxWidth="xl">
+        <Container maxWidth="xl" disableGutters>
           {children}
         </Container>
       </Box>

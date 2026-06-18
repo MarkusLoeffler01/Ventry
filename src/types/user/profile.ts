@@ -7,6 +7,13 @@ export const enhancedUserSchema = z.object({
   bio: z.string().max(500).optional(),
   dateOfBirth: z.string().date().optional(), // ISO date string (YYYY-MM-DD)
   pronouns: z.string().max(50).optional(),
+  legalName: z.string().max(200).optional().nullable(),
+  addressLine1: z.string().max(200).optional().nullable(),
+  addressLine2: z.string().max(200).optional().nullable(),
+  addressCity: z.string().max(120).optional().nullable(),
+  addressState: z.string().max(120).optional().nullable(),
+  addressPostalCode: z.string().max(40).optional().nullable(),
+  addressCountry: z.string().max(120).optional().nullable(),
   profilePictures: z.array(z.object({
     id: z.string(),
     signedUrl: z.string().url().nullable(),

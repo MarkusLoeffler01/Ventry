@@ -85,9 +85,9 @@ export default function EventSchedule({ schedule }: EventScheduleProps) {
             </Box>
 
             <Stack spacing={2}>
-              {dayItems.map((item, index) => (
+              {dayItems.map((item) => (
                 <Paper 
-                  key={index} 
+                  key={item.id || `${dateKey}:${item.startTime}:${item.endTime || ""}:${item.title}`} 
                   variant="outlined" 
                   sx={{ 
                     p: 2,

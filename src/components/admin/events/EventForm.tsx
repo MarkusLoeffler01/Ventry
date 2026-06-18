@@ -49,6 +49,11 @@ export interface InitialData {
   maxRegistrations?: number | null;
   requiresHotel?: boolean;
   requireApproval?: boolean;
+  scanOnce?: boolean;
+  communityEnabled?: boolean;
+  communityOpenAfterEnd?: boolean;
+  communityModerated?: boolean;
+  communityAttendeesOnly?: boolean;
   paymentDeadline?: string | Date | null;
   status?: "DRAFT" | "PUBLISHED" | "CANCELLED";
   imageUrl?: string | null;
@@ -211,6 +216,11 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       maxRegistrations: initialData?.maxRegistrations || null,
       requiresHotel: initialData?.requiresHotel || false,
       requireApproval: initialData?.requireApproval || false,
+      scanOnce: initialData?.scanOnce || false,
+      communityEnabled: initialData?.communityEnabled || false,
+      communityOpenAfterEnd: initialData?.communityOpenAfterEnd ?? true,
+      communityModerated: initialData?.communityModerated ?? true,
+      communityAttendeesOnly: initialData?.communityAttendeesOnly ?? true,
       paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || "DRAFT",
       imageUrl: initialData?.imageUrl || null,
@@ -266,6 +276,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
   const watchEndDate = watch("endDate") as Date | string | undefined;
   const watchImageUrl = watch("imageUrl");
   const watchRequiresHotel = watch("requiresHotel") as boolean | undefined;
+  const watchCommunityEnabled = watch("communityEnabled") as boolean | undefined;
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -1117,6 +1128,116 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                   If enabled, attendees can submit registration but payment remains locked until an admin approves it.
                 </Typography>
               </Box>
+
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Controller
+                      name="scanOnce"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch checked={field.value} onChange={event => field.onChange(event.target.checked)} />
+                      )}
+                    />
+                  }
+                  label="Expire tickets after first check-in scan"
+                />
+                <Typography variant="caption" display="block" color="text.secondary">
+                  If enabled, repeat scans of a checked-in ticket will be rejected at the door.
+                </Typography>
+                <Typography variant="caption" display="block" color="text.secondary">
+                  Regardless of this setting, the UI will always show how many times a ticket has been scanned.
+                </Typography>
+              </Box>
+
+              <Divider />
+              <Typography variant="h6">Community</Typography>
+
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Controller
+                      name="communityEnabled"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch checked={field.value} onChange={event => field.onChange(event.target.checked)} />
+                      )}
+                    />
+                  }
+                  label="Enable community feed"
+                />
+                <Typography variant="caption" display="block" color="text.secondary">
+                  Adds a community section to the event page where attendees and organizers can post updates.
+                </Typography>
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Controller
+                        name="communityModerated"
+                        control={control}
+                        render={({ field }) => (
+                          <Switch
+                            checked={field.value}
+                            disabled={!watchCommunityEnabled}
+                            onChange={event => field.onChange(event.target.checked)}
+                          />
+                        )}
+                      />
+                    }
+                    label="Moderate new posts"
+                  />
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    New posts stay pending until approved by a future moderation workflow.
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Controller
+                        name="communityAttendeesOnly"
+                        control={control}
+                        render={({ field }) => (
+                          <Switch
+                            checked={field.value}
+                            disabled={!watchCommunityEnabled}
+                            onChange={event => field.onChange(event.target.checked)}
+                          />
+                        )}
+                      />
+                    }
+                    label="Attendees only"
+                  />
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Restricts posting and reactions to active attendees, event owners, and admins.
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Controller
+                        name="communityOpenAfterEnd"
+                        control={control}
+                        render={({ field }) => (
+                          <Switch
+                            checked={field.value}
+                            disabled={!watchCommunityEnabled}
+                            onChange={event => field.onChange(event.target.checked)}
+                          />
+                        )}
+                      />
+                    }
+                    label="Open after event ends"
+                  />
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Allows new posts and reactions after the event end date.
+                  </Typography>
+                </Grid>
+              </Grid>
 
               <Box>
                 <Typography variant="subtitle2" gutterBottom>Event Banner</Typography>
