@@ -102,5 +102,19 @@ export const reactToCommunityPostSchema = z.object({
   reaction: z.enum(communityReactionSchemaValues),
 });
 
+export const moderateCommunityPostSchema = z.object({
+  action: z.enum(["approve", "reject", "remove", "pin", "unpin"]),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export const bulkModerateCommunityPostsSchema = z.object({
+  eventId: z.number().int().positive(),
+  postIds: z.array(z.string().min(1)).min(1).max(100),
+  action: z.enum(["remove", "approve", "reject"]),
+  reason: z.string().trim().max(500).optional(),
+});
+
 export type CreateCommunityPostInput = z.infer<typeof createCommunityPostSchema>;
 export type CommunityFeedbackInput = z.infer<typeof communityFeedbackEntrySchema>;
+export type ModerateCommunityPostInput = z.infer<typeof moderateCommunityPostSchema>;
+export type BulkModerateCommunityPostsInput = z.infer<typeof bulkModerateCommunityPostsSchema>;
