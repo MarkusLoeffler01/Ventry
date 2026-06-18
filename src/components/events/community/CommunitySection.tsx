@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Settings } from "@mui/icons-material";
+import NextLink from "next/link";
 import CommunityComposer from "./CommunityComposer";
 import CommunityPostCard from "./CommunityPostCard";
 import type { CommunityPostView, CommunityReactionKey } from "./types";
@@ -30,6 +32,7 @@ interface CommunitySectionProps {
   eventId: number;
   eventEnded: boolean;
   communityOpenAfterEnd: boolean;
+  communityModerated?: boolean;
   currentUserId?: string | null;
   canModerate?: boolean;
 }
@@ -38,6 +41,7 @@ export default function CommunitySection({
   eventId,
   eventEnded,
   communityOpenAfterEnd,
+  communityModerated = true,
   currentUserId,
   canModerate,
 }: CommunitySectionProps) {
@@ -46,6 +50,7 @@ export default function CommunitySection({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [actionPostId, setActionPostId] = useState<string | null>(null);
+  const [moderatingPostId, setModeratingPostId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const composerDisabledReason = useMemo(() => {
@@ -156,6 +161,49 @@ export default function CommunitySection({
     }
   };
 
+  const handleModerate = async (postId: string, action: "approve" | "reject" | "pin" | "unpin" | "remove") => {
+    setModeratingPostId(postId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/community/posts/${postId}/moderate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        post?: { id: string; status: string; pinned: boolean };
+        action?: string;
+        error?: unknown;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(payload, "Moderation action failed"));
+      }
+
+      if (action === "remove") {
+        setPosts(current => current.filter(p => p.id !== postId));
+      } else if (payload?.post) {
+        const updated = payload.post;
+        setPosts(current =>
+          current.map(p =>
+            p.id !== postId
+              ? p
+              : {
+                  ...p,
+                  status: updated.status as CommunityPostView["status"],
+                  pinned: updated.pinned,
+                },
+          ),
+        );
+      }
+    } catch (moderateError) {
+      setError(moderateError instanceof Error ? moderateError.message : "Moderation action failed");
+    } finally {
+      setModeratingPostId(null);
+    }
+  };
+
   const handleDelete = async (postId: string) => {
     setActionPostId(postId);
     setError(null);
@@ -182,9 +230,28 @@ export default function CommunitySection({
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack spacing={3}>
         <Box>
-          <Typography variant="h4" gutterBottom fontWeight="bold">
-            Community
-          </Typography>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            flexWrap="wrap"
+            gap={1}
+          >
+            <Typography variant="h4" fontWeight="bold">
+              Community
+            </Typography>
+            {canModerate ? (
+              <Button
+                component={NextLink}
+                href={`/admin/events/${eventId}/community`}
+                size="small"
+                variant="outlined"
+                startIcon={<Settings fontSize="small" />}
+              >
+                Manage community
+              </Button>
+            ) : null}
+          </Stack>
           {eventEnded ? (
             <Alert severity="info" sx={{ mt: 2 }}>
               This is the post-event community space for attendees and organizers.
@@ -215,9 +282,13 @@ export default function CommunitySection({
                 key={post.id}
                 post={post}
                 canDelete={Boolean(canModerate || post.authorId === currentUserId)}
+                canModerate={canModerate}
+                communityModerated={communityModerated}
                 deleteDisabled={!currentUserId || actionPostId === post.id}
+                moderateDisabled={Boolean(moderatingPostId)}
                 reactionDisabled={!currentUserId || Boolean(composerDisabledReason)}
                 onDelete={handleDelete}
+                onModerate={canModerate ? handleModerate : undefined}
                 onReact={handleReact}
               />
             ))}

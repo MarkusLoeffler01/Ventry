@@ -505,4 +505,6 @@ enum ModerationAction {
   APPROVED
   REJECTED
   DELETED
+  PINNED
+  UNPINNED
 }
