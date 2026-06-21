@@ -53,6 +53,7 @@ export interface InitialData {
   communityEnabled?: boolean;
   communityOpenAfterEnd?: boolean;
   communityModerated?: boolean;
+  communityModerateComments?: boolean;
   communityAttendeesOnly?: boolean;
   paymentDeadline?: string | Date | null;
   status?: "DRAFT" | "PUBLISHED" | "CANCELLED";
@@ -220,6 +221,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
       communityEnabled: initialData?.communityEnabled || false,
       communityOpenAfterEnd: initialData?.communityOpenAfterEnd ?? true,
       communityModerated: initialData?.communityModerated ?? true,
+      communityModerateComments: initialData?.communityModerateComments ?? false,
       communityAttendeesOnly: initialData?.communityAttendeesOnly ?? true,
       paymentDeadline: initialData?.paymentDeadline ? new Date(initialData.paymentDeadline) : null,
       status: initialData?.status || "DRAFT",
@@ -277,6 +279,7 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
   const watchImageUrl = watch("imageUrl");
   const watchRequiresHotel = watch("requiresHotel") as boolean | undefined;
   const watchCommunityEnabled = watch("communityEnabled") as boolean | undefined;
+  const watchCommunityModerated = watch("communityModerated") as boolean | undefined;
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -1191,6 +1194,26 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                   />
                   <Typography variant="caption" display="block" color="text.secondary">
                     New posts stay pending until approved by a future moderation workflow.
+                  </Typography>
+                  <FormControlLabel
+                    sx={{ mt: 1 }}
+                    control={
+                      <Controller
+                        name="communityModerateComments"
+                        control={control}
+                        render={({ field }) => (
+                          <Switch
+                            checked={field.value}
+                            disabled={!watchCommunityEnabled || !watchCommunityModerated}
+                            onChange={event => field.onChange(event.target.checked)}
+                          />
+                        )}
+                      />
+                    }
+                    label="Also moderate comments"
+                  />
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Requires post moderation to be enabled. Comments will also need approval before appearing.
                   </Typography>
                 </Grid>
 

@@ -44,13 +44,13 @@ export async function uploadEventImage(file: Buffer, fileName: string) {
     return data;
 }
 
-export async function uploadCommunityImage(file: Buffer, eventId: number, userId: string, fileName: string) {
+export async function uploadCommunityImage(file: Buffer, eventId: number, userId: string, fileName: string, contentType: string = "image/jpeg") {
     const { data, error } = await getSupabaseClient().storage
         .from(process.env.SUPABASE_BUCKET_ID)
         .upload(`community/${eventId}/${userId}/${fileName}`, file, {
             cacheControl: '3600',
             upsert: false,
-            contentType: 'image/jpeg'
+            contentType,
     });
 
     if(error) throw error;

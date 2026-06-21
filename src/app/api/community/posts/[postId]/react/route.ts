@@ -58,6 +58,7 @@ export async function POST(
             communityEnabled: true,
             communityOpenAfterEnd: true,
             communityModerated: true,
+            communityModerateComments: true,
             communityAttendeesOnly: true,
           },
         },

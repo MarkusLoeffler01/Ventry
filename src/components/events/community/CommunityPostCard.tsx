@@ -18,6 +18,7 @@ import { Celebration, CheckCircle, Delete, Favorite, Lightbulb, Link as LinkIcon
 import Image from "next/image";
 import NextLink from "next/link";
 import type { ReactNode } from "react";
+import CommentList from "./CommentList";
 import type { CommunityPostView, CommunityReactionKey } from "./types";
 
 const reactionConfig: Array<{
@@ -65,6 +66,8 @@ interface CommunityPostCardProps {
   deleteDisabled?: boolean;
   moderateDisabled?: boolean;
   reactionDisabled?: boolean;
+  currentUserId?: string | null;
+  composerDisabled?: boolean;
   onDelete: (postId: string) => void;
   onModerate?: (postId: string, action: ModerateAction) => void;
   onReact: (postId: string, reaction: CommunityReactionKey) => void;
@@ -78,6 +81,8 @@ export default function CommunityPostCard({
   deleteDisabled,
   moderateDisabled,
   reactionDisabled,
+  currentUserId,
+  composerDisabled,
   onDelete,
   onModerate,
   onReact,
@@ -289,6 +294,16 @@ export default function CommunityPostCard({
             );
           })}
         </Stack>
+
+        <CommentList
+          postId={post.id}
+          eventId={post.eventId}
+          initialComments={post.comments}
+          totalCount={post.commentCount}
+          currentUserId={currentUserId}
+          canDelete={canDelete}
+          composerDisabled={composerDisabled}
+        />
       </Stack>
     </Paper>
   );
