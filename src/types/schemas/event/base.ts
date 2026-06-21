@@ -246,6 +246,8 @@ export const EventBaseObject = z.object({
   communityOpenAfterEnd: z.boolean().default(true),
   /** New posts require moderation before they appear publicly */
   communityModerated: z.boolean().default(true),
+  /** Also require moderation for comments (only active when communityModerated is true) */
+  communityModerateComments: z.boolean().default(false),
   /** Restrict community writes to active attendees */
   communityAttendeesOnly: z.boolean().default(true),
   /** Fixed deadline for all payments */

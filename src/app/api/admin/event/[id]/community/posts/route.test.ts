@@ -18,10 +18,15 @@ vi.mock("@/lib/auth/event-admin", () => ({
 vi.mock("@/lib/community/server", () => ({
   communityPostInclude: {},
   serializeCommunityPost: vi.fn((p: { id: string }) => ({ id: p.id, serialized: true })),
+  buildMentionMapForPosts: vi.fn(() => Promise.resolve(new Map([["u1", { id: "u1", name: "Alice" }]]))),
 }));
 
 import * as postsRoute from "./route";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
+import { buildMentionMapForPosts, serializeCommunityPost } from "@/lib/community/server";
+
+const mockedBuildMentionMap = buildMentionMapForPosts as unknown as ReturnType<typeof vi.fn>;
+const mockedSerialize = serializeCommunityPost as unknown as ReturnType<typeof vi.fn>;
 
 const mockedCheckEventAdminAuth = checkEventAdminAuth as unknown as ReturnType<typeof vi.fn>;
 const mockedFindMany = prismaMock.communityPost.findMany as unknown as ReturnType<typeof vi.fn>;
@@ -201,6 +206,76 @@ describe("GET /api/admin/event/[id]/community/posts", () => {
     expect(mockedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         take: 51,
+      }),
+    );
+  });
+
+  it("calls buildMentionMapForPosts with the page of posts", async () => {
+    const posts = makePosts(3);
+    mockedFindMany.mockResolvedValue(posts);
+
+    await postsRoute.GET(
+      getRequest("7"),
+      { params: Promise.resolve({ id: "7" }) },
+    );
+
+    expect(mockedBuildMentionMap).toHaveBeenCalledWith(posts);
+  });
+
+  it("passes mention map from buildMentionMapForPosts to serializeCommunityPost", async () => {
+    const mentionMap = new Map([["u-x", { id: "u-x", name: "Xavier" }]]);
+    mockedBuildMentionMap.mockResolvedValueOnce(mentionMap);
+    mockedFindMany.mockResolvedValue(makePosts(2));
+
+    await postsRoute.GET(
+      getRequest("7"),
+      { params: Promise.resolve({ id: "7" }) },
+    );
+
+    for (const call of mockedSerialize.mock.calls) {
+      expect(call[2]).toBe(mentionMap);
+    }
+  });
+
+  it("serializes each post in the page", async () => {
+    mockedFindMany.mockResolvedValue(makePosts(3));
+
+    const response = await postsRoute.GET(
+      getRequest("7"),
+      { params: Promise.resolve({ id: "7" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedSerialize).toHaveBeenCalledTimes(3);
+    const body = await response.json() as { posts: { id: string; serialized: boolean }[] };
+    expect(body.posts.every(p => p.serialized)).toBe(true);
+  });
+
+  it("returns empty posts array when event has no posts", async () => {
+    mockedFindMany.mockResolvedValue([]);
+
+    const response = await postsRoute.GET(
+      getRequest("7"),
+      { params: Promise.resolve({ id: "7" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { posts: unknown[]; nextCursor: unknown };
+    expect(body.posts).toHaveLength(0);
+    expect(body.nextCursor).toBeNull();
+  });
+
+  it("filters posts by eventId", async () => {
+    mockedFindMany.mockResolvedValue([]);
+
+    await postsRoute.GET(
+      getRequest("42"),
+      { params: Promise.resolve({ id: "42" }) },
+    );
+
+    expect(mockedFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ eventId: 42 }),
       }),
     );
   });
