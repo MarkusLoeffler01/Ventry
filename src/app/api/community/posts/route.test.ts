@@ -5,6 +5,7 @@ vi.mock("@/lib/prisma/prisma", () => ({
   prisma: {
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     event: {
       findUnique: vi.fn(),
@@ -29,6 +30,7 @@ import { getSession } from "@/lib/auth/session";
 
 const mockedGetSession = getSession as unknown as ReturnType<typeof vi.fn>;
 const mockedFindUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
+const mockedFindManyUsers = prisma.user.findMany as unknown as ReturnType<typeof vi.fn>;
 const mockedFindEvent = prisma.event.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockedFindRegistration = prisma.registration.findFirst as unknown as ReturnType<typeof vi.fn>;
 const mockedFindPosts = prisma.communityPost.findMany as unknown as ReturnType<typeof vi.fn>;
@@ -54,6 +56,7 @@ function communityEvent(overrides: Record<string, unknown> = {}) {
     communityEnabled: true,
     communityOpenAfterEnd: true,
     communityModerated: true,
+    communityModerateComments: false,
     communityAttendeesOnly: true,
     ...overrides,
   };
@@ -86,6 +89,8 @@ function includedPost(overrides: Record<string, unknown> = {}) {
       { userId: "user-1", reaction: "LIKE" },
       { userId: "user-2", reaction: "LOVE" },
     ],
+    comments: [],
+    _count: { comments: 0 },
     ...overrides,
   };
 }
@@ -94,11 +99,8 @@ describe("App Router: /api/community/posts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedFindEvent.mockResolvedValue(communityEvent());
-    mockedFindUser.mockResolvedValue({
-      id: "user-1",
-      isAdmin: false,
-      adminProfile: null,
-    });
+    mockedFindUser.mockResolvedValue({ id: "user-1", isAdmin: false, adminProfile: null });
+    mockedFindManyUsers.mockResolvedValue([]); // mention map: no mentions in test posts
   });
 
   describe("GET", () => {

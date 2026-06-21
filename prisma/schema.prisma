@@ -55,6 +55,7 @@ model User {
   sessions             Session[]
   twofactors           TwoFactor[]
   communityPosts       CommunityPost[]
+  communityComments    CommunityComment[]
   postReactions        PostReaction[]
   postModerationLogs   PostModerationLog[] @relation("UserPostModerationLogs")
 
@@ -147,6 +148,7 @@ model Event {
   communityEnabled    Boolean         @default(false)
   communityOpenAfterEnd Boolean       @default(true)
   communityModerated  Boolean         @default(true)
+  communityModerateComments Boolean   @default(false)
   communityAttendeesOnly Boolean      @default(true)
   badgeTemplates      BadgeTemplate[]
   owner               Admin?          @relation(fields: [ownerId], references: [id])
@@ -181,8 +183,28 @@ model CommunityPost {
   author         User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
   reactions      PostReaction[]
   moderationLogs PostModerationLog[]
+  comments       CommunityComment[]
 
   @@index([eventId, status, pinned, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model CommunityComment {
+  id               String        @id @default(cuid())
+  postId           String
+  authorId         String
+  content          String?
+  imageUrls        String[]      @default([])
+  gifUrl           String?
+  mentionedUserIds String[]      @default([])
+  status           PostStatus    @default(PENDING)
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  post             CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author           User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, status, createdAt])
   @@index([authorId, createdAt])
 }
 

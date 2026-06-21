@@ -77,6 +77,7 @@ function buildCreateEventArgs(
             communityEnabled: validatedData.communityEnabled ?? false,
             communityOpenAfterEnd: validatedData.communityOpenAfterEnd ?? true,
             communityModerated: validatedData.communityModerated ?? true,
+            communityModerateComments: validatedData.communityModerateComments ?? false,
             communityAttendeesOnly: validatedData.communityAttendeesOnly ?? true,
         },
         include: {
