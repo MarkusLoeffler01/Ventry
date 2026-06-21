@@ -12,6 +12,9 @@ import Link from "next/link";
 import { useSession } from "@/lib/auth/client";
 import { usePathname } from "next/navigation";
 
+type ProfilePictureEntry = { signedUrl: string | null; isPrimary: boolean; order: number };
+type UserProfileResponse = { profilePictures?: ProfilePictureEntry[]; image?: string | null };
+
 /**
  * AppHeader – persistent sticky navigation bar.
  *
@@ -28,6 +31,22 @@ export default function AppHeader() {
 
     const [visible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
+    const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!user?.id) {
+            setProfileImageUrl(null);
+            return;
+        }
+        fetch(`/api/user?userId=${user.id}`)
+            .then(r => r.ok ? r.json() as Promise<UserProfileResponse> : null)
+            .then(data => {
+                const pics = data?.profilePictures ?? [];
+                const primary = pics.find(p => p.isPrimary) ?? pics[0] ?? null;
+                setProfileImageUrl(primary?.signedUrl ?? user.image ?? null);
+            })
+            .catch(() => null);
+    }, [user?.id, user?.image]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -122,10 +141,10 @@ export default function AppHeader() {
                             <IconButton size="small" sx={{ p: 0 }} aria-label="Go to profile">
                                 <Avatar
                                     alt={user.name ?? "Profile"}
-                                    src={user.image ?? undefined}
+                                    src={profileImageUrl ?? undefined}
                                     sx={{ width: 36, height: 36, fontSize: "0.875rem" }}
                                 >
-                                    {!user.image && initials}
+                                    {!profileImageUrl && initials}
                                 </Avatar>
                             </IconButton>
                         </Link>

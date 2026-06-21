@@ -4,6 +4,7 @@ import {
   CommunityError,
   assertCanWriteInCommunity,
   assertCommunityEnabled,
+  buildMentionMapForPosts,
   communityPostInclude,
   deriveCommunityPostTags,
   loadCommunityActor,
@@ -58,9 +59,11 @@ export async function GET(req: NextRequest) {
     const hasMore = posts.length > parsed.data.limit;
     const page = hasMore ? posts.slice(0, parsed.data.limit) : posts;
 
+    const mentionedUsersById = await buildMentionMapForPosts(page);
+
     return NextResponse.json(
       {
-        posts: page.map(post => serializeCommunityPost(post, session?.user?.id)),
+        posts: page.map(post => serializeCommunityPost(post, session?.user?.id, mentionedUsersById)),
         nextCursor: hasMore ? page[page.length - 1]?.id || null : null,
       },
       { status: 200 },

@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma";
 import { CommunityFeedbackType, CommunityPostType, ModerationAction, PostStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma/prisma";
+import type { CommunityCommentView } from "@/components/events/community/types";
 
 export const COMMUNITY_REACTIONS = ["LIKE", "LOVE", "CELEBRATE", "HELPFUL"] as const;
 
@@ -38,6 +39,32 @@ export class CommunityError extends Error {
   }
 }
 
+export const communityCommentInclude = {
+  author: {
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      profilePictures: {
+        orderBy: [
+          { isPrimary: "desc" as const },
+          { order: "asc" as const },
+          { createdAt: "desc" as const },
+        ],
+        take: 1,
+        select: {
+          signedUrl: true,
+          isPrimary: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.CommunityCommentInclude;
+
+export type CommunityCommentWithInclude = Prisma.CommunityCommentGetPayload<{
+  include: typeof communityCommentInclude;
+}>;
+
 export const communityPostInclude = {
   author: {
     select: {
@@ -64,6 +91,39 @@ export const communityPostInclude = {
       reaction: true,
     },
   },
+  comments: {
+    where: { status: PostStatus.APPROVED, deletedAt: null },
+    orderBy: { createdAt: "asc" as const },
+    take: 2,
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          profilePictures: {
+            orderBy: [
+              { isPrimary: "desc" as const },
+              { order: "asc" as const },
+              { createdAt: "desc" as const },
+            ],
+            take: 1,
+            select: {
+              signedUrl: true,
+              isPrimary: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  _count: {
+    select: {
+      comments: {
+        where: { status: PostStatus.APPROVED, deletedAt: null },
+      },
+    },
+  },
 } satisfies Prisma.CommunityPostInclude;
 
 export type CommunityPostWithInclude = Prisma.CommunityPostGetPayload<{
@@ -83,6 +143,7 @@ export type CommunityEventAccess = {
   communityEnabled: boolean;
   communityOpenAfterEnd: boolean;
   communityModerated: boolean;
+  communityModerateComments: boolean;
   communityAttendeesOnly: boolean;
 };
 
@@ -175,6 +236,7 @@ export async function loadCommunityEvent(eventId: number): Promise<CommunityEven
       communityEnabled: true,
       communityOpenAfterEnd: true,
       communityModerated: true,
+      communityModerateComments: true,
       communityAttendeesOnly: true,
     },
   });
@@ -236,7 +298,47 @@ export function assertCanDeletePost(
   throw new CommunityError(403, "You cannot delete this post");
 }
 
-export function serializeCommunityPost(post: CommunityPostWithInclude, viewerUserId?: string | null) {
+export async function buildMentionMapForPosts(
+  posts: { comments: { mentionedUserIds: string[] }[] }[],
+): Promise<Map<string, { id: string; name: string }>> {
+  const allIds = [...new Set(posts.flatMap(p => p.comments.flatMap(c => c.mentionedUserIds)))];
+  if (allIds.length === 0) return new Map();
+  const users = await prisma.user.findMany({
+    where: { id: { in: allIds } },
+    select: { id: true, name: true },
+  });
+  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User" }]));
+}
+
+export function serializeCommunityComment(
+  comment: CommunityCommentWithInclude,
+  mentionedUsersById?: Map<string, { id: string; name: string }>,
+): CommunityCommentView {
+  return {
+    id: comment.id,
+    postId: comment.postId,
+    authorId: comment.authorId,
+    content: comment.content,
+    imageUrls: comment.imageUrls,
+    gifUrl: comment.gifUrl,
+    status: comment.status,
+    createdAt: comment.createdAt.toISOString(),
+    author: {
+      id: comment.author.id,
+      name: comment.author.name || "Attendee",
+      imageUrl: comment.author.profilePictures[0]?.signedUrl || comment.author.image || null,
+    },
+    mentionedUsers: comment.mentionedUserIds
+      .map(id => mentionedUsersById?.get(id))
+      .filter((u): u is { id: string; name: string } => u !== undefined),
+  };
+}
+
+export function serializeCommunityPost(
+  post: CommunityPostWithInclude,
+  viewerUserId?: string | null,
+  mentionedUsersById?: Map<string, { id: string; name: string }>,
+) {
   const feedbacks = normalizeCommunityFeedbackEntries(post.feedbackEntries, {
     content: post.content,
     feedbackRating: post.feedbackRating,
@@ -281,6 +383,8 @@ export function serializeCommunityPost(post: CommunityPostWithInclude, viewerUse
     },
     reactions: reactionCounts,
     viewerReactions,
+    commentCount: post._count.comments,
+    comments: post.comments.map(c => serializeCommunityComment(c as CommunityCommentWithInclude, mentionedUsersById)),
   };
 }
 

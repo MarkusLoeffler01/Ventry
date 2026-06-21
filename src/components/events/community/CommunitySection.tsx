@@ -287,6 +287,8 @@ export default function CommunitySection({
                 deleteDisabled={!currentUserId || actionPostId === post.id}
                 moderateDisabled={Boolean(moderatingPostId)}
                 reactionDisabled={!currentUserId || Boolean(composerDisabledReason)}
+                currentUserId={currentUserId}
+                composerDisabled={Boolean(composerDisabledReason)}
                 onDelete={handleDelete}
                 onModerate={canModerate ? handleModerate : undefined}
                 onReact={handleReact}
