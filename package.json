@@ -23,6 +23,7 @@
     "db:backup": "bash scripts/db-backup.sh",
     "db:restore": "bash scripts/db-restore.sh",
     "db:reset": "bash scripts/db-reset.sh",
+    "db:sync": "node scripts/db-sync-overwrite.mjs",
     "db:migrate": "./scripts/prisma-migrate-dev.mjs"
   },
   "dependencies": {
