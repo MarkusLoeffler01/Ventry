@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
-import { Container, Box, Typography, Paper } from "@mui/material";
+import { Container, Box, Typography } from "@mui/material";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
 
@@ -68,15 +68,12 @@ async function ProfilePageContent() {
   const profilePictures = await refreshSignedUrls(user.profilePictures);
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
+    <Container maxWidth="md">
+      <Box sx={{ py: 3 }}>
+        <Typography variant="h5" component="h1" fontWeight={700} sx={{ mb: 2 }}>
           Profile Settings
         </Typography>
-
-        <Paper elevation={2} sx={{ p: 4, mt: 3 }}>
-          <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
-        </Paper>
+        <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
       </Box>
     </Container>
   );
