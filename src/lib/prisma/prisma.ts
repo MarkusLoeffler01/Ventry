@@ -2,10 +2,19 @@ import { createPrismaClient } from "./client";
 
 type AppPrismaClient = ReturnType<typeof createPrismaClient>;
 
-const globalForPrisma = globalThis as { prisma?: AppPrismaClient };
+const globalForPrisma = globalThis as {
+  prisma?: AppPrismaClient;
+  prismaDatabaseUrl?: string;
+};
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+const shouldReuseClient = globalForPrisma.prisma && globalForPrisma.prismaDatabaseUrl === databaseUrl;
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = shouldReuseClient ? globalForPrisma.prisma! : createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+  globalForPrisma.prismaDatabaseUrl = databaseUrl;
+}
 
 export default prisma;
