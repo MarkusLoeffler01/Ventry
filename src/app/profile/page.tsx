@@ -3,7 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
-import { Container, Box, Typography } from "@mui/material";
+import { Container, Box, Typography, Button } from "@mui/material";
+import { Visibility } from "@mui/icons-material";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
 
@@ -70,9 +71,22 @@ async function ProfilePageContent() {
   return (
     <Container maxWidth="md">
       <Box sx={{ py: 3 }}>
-        <Typography variant="h5" component="h1" fontWeight={700} sx={{ mb: 2 }}>
-          Profile Settings
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="h5" component="h1" fontWeight={700}>
+            Profile Settings
+          </Typography>
+          {user.name && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Visibility />}
+              href={`/profile/${encodeURIComponent(user.name)}`}
+              target="_blank"
+            >
+              Preview
+            </Button>
+          )}
+        </Box>
         <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
       </Box>
     </Container>
