@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
 
 // Enhanced user schema with new profile fields
 export const enhancedUserSchema = z.object({
-  name: z.string().min(2).max(100).optional(),
+  name: z.string().min(2).max(DISPLAY_NAME_MAX_LENGTH).optional(),
   email: z.email().optional(),
   bio: z.string().max(500).optional(),
   dateOfBirth: z.string().date().optional(), // ISO date string (YYYY-MM-DD)
