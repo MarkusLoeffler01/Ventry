@@ -9,6 +9,9 @@ import {
   Divider,
   Switch,
   FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -30,12 +33,16 @@ import {
   VisibilityOff,
   Telegram,
   Twitter,
-  PhotoCamera
+  PhotoCamera,
+  ExpandMore,
+  Badge,
+  Public,
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
 import MyRegistrations from './MyRegistrations';
 import { COUNTRIES } from '@/lib/countries';
+import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
 
 interface ProfilePicture {
   id: string;
@@ -117,6 +124,14 @@ const PRONOUN_OPTIONS = [
   'choose my own pronouns'
 ];
 
+const sectionSx = {
+  p: { xs: 2, md: 2.5 },
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 1,
+  bgcolor: 'background.paper',
+};
+
 export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
@@ -190,10 +205,20 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     setSaving(true);
     setError(null);
 
+    const displayName = formData.name.trim();
+    if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
+      setSaving(false);
+      setError(`Display name must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.`);
+      return;
+    }
+
     const socialLinksPayload: SocialLinks = {};
     if (formData.socialLinks.telegram) socialLinksPayload.telegram = formData.socialLinks.telegram;
     if (formData.socialLinks.twitter) socialLinksPayload.twitter = formData.socialLinks.twitter;
     if (formData.socialLinks.instagram) socialLinksPayload.instagram = formData.socialLinks.instagram;
+    const pronouns = formData.pronouns === 'choose my own pronouns'
+      ? formData.customPronouns?.trim() || ''
+      : formData.pronouns;
 
     try {
       const response = await fetch('/api/user', {
@@ -201,7 +226,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: user.id,
-          name: formData.name,
+          name: displayName,
           country: formData.country || null,
           legalName: formData.legalName || null,
           addressLine1: formData.addressLine1 || null,
@@ -212,7 +237,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
           addressCountry: formData.addressCountry || null,
           bio: formData.bio,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
-          pronouns: formData.pronouns,
+          pronouns,
           showAge: formData.showAge,
           showExactBirthdate: formData.showExactBirthdate,
           socialLinks: socialLinksPayload,
@@ -284,8 +309,18 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     return age;
   };
 
+  const displayNameLength = formData.name.length;
+  const displayNameTooLong = displayNameLength > DISPLAY_NAME_MAX_LENGTH;
+  const hasCheckInIdentity = Boolean(
+    formData.legalName ||
+    formData.addressLine1 ||
+    formData.addressCity ||
+    formData.addressPostalCode ||
+    formData.addressCountry
+  );
+
   return (
-    <Stack spacing={4}>
+    <Stack spacing={2.5}>
       {error && (
         <Alert severity="error" onClose={() => setError(null)}>
           {error}
@@ -304,11 +339,15 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Alert>
       )}
 
-      {/* Profile Picture Section */}
-      <Box>
-        <Typography variant="h5" gutterBottom>
-          Profile Pictures
-        </Typography>
+      <Box sx={sectionSx}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h5" fontWeight={700}>
+            Profile Pictures
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {profilePictures.length} uploaded photo{profilePictures.length === 1 ? '' : 's'}
+          </Typography>
+        </Box>
         <ProfilePictureGallery
           userId={user.id}
           profilePictures={profilePictures}
@@ -318,13 +357,18 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         />
       </Box>
 
-      <Divider />
-
-      {/* Basic Information */}
-      <Box>
-        <Typography variant="h5" gutterBottom>
-          Basic Information
-        </Typography>
+      <Box sx={sectionSx}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 3 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={700}>
+              Basic Information
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Public profile details and discoverability.
+            </Typography>
+          </Box>
+          <Chip icon={<Public />} label={formData.country ? 'Public profile ready' : 'Country optional'} size="small" color={formData.country ? 'primary' : 'default'} />
+        </Stack>
 
         <Stack spacing={3}>
           <TextField
@@ -332,7 +376,11 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             value={formData.name}
             onChange={handleInputChange('name')}
             fullWidth
-            helperText="This is how others will see you — also used in your profile URL"
+            error={displayNameTooLong}
+            inputProps={{ maxLength: DISPLAY_NAME_MAX_LENGTH }}
+            helperText={displayNameTooLong
+              ? `Display name must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.`
+              : `${displayNameLength}/${DISPLAY_NAME_MAX_LENGTH} characters`}
           />
 
           <TextField
@@ -353,67 +401,97 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             ))}
           </TextField>
 
-          <Divider />
+          <Accordion variant="outlined" disableGutters sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
+            <AccordionSummary
+              expandIcon={<ExpandMore />}
+              sx={{ '& .MuiAccordionSummary-content': { minWidth: 0, overflow: 'hidden' } }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+                <Badge color="action" sx={{ flexShrink: 0 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Check-in Identity
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Legal name and address for on-site verification.
+                  </Typography>
+                </Box>
+                <Chip
+                  label={hasCheckInIdentity ? 'Added' : 'Empty'}
+                  size="small"
+                  color={hasCheckInIdentity ? 'success' : 'default'}
+                  sx={{ flexShrink: 0 }}
+                />
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack spacing={2.5}>
+                <Alert severity="info">
+                  This information is used for event check-in and is not shown on your public profile.
+                </Alert>
 
-          <Typography variant="h6">
-            Check-in Identity
-          </Typography>
+                <TextField
+                  label="Legal Name"
+                  value={formData.legalName}
+                  onChange={handleInputChange('legalName')}
+                  fullWidth
+                  helperText="Used by event staff for ID checks."
+                />
 
-          <TextField
-            label="Legal Name"
-            value={formData.legalName}
-            onChange={handleInputChange('legalName')}
-            fullWidth
-            helperText="Used by event staff for ID checks."
-          />
+                <TextField
+                  label="Address"
+                  value={formData.addressLine1}
+                  onChange={handleInputChange('addressLine1')}
+                  fullWidth
+                  autoComplete="street-address"
+                />
 
-          <TextField
-            label="Address"
-            value={formData.addressLine1}
-            onChange={handleInputChange('addressLine1')}
-            fullWidth
-            autoComplete="street-address"
-          />
+                <TextField
+                  label="Address line 2"
+                  value={formData.addressLine2}
+                  onChange={handleInputChange('addressLine2')}
+                  fullWidth
+                  autoComplete="address-line2"
+                />
 
-          <TextField
-            label="Address line 2"
-            value={formData.addressLine2}
-            onChange={handleInputChange('addressLine2')}
-            fullWidth
-            autoComplete="address-line2"
-          />
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                  <TextField
+                    label="City"
+                    value={formData.addressCity}
+                    onChange={handleInputChange('addressCity')}
+                    fullWidth
+                    autoComplete="address-level2"
+                  />
 
-          <TextField
-            label="City"
-            value={formData.addressCity}
-            onChange={handleInputChange('addressCity')}
-            fullWidth
-            autoComplete="address-level2"
-          />
+                  <TextField
+                    label="State/Region"
+                    value={formData.addressState}
+                    onChange={handleInputChange('addressState')}
+                    fullWidth
+                    autoComplete="address-level1"
+                  />
+                </Stack>
 
-          <TextField
-            label="State/Region"
-            value={formData.addressState}
-            onChange={handleInputChange('addressState')}
-            fullWidth
-            autoComplete="address-level1"
-          />
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                  <TextField
+                    label="Postal code"
+                    value={formData.addressPostalCode}
+                    onChange={handleInputChange('addressPostalCode')}
+                    fullWidth
+                    autoComplete="postal-code"
+                  />
 
-          <TextField
-            label="Postal code"
-            value={formData.addressPostalCode}
-            onChange={handleInputChange('addressPostalCode')}
-            fullWidth
-            autoComplete="postal-code"
-          />
-
-          <TextField
-            label="Address country"
-            value={formData.addressCountry}
-            onChange={handleInputChange('addressCountry')}
-            fullWidth
-            autoComplete="country-name"
-          />
+                  <TextField
+                    label="Address country"
+                    value={formData.addressCountry}
+                    onChange={handleInputChange('addressCountry')}
+                    fullWidth
+                    autoComplete="country-name"
+                  />
+                </Stack>
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
 
           <Divider />
 
@@ -467,26 +545,32 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             ))}
           </TextField>
           {formData.pronouns === "choose my own pronouns" && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Custom Pronouns
-              </Typography>
-              <TextField type='text' value={formData.customPronouns} onChange={handleInputChange('customPronouns')} />
-            </Box>
+            <TextField
+              label="Custom Pronouns"
+              type="text"
+              value={formData.customPronouns}
+              onChange={handleInputChange('customPronouns')}
+              fullWidth
+            />
           )}
         </Stack>
       </Box>
 
-      <Divider />
-
-      {/* Social Links */}
-      <Box>
-        <Typography variant="h5" gutterBottom>
-          Social Links
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Enter your usernames (without @). They will appear as clickable chips on your profile.
-        </Typography>
+      <Box sx={sectionSx}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 2 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={700}>
+              Social Links
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Usernames appear as clickable profile chips.
+            </Typography>
+          </Box>
+          <Chip
+            label={`${Object.values(formData.socialLinks).filter(Boolean).length}/3 linked`}
+            size="small"
+          />
+        </Stack>
 
         <Stack spacing={2}>
           <TextField
@@ -537,13 +621,23 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Stack>
       </Box>
 
-      <Divider />
-
-      {/* Privacy Settings */}
-      <Box>
-        <Typography variant="h5" gutterBottom>
-          Privacy Settings
-        </Typography>
+      <Box sx={sectionSx}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 2 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={700}>
+              Privacy Settings
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Control what appears on your public profile.
+            </Typography>
+          </Box>
+          <Chip
+            icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+            label={formData.showAge ? 'Age visible' : 'Age hidden'}
+            color={formData.showAge ? 'primary' : 'default'}
+            size="small"
+          />
+        </Stack>
 
         <Stack spacing={2}>
           <FormControlLabel
@@ -578,19 +672,13 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Stack>
       </Box>
 
-      <Divider />
-
-      {/* My Registrations */}
-      <Box>
-        <Typography variant="h5" gutterBottom>
+      <Box sx={sectionSx}>
+        <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
           My Registrations
         </Typography>
         <MyRegistrations userId={user.id} />
       </Box>
 
-      <Divider />
-
-      {/* Linked Accounts */}
       <Box>
         <LinkedAccounts
           accounts={user.accounts}
@@ -599,11 +687,8 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         />
       </Box>
 
-      <Divider />
-
-      {/* Account Actions */}
-      <Box>
-        <Typography variant="h5" gutterBottom>
+      <Box sx={sectionSx}>
+        <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
           Account Management
         </Typography>
 
@@ -634,10 +719,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                 Delete Account
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Permanently delete your account and all associated data.
-              </Typography>
-              <Typography variant="h4" color="error" sx={{ mt: 1 }}>
-                ⚠️This action cannot be undone⚠️
+                Permanently delete your account and all associated data. This action cannot be undone.
               </Typography>
             </CardContent>
             <CardActions>
@@ -654,8 +736,21 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Stack>
       </Box>
 
-      {/* Save Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
+      <Box
+        sx={{
+          position: 'sticky',
+          bottom: 16,
+          zIndex: 2,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          p: 1.5,
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          bgcolor: 'background.paper',
+          boxShadow: 3,
+        }}
+      >
         <Button
           variant="contained"
           size="large"
@@ -665,7 +760,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
               setError(err instanceof Error ? err.message : 'Failed to update profile');
             });
           }}
-          disabled={saving}
+          disabled={saving || displayNameTooLong}
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>

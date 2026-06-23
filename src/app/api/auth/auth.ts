@@ -11,8 +11,13 @@ import { renderComponentToHTML } from "@/lib/helpers/html";
 import WelcomeMail from "@/components/emails/WelcomeMail";
 import EmailVerificationMail from "@/components/emails/EmailVerificationMail";
 import { getTrustedOrigins } from "@/lib/security/origins";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
 
 const cookiePrefix = "VENTRY";
+
+function clampDisplayName(name: string | null | undefined) {
+    return name?.slice(0, DISPLAY_NAME_MAX_LENGTH);
+}
 
 export const auth = betterAuth({
     rateLimit: {
@@ -170,7 +175,7 @@ export const auth = betterAuth({
             mapProfileToUser(profile) {
                 return {
                     id: profile.sub,
-                    name: profile.name,
+                    name: clampDisplayName(profile.name),
                     email: profile.email,
                     image: profile.picture,
                     emailVerified: profile.email_verified
@@ -185,7 +190,7 @@ export const auth = betterAuth({
             mapProfileToUser(profile) {
                 return {
                     id: profile.id.toString(),
-                    name: profile.name || profile.login,
+                    name: clampDisplayName(profile.name || profile.login),
                     email: profile.email,
                     image: profile.avatar_url,
                     emailVerified: true // GitHub emails are verified

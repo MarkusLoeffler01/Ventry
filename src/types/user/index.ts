@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
 
 // Define user validation schema
 const userSchema = z.object({
-  name: z.string().min(2).optional(),
+  name: z.string().min(2).max(DISPLAY_NAME_MAX_LENGTH).optional(),
   email: z.email().optional(),
   password: z.string().min(8).optional(),
   profilePicture: z.url().nullable().optional(),
@@ -27,7 +28,7 @@ const userSchema = z.object({
 });
 
 const createUserSchema = userSchema.extend({
-  name: z.string().min(2),
+  name: z.string().min(2).max(DISPLAY_NAME_MAX_LENGTH),
   email: z.email(),
   password: z.string().min(8),
 }).strict();
