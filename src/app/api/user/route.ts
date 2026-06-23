@@ -40,9 +40,10 @@ export async function GET(req: NextRequest) {
         dateOfBirth: true,
         pronouns: true,
         showAge: true,
+        showExactBirthdate: true,
+        socialLinks: true,
         createdAt: true,
         updatedAt: true,
-        // Exclude password for security
       }
       });
 
@@ -293,6 +294,9 @@ export async function PATCH(req: NextRequest) {
         addressPostalCode: true,
         addressCountry: true,
         profilePictures: true,
+        showAge: true,
+        showExactBirthdate: true,
+        socialLinks: true,
         createdAt: true,
         updatedAt: true,
       }

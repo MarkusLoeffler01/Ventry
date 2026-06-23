@@ -19,18 +19,23 @@ import {
   Chip,
   Card,
   CardContent,
-  CardActions
+  CardActions,
+  InputAdornment
 } from '@mui/material';
 import {
   Save,
   Delete,
   Download,
   Visibility,
-  VisibilityOff
+  VisibilityOff,
+  Telegram,
+  Twitter,
+  PhotoCamera
 } from '@mui/icons-material';
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
 import MyRegistrations from './MyRegistrations';
+import { COUNTRIES } from '@/lib/countries';
 
 interface ProfilePicture {
   id: string;
@@ -38,6 +43,12 @@ interface ProfilePicture {
   storagePath?: string | null;
   isPrimary: boolean;
   createdAt: Date;
+}
+
+interface SocialLinks {
+  telegram?: string;
+  twitter?: string;
+  instagram?: string;
 }
 
 interface User {
@@ -54,13 +65,15 @@ interface User {
   addressCountry?: string | null;
   profilePictures: ProfilePicture[];
   accounts: Array<{
-    providerId: string;  // Changed from 'provider' for better-auth
-    password?: string | null; // Password stored in credential account
+    providerId: string;
+    password?: string | null;
   }>;
   bio?: string | null;
   dateOfBirth?: Date | null;
   pronouns?: string | null;
   showAge: boolean;
+  showExactBirthdate: boolean;
+  socialLinks?: SocialLinks | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -83,12 +96,18 @@ interface ProfileFormData {
   dateOfBirth: string;
   pronouns: string;
   showAge: boolean;
+  showExactBirthdate: boolean;
   customPronouns?: string;
+  socialLinks: {
+    telegram: string;
+    twitter: string;
+    instagram: string;
+  };
 }
 
 const PRONOUN_OPTIONS = [
   'she/her',
-  'he/him', 
+  'he/him',
   'they/them',
   'she/they',
   'he/they',
@@ -99,6 +118,7 @@ const PRONOUN_OPTIONS = [
 ];
 
 export default function ProfilePageClient({ user }: ProfilePageClientProps) {
+  const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
     country: user.country || '',
@@ -113,13 +133,17 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
     showAge: user.showAge ?? true,
-    customPronouns: user.pronouns && !PRONOUN_OPTIONS.includes(user.pronouns) ? user.pronouns : undefined
+    showExactBirthdate: user.showExactBirthdate ?? false,
+    customPronouns: user.pronouns && !PRONOUN_OPTIONS.includes(user.pronouns) ? user.pronouns : undefined,
+    socialLinks: {
+      telegram: socialLinks.telegram || '',
+      twitter: socialLinks.twitter || '',
+      instagram: socialLinks.instagram || '',
+    }
   });
 
-  // Manage profile pictures state locally
   const [profilePictures, setProfilePictures] = useState<ProfilePicture[]>(user.profilePictures);
 
-  // Function to refresh profile pictures from API
   const refreshProfilePictures = async () => {
     try {
       const response = await fetch(`/api/user/profile-picture?userId=${user.id}`);
@@ -139,15 +163,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
-  // Check for linking success in URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('linked') === 'success') {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- URL param check must run in effect
       setLinkSuccess(true);
-      // Clean URL
       window.history.replaceState({}, '', '/profile');
-      // Auto-hide after 5 seconds
       setTimeout(() => setLinkSuccess(false), 5000);
     }
   }, []);
@@ -157,9 +178,22 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleSocialChange = (platform: keyof ProfileFormData['socialLinks']) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value.replace(/^@/, '');
+    setFormData(prev => ({
+      ...prev,
+      socialLinks: { ...prev.socialLinks, [platform]: value }
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+
+    const socialLinksPayload: SocialLinks = {};
+    if (formData.socialLinks.telegram) socialLinksPayload.telegram = formData.socialLinks.telegram;
+    if (formData.socialLinks.twitter) socialLinksPayload.twitter = formData.socialLinks.twitter;
+    if (formData.socialLinks.instagram) socialLinksPayload.instagram = formData.socialLinks.instagram;
 
     try {
       const response = await fetch('/api/user', {
@@ -179,7 +213,9 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
           bio: formData.bio,
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
           pronouns: formData.pronouns,
-          showAge: formData.showAge
+          showAge: formData.showAge,
+          showExactBirthdate: formData.showExactBirthdate,
+          socialLinks: socialLinksPayload,
         })
       });
 
@@ -206,7 +242,6 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         throw new Error('Failed to delete account');
       }
 
-      // Redirect to home page after successful deletion
       window.location.href = '/';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete account');
@@ -216,7 +251,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
   const handleDownloadData = async () => {
     try {
       const response = await fetch(`/api/user/export?userId=${user.id}`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to export data');
       }
@@ -230,7 +265,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       setDownloadDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export data');
@@ -241,345 +276,431 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
   return (
     <Stack spacing={4}>
-        {/* Alerts */}
-        {error && (
-          <Alert severity="error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-        
-        {success && (
-          <Alert severity="success" onClose={() => setSuccess(false)}>
-            Profile updated successfully!
-          </Alert>
-        )}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-        {linkSuccess && (
-          <Alert severity="success" onClose={() => setLinkSuccess(false)}>
-            Account linked successfully!
-          </Alert>
-        )}
+      {success && (
+        <Alert severity="success" onClose={() => setSuccess(false)}>
+          Profile updated successfully!
+        </Alert>
+      )}
 
-        {/* Profile Picture Section */}
-        <Box>
-          <Typography variant="h5" gutterBottom>
-            Profile Pictures
-          </Typography>
-          <ProfilePictureGallery
-            userId={user.id}
-            profilePictures={profilePictures}
-            userName={formData.name}
-            userEmail={user.email}
-            onPicturesUpdate={refreshProfilePictures}
+      {linkSuccess && (
+        <Alert severity="success" onClose={() => setLinkSuccess(false)}>
+          Account linked successfully!
+        </Alert>
+      )}
+
+      {/* Profile Picture Section */}
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          Profile Pictures
+        </Typography>
+        <ProfilePictureGallery
+          userId={user.id}
+          profilePictures={profilePictures}
+          userName={formData.name}
+          userEmail={user.email}
+          onPicturesUpdate={refreshProfilePictures}
+        />
+      </Box>
+
+      <Divider />
+
+      {/* Basic Information */}
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          Basic Information
+        </Typography>
+
+        <Stack spacing={3}>
+          <TextField
+            label="Display Name"
+            value={formData.name}
+            onChange={handleInputChange('name')}
+            fullWidth
+            helperText="This is how others will see you — also used in your profile URL"
           />
-        </Box>
 
-        <Divider />
+          <TextField
+            label="Country"
+            value={formData.country}
+            onChange={handleInputChange('country')}
+            select
+            fullWidth
+            helperText="Shown on your profile with a flag"
+          >
+            <MenuItem value="">
+              <em>None</em>
+            </MenuItem>
+            {COUNTRIES.map((c) => (
+              <MenuItem key={c.code} value={c.code}>
+                {String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(0) - 65)}{String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(1) - 65)} {c.name}
+              </MenuItem>
+            ))}
+          </TextField>
 
-        {/* Basic Information */}
-        <Box>
-          <Typography variant="h5" gutterBottom>
-            Basic Information
+          <Divider />
+
+          <Typography variant="h6">
+            Check-in Identity
           </Typography>
-          
-          <Stack spacing={3}>
-            <TextField
-              label="Display Name"
-              value={formData.name}
-              onChange={handleInputChange('name')}
-              fullWidth
-              helperText="This is how others will see you on the platform"
-            />
 
-            <TextField
-              label="Country"
-              value={formData.country}
-              onChange={handleInputChange('country')}
-              fullWidth
-              helperText="Optional, shown on attendee cards if enabled"
-            />
+          <TextField
+            label="Legal Name"
+            value={formData.legalName}
+            onChange={handleInputChange('legalName')}
+            fullWidth
+            helperText="Used by event staff for ID checks."
+          />
 
-            <Divider />
+          <TextField
+            label="Address"
+            value={formData.addressLine1}
+            onChange={handleInputChange('addressLine1')}
+            fullWidth
+            autoComplete="street-address"
+          />
 
-            <Typography variant="h6">
-              Check-in Identity
-            </Typography>
+          <TextField
+            label="Address line 2"
+            value={formData.addressLine2}
+            onChange={handleInputChange('addressLine2')}
+            fullWidth
+            autoComplete="address-line2"
+          />
 
-            <TextField
-              label="Legal Name"
-              value={formData.legalName}
-              onChange={handleInputChange('legalName')}
-              fullWidth
-              helperText="Used by event staff for ID checks."
-            />
+          <TextField
+            label="City"
+            value={formData.addressCity}
+            onChange={handleInputChange('addressCity')}
+            fullWidth
+            autoComplete="address-level2"
+          />
 
-            <TextField
-              label="Address"
-              value={formData.addressLine1}
-              onChange={handleInputChange('addressLine1')}
-              fullWidth
-              autoComplete="street-address"
-            />
+          <TextField
+            label="State/Region"
+            value={formData.addressState}
+            onChange={handleInputChange('addressState')}
+            fullWidth
+            autoComplete="address-level1"
+          />
 
-            <TextField
-              label="Address line 2"
-              value={formData.addressLine2}
-              onChange={handleInputChange('addressLine2')}
-              fullWidth
-              autoComplete="address-line2"
-            />
+          <TextField
+            label="Postal code"
+            value={formData.addressPostalCode}
+            onChange={handleInputChange('addressPostalCode')}
+            fullWidth
+            autoComplete="postal-code"
+          />
 
-            <TextField
-              label="City"
-              value={formData.addressCity}
-              onChange={handleInputChange('addressCity')}
-              fullWidth
-              autoComplete="address-level2"
-            />
+          <TextField
+            label="Address country"
+            value={formData.addressCountry}
+            onChange={handleInputChange('addressCountry')}
+            fullWidth
+            autoComplete="country-name"
+          />
 
-            <TextField
-              label="State/Region"
-              value={formData.addressState}
-              onChange={handleInputChange('addressState')}
-              fullWidth
-              autoComplete="address-level1"
-            />
+          <Divider />
 
-            <TextField
-              label="Postal code"
-              value={formData.addressPostalCode}
-              onChange={handleInputChange('addressPostalCode')}
-              fullWidth
-              autoComplete="postal-code"
-            />
+          <TextField
+            label="Bio"
+            value={formData.bio}
+            onChange={handleInputChange('bio')}
+            multiline
+            rows={4}
+            fullWidth
+            placeholder="Tell us about yourself..."
+            inputProps={{ maxLength: 500 }}
+            helperText={`${formData.bio.length}/500 characters`}
+          />
 
-            <TextField
-              label="Address country"
-              value={formData.addressCountry}
-              onChange={handleInputChange('addressCountry')}
-              fullWidth
-              autoComplete="country-name"
-            />
+          <TextField
+            label="Date of Birth"
+            type="date"
+            value={formData.dateOfBirth}
+            onChange={handleInputChange('dateOfBirth')}
+            fullWidth
+            helperText="Your age will only be shown if you enable it in privacy settings"
+            InputLabelProps={{ shrink: true }}
+          />
 
-            <Divider />
+          {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip
+                label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
+                color={formData.showAge ? 'primary' : 'default'}
+                icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {formData.showAge ? 'Visible to others' : 'Hidden from others'}
+              </Typography>
+            </Box>
+          )}
 
-            <TextField
-              label="Bio"
-              value={formData.bio}
-              onChange={handleInputChange('bio')}
-              multiline
-              rows={4}
-              fullWidth
-              placeholder="Tell us about yourself..."
-              inputProps={{ maxLength: 500 }}
-              helperText={`${formData.bio.length}/500 characters`}
-            />
-
-            <TextField
-              label="Date of Birth"
-              type="date"
-              value={formData.dateOfBirth}
-              onChange={handleInputChange('dateOfBirth')}
-              fullWidth
-              helperText="Your age will only be shown if you enable it in privacy settings"
-              InputLabelProps={{ shrink: true }}
-            />
-
-            {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip 
-                  label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
-                  color={formData.showAge ? 'primary' : 'default'}
-                  icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
-                />
-                <Typography variant="body2" color="text.secondary">
-                  {formData.showAge ? 'Visible to others' : 'Hidden from others'}
-                </Typography>
-              </Box>
-            )}
-
-            <TextField
-              label="Pronouns"
-              value={formData.pronouns}
-              onChange={handleInputChange('pronouns')}
-              select
-              fullWidth
-              helperText="Help others know how to refer to you"
-            >
-              {PRONOUN_OPTIONS.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-            { formData.pronouns === "choose my own pronouns" && <Box sx={{ mt: 1 }}>
+          <TextField
+            label="Pronouns"
+            value={formData.pronouns}
+            onChange={handleInputChange('pronouns')}
+            select
+            fullWidth
+            helperText="Help others know how to refer to you"
+          >
+            {PRONOUN_OPTIONS.map((option) => (
+              <MenuItem key={option} value={option}>
+                {option}
+              </MenuItem>
+            ))}
+          </TextField>
+          {formData.pronouns === "choose my own pronouns" && (
+            <Box sx={{ mt: 1 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Custom Pronouns
               </Typography>
               <TextField type='text' value={formData.customPronouns} onChange={handleInputChange('customPronouns')} />
-            </Box> }
-          </Stack>
-        </Box>
+            </Box>
+          )}
+        </Stack>
+      </Box>
 
-        <Divider />
+      <Divider />
 
-        {/* Privacy Settings */}
-        <Box>
-          <Typography variant="h5" gutterBottom>
-            Privacy Settings
-          </Typography>
-          
-          <Stack spacing={2}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.showAge}
-                  onChange={(e) => setFormData(prev => ({ ...prev, showAge: e.target.checked }))}
-                />
-              }
-              label="Show my age publicly"
-            />
-            
-            <Typography variant="body2" color="text.secondary">
-              When enabled, your age will be visible to other users. When disabled, only you can see your age.
-            </Typography>
-          </Stack>
-        </Box>
+      {/* Social Links */}
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          Social Links
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Enter your usernames (without @). They will appear as clickable chips on your profile.
+        </Typography>
 
-        <Divider />
-
-        {/* My Registrations */}
-        <Box>
-          <Typography variant="h5" gutterBottom>
-            My Registrations
-          </Typography>
-          <MyRegistrations userId={user.id} />
-        </Box>
-
-        <Divider />
-
-        {/* Linked Accounts */}
-        <Box>
-          <LinkedAccounts
-            accounts={user.accounts}
-            hasPassword={!!user.accounts.find(a => a.providerId === 'credential')?.password}
-            hasOAuthProviders={user.accounts.some(a => a.providerId === 'github' || a.providerId === 'google')}
+        <Stack spacing={2}>
+          <TextField
+            label="Telegram"
+            value={formData.socialLinks.telegram}
+            onChange={handleSocialChange('telegram')}
+            fullWidth
+            placeholder="username"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Telegram color="action" />
+                </InputAdornment>
+              )
+            }}
+            helperText="https://t.me/username"
           />
-        </Box>
+          <TextField
+            label="Twitter / X"
+            value={formData.socialLinks.twitter}
+            onChange={handleSocialChange('twitter')}
+            fullWidth
+            placeholder="username"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Twitter color="action" />
+                </InputAdornment>
+              )
+            }}
+            helperText="https://x.com/username"
+          />
+          <TextField
+            label="Instagram"
+            value={formData.socialLinks.instagram}
+            onChange={handleSocialChange('instagram')}
+            fullWidth
+            placeholder="username"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PhotoCamera color="action" />
+                </InputAdornment>
+              )
+            }}
+            helperText="https://instagram.com/username"
+          />
+        </Stack>
+      </Box>
 
-        <Divider />
+      <Divider />
 
-        {/* Account Actions */}
-        <Box>
-          <Typography variant="h5" gutterBottom>
-            Account Management
+      {/* Privacy Settings */}
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          Privacy Settings
+        </Typography>
+
+        <Stack spacing={2}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={formData.showAge}
+                onChange={(e) => setFormData(prev => ({ ...prev, showAge: e.target.checked }))}
+              />
+            }
+            label="Show my age publicly"
+          />
+          <Typography variant="body2" color="text.secondary">
+            When enabled, your age will be visible to other users.
           </Typography>
-          
-          <Stack spacing={2}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Download Your Data
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Export all your personal data as required by GDPR. This includes your profile, events, and any other data we have stored.
-                </Typography>
-              </CardContent>
-              <CardActions>
-                <Button
-                  variant="outlined"
-                  startIcon={<Download />}
-                  onClick={() => setDownloadDialogOpen(true)}
-                >
-                  Download Data
-                </Button>
-              </CardActions>
-            </Card>
 
-            <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom color="error">
-                  Delete Account
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Permanently delete your account and all associated data.
-                </Typography>
-                <Typography variant="h4" color="error" sx={{ mt: 1 }}>
-                  ⚠️This action cannot be undone⚠️
-                </Typography>
-              </CardContent>
-              <CardActions>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<Delete />}
-                  onClick={() => setDeleteDialogOpen(true)}
-                >
-                  Delete Account
-                </Button>
-              </CardActions>
-            </Card>
-          </Stack>
-        </Box>
+          {formData.showAge && (
+            <>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.showExactBirthdate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, showExactBirthdate: e.target.checked }))}
+                  />
+                }
+                label="Show exact birth date (not just age)"
+              />
+              <Typography variant="body2" color="text.secondary">
+                When enabled, your exact birth date is shown in addition to your age.
+              </Typography>
+            </>
+          )}
+        </Stack>
+      </Box>
 
-        {/* Save Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
+      <Divider />
+
+      {/* My Registrations */}
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          My Registrations
+        </Typography>
+        <MyRegistrations userId={user.id} />
+      </Box>
+
+      <Divider />
+
+      {/* Linked Accounts */}
+      <Box>
+        <LinkedAccounts
+          accounts={user.accounts}
+          hasPassword={!!user.accounts.find(a => a.providerId === 'credential')?.password}
+          hasOAuthProviders={user.accounts.some(a => a.providerId === 'github' || a.providerId === 'google')}
+        />
+      </Box>
+
+      <Divider />
+
+      {/* Account Actions */}
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          Account Management
+        </Typography>
+
+        <Stack spacing={2}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Download Your Data
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Export all your personal data as required by GDPR. This includes your profile, events, and any other data we have stored.
+              </Typography>
+            </CardContent>
+            <CardActions>
+              <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={() => setDownloadDialogOpen(true)}
+              >
+                Download Data
+              </Button>
+            </CardActions>
+          </Card>
+
+          <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom color="error">
+                Delete Account
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Permanently delete your account and all associated data.
+              </Typography>
+              <Typography variant="h4" color="error" sx={{ mt: 1 }}>
+                ⚠️This action cannot be undone⚠️
+              </Typography>
+            </CardContent>
+            <CardActions>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<Delete />}
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Delete Account
+              </Button>
+            </CardActions>
+          </Card>
+        </Stack>
+      </Box>
+
+      {/* Save Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 2 }}>
+        <Button
+          variant="contained"
+          size="large"
+          startIcon={<Save />}
+          onClick={() => {
+            handleSave().catch(err => {
+              setError(err instanceof Error ? err.message : 'Failed to update profile');
+            });
+          }}
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </Box>
+
+      <DeleteAccountDialog onClose={() => setDeleteDialogOpen(false)} onDelete={handleDeleteAccount} open={deleteDialogOpen} userEmail={user.email} />
+
+      <Dialog open={downloadDialogOpen} onClose={() => setDownloadDialogOpen(false)}>
+        <DialogTitle>Download Your Data</DialogTitle>
+        <DialogContent>
+          <Typography>
+            We will prepare a JSON file containing all your personal data. This includes:
+          </Typography>
+          <ul>
+            <li>Profile information</li>
+            <li>Event registrations</li>
+            <li>Payment history</li>
+            <li>Account settings</li>
+          </ul>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDownloadDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
-            size="large"
-            startIcon={<Save />}
             onClick={() => {
-              handleSave().catch(err => {
-                setError(err instanceof Error ? err.message : 'Failed to update profile');
+              handleDownloadData().catch(err => {
+                setError(err instanceof Error ? err.message : 'Failed to export data');
               });
             }}
-            disabled={saving}
           >
-            {saving ? 'Saving...' : 'Save Changes'}
+            Download
           </Button>
-        </Box>
-
-        {/* Confirmation Dialogs */}
-        <DeleteAccountDialog onClose={() => setDeleteDialogOpen(false)} onDelete={handleDeleteAccount} open={deleteDialogOpen} userEmail={user.email} />
-
-        <Dialog open={downloadDialogOpen} onClose={() => setDownloadDialogOpen(false)}>
-          <DialogTitle>Download Your Data</DialogTitle>
-          <DialogContent>
-            <Typography>
-              We will prepare a JSON file containing all your personal data. This includes:
-            </Typography>
-            <ul>
-              <li>Profile information</li>
-              <li>Event registrations</li>
-              <li>Payment history</li>
-              <li>Account settings</li>
-            </ul>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDownloadDialogOpen(false)}>Cancel</Button>
-            <Button
-              variant="contained"
-              onClick={() => {
-                handleDownloadData().catch(err => {
-                  setError(err instanceof Error ? err.message : 'Failed to export data');
-                });
-              }}
-            >
-              Download
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Stack>
+        </DialogActions>
+      </Dialog>
+    </Stack>
   );
 }
 
@@ -617,43 +738,45 @@ function DeleteAccountDialog({
     } finally {
       setIsDeleting(false);
     }
-  }
+  };
 
-  return <Dialog open={open} onClose={onClose} aria-labelledby='delete-dialog-title'>
-          <DialogTitle>Delete Account</DialogTitle>
+  return (
+    <Dialog open={open} onClose={onClose} aria-labelledby='delete-dialog-title'>
+      <DialogTitle>Delete Account</DialogTitle>
 
-          <DialogContent>
-            <Typography>
-              Are you sure you want to delete your account? This will permanently remove all your data and cannot be undone.
-            </Typography>
+      <DialogContent>
+        <Typography>
+          Are you sure you want to delete your account? This will permanently remove all your data and cannot be undone.
+        </Typography>
 
-            <Typography sx={{ mt: 2, fontWeight: 'bold' }}>
-              Type &quot;{userEmail}&quot; to confirm:
-            </Typography>
+        <Typography sx={{ mt: 2, fontWeight: 'bold' }}>
+          Type &quot;{userEmail}&quot; to confirm:
+        </Typography>
 
-            <TextField
-              fullWidth
-              inputRef={inputRef}
-              sx={{ mt: 1 }}
-              error={!!error}
-              placeholder={userEmail}
-              helperText={error || 'This action cannot be undone'}
-              disabled={isDeleting}
-            />
-          </DialogContent>
+        <TextField
+          fullWidth
+          inputRef={inputRef}
+          sx={{ mt: 1 }}
+          error={!!error}
+          placeholder={userEmail}
+          helperText={error || 'This action cannot be undone'}
+          disabled={isDeleting}
+        />
+      </DialogContent>
 
-          <DialogActions>
-            <Button onClick={onClose}>
-              Cancel
-            </Button>
-            <Button 
-              color="error" 
-              variant="contained"
-              onClick={() => void handleConfirmDelete()}
-              disabled={isDeleting}
-            >
-              {isDeleting ? 'Deleting...' : 'Delete Account'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+      <DialogActions>
+        <Button onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          color="error"
+          variant="contained"
+          onClick={() => void handleConfirmDelete()}
+          disabled={isDeleting}
+        >
+          {isDeleting ? 'Deleting...' : 'Delete Account'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }

@@ -1,43 +1,42 @@
 "use client";
 
-import { 
+import {
   Box,
   Typography,
   Card,
   CardContent,
-  Stack,
-  Chip
+  Stack
 } from "@mui/material";
-import { 
-  Cake, 
+import {
+  Cake,
   Badge,
-  VisibilityOff 
 } from "@mui/icons-material";
 
 interface PersonalInfoProps {
   dateOfBirth: Date | null;
   showAge: boolean;
+  showExactBirthdate: boolean;
   pronouns: string | null;
   age: number | null;
 }
 
-export default function PersonalInfo({ 
-  dateOfBirth, 
-  showAge, 
-  pronouns, 
-  age 
+export default function PersonalInfo({
+  dateOfBirth,
+  showAge,
+  showExactBirthdate,
+  pronouns,
+  age
 }: PersonalInfoProps) {
-  // Don't render if no personal info
   if (!dateOfBirth && !pronouns) {
     return null;
   }
 
   return (
     <Box>
-      <Typography 
-        variant="h6" 
-        gutterBottom 
-        sx={{ 
+      <Typography
+        variant="h6"
+        gutterBottom
+        sx={{
           color: 'primary.main',
           fontWeight: 'bold',
           mb: 2
@@ -45,16 +44,15 @@ export default function PersonalInfo({
       >
         Personal Information
       </Typography>
-      
+
       <Stack spacing={2}>
-        {/* Age/Birthday */}
-        {dateOfBirth && (
+        {dateOfBirth && showAge && (
           <Card variant="outlined">
             <CardContent sx={{ py: 2 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Box sx={{ 
-                  p: 1, 
-                  borderRadius: '50%', 
+                <Box sx={{
+                  p: 1,
+                  borderRadius: '50%',
                   bgcolor: 'primary.light',
                   display: 'flex',
                   alignItems: 'center',
@@ -64,41 +62,30 @@ export default function PersonalInfo({
                 </Box>
                 <Box>
                   <Typography variant="subtitle1" fontWeight="bold">
-                    {showAge ? (
-                      <>Age: {age} years old</>
-                    ) : (
-                      <>Birthday: {dateOfBirth.toLocaleDateString()}</>
-                    )}
+                    Age: {age} years old
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Born on {dateOfBirth.toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                    {!showAge && (
-                      <Chip 
-                        icon={<VisibilityOff />}
-                        label="Age Hidden" 
-                        size="small" 
-                        sx={{ ml: 1 }}
-                      />
-                    )}
-                  </Typography>
+                  {showExactBirthdate && (
+                    <Typography variant="body2" color="text.secondary">
+                      Born on {dateOfBirth.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </Typography>
+                  )}
                 </Box>
               </Stack>
             </CardContent>
           </Card>
         )}
 
-        {/* Pronouns */}
         {pronouns && (
           <Card variant="outlined">
             <CardContent sx={{ py: 2 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Box sx={{ 
-                  p: 1, 
-                  borderRadius: '50%', 
+                <Box sx={{
+                  p: 1,
+                  borderRadius: '50%',
                   bgcolor: 'secondary.light',
                   display: 'flex',
                   alignItems: 'center',
