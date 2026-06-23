@@ -1,72 +1,162 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
-    ":disableRateLimiting",
+    "config:recommended",
     ":semanticCommits",
+    ":dependencyDashboard",
     ":maintainLockFilesWeekly",
-    "group:allNonMajor",
     "schedule:earlyMondays"
   ],
   "timezone": "Europe/Berlin",
-  "prHourlyLimit": 0,
   "rangeStrategy": "bump",
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "groupName": null,
+    "schedule": [],
+    "dependencyDashboardApproval": false,
+    "minimumReleaseAge": null,
+    "prCreation": "immediate",
+    "labels": ["security"]
+  },
   "packageRules": [
     {
-      "description": "CRITICAL: Group Next.js, React, and React DOM together to prevent version mismatch",
+      "description": "Wait a bit before adopting fresh npm releases",
+      "matchDatasources": ["npm"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Catch-all: group ungrouped npm minor/patch updates (specific groups below override this group name)",
+      "groupName": "npm Dependencies",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Keep Next.js, React, and matching types/config together",
       "groupName": "Next.js Core",
+      "matchManagers": ["npm"],
       "matchPackageNames": [
         "next",
         "react",
         "react-dom",
-        "eslint-config-next"
-      ],
-      "matchPackagePrefixes": ["@types/react"]
+        "eslint-config-next",
+        "@types/react",
+        "@types/react-dom"
+      ]
     },
     {
-      "description": "CRITICAL: Prisma Client and CLI must be exact match",
+      "description": "Prisma packages should be reviewed and tested together",
       "groupName": "Prisma Database",
-      "matchPackageNames": ["prisma", "@prisma/client"],
-      "matchUpdateTypes": ["major", "minor", "patch"]
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "prisma",
+        "@prisma/client",
+        "@prisma/adapter-pg",
+        "@prisma/extension-accelerate"
+      ]
+    },
+    {
+      "description": "Stripe SDK packages should be updated together",
+      "groupName": "Stripe",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "stripe",
+        "@stripe/stripe-js",
+        "@stripe/react-stripe-js",
+        "@stripe/connect-js",
+        "@stripe/react-connect-js"
+      ]
+    },
+    {
+      "description": "Group better-auth packages",
+      "groupName": "Better Auth",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "better-auth",
+        "@better-auth/**"
+      ]
     },
     {
       "description": "Group Material UI and Emotion",
       "groupName": "MUI System",
-      "matchPackagePrefixes": ["@mui", "@emotion"]
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "@mui/**",
+        "@emotion/**"
+      ]
+    },
+    {
+      "description": "Group FullCalendar packages",
+      "groupName": "FullCalendar",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@fullcalendar/**"]
     },
     {
       "description": "Group DnD Kit packages",
       "groupName": "DnD Kit",
-      "matchPackagePrefixes": ["@dnd-kit"]
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@dnd-kit/**"]
     },
     {
-      "description": "Group Testing Tools (Vitest, Testing Library, etc.)",
+      "description": "Group testing tools",
       "groupName": "Testing Suite",
+      "matchManagers": ["npm"],
       "matchPackageNames": [
         "vitest",
         "jsdom",
         "next-test-api-route-handler",
-        "@vitejs/plugin-react"
-      ],
-      "matchPackagePrefixes": ["@testing-library"]
+        "@vitejs/plugin-react",
+        "@testing-library/**"
+      ]
     },
     {
-      "description": "Group Code Quality Tools (Biome, ESLint)",
-      "groupName": "Code Quality (Biome/ESLint)",
-      "matchPackageNames": ["eslint", "typescript"],
-      "matchPackagePrefixes": ["@biomejs", "@eslint", "eslint-"]
+      "description": "Group code quality tools",
+      "groupName": "Code Quality",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "eslint",
+        "typescript",
+        "@biomejs/**",
+        "@eslint/**",
+        "eslint-*"
+      ]
     },
     {
       "description": "Group Tailwind ecosystem",
       "groupName": "Tailwind CSS",
-      "matchPackageNames": ["tailwindcss"],
-      "matchPackagePrefixes": ["@tailwindcss"]
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "tailwindcss",
+        "@tailwindcss/**"
+      ]
     },
     {
-      "description": "Group all simple Type definitions to reduce noise",
+      "description": "Group remaining type definitions",
       "groupName": "Type Definitions",
-      "matchPackagePrefixes": ["@types"],
-      "excludePackagePrefixes": ["@types/react"] 
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@types/**", "!@types/react", "!@types/react-dom"]
+    },
+    {
+      "description": "Group GitHub Actions updates",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Group Docker image updates",
+      "groupName": "Docker images",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Require dashboard approval for major updates",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
     }
   ]
 }
