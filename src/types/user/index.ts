@@ -18,6 +18,12 @@ const userSchema = z.object({
   dateOfBirth: z.string().nullable().optional(),
   pronouns: z.string().max(50).optional(),
   showAge: z.boolean().optional(),
+  showExactBirthdate: z.boolean().optional(),
+  socialLinks: z.object({
+    telegram: z.string().max(100).optional(),
+    twitter: z.string().max(100).optional(),
+    instagram: z.string().max(100).optional(),
+  }).optional(),
 });
 
 const createUserSchema = userSchema.extend({
