@@ -3,8 +3,9 @@
   "version": "0.4.1",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.11.1",
   "engines": {
-    "node": ">=23"
+    "node": ">=24 <25"
   },
   "engineStrict": true,
   "scripts": {
