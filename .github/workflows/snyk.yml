@@ -1,0 +1,92 @@
+name: Snyk Security
+
+# Snyk runs as a SCANNER ONLY. Dependency-update and fix PRs are owned by
+# Renovate. Do NOT enable Snyk's "automatic fix PRs" / "upgrade PRs" in the
+# Snyk web UI for this repo, or it will compete with Renovate.
+#
+# All scan steps are non-blocking for now (continue-on-error: true) so we can
+# establish a clean baseline. Once the baseline is clean, drop
+# continue-on-error on the high/critical steps to make them blocking.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [dev, main]
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC, mirrors Renovate's weekly cadence
+
+permissions:
+  contents: read
+  security-events: write # required to upload SARIF to Code Scanning
+
+jobs:
+  # Snyk needs SNYK_TOKEN. Skip every scan job cleanly when it is absent
+  # (e.g. on forks) instead of failing the workflow.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "$SNYK_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SNYK_TOKEN not configured; skipping Snyk scans."
+          fi
+
+  node:
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Snyk npm dependency scan
+        continue-on-error: true # non-blocking baseline; tighten to blocking later
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk-node.sarif
+
+      - name: Upload npm scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-node.sarif
+          category: snyk-node
+
+  container:
+    needs: guard
+    # Container builds are heavy; only scan on push to deploy branches and the
+    # weekly schedule, not on every PR.
+    if: needs.guard.outputs.enabled == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        run: docker build -t ventry:scan .
+
+      - name: Snyk container scan
+        continue-on-error: true # non-blocking baseline; tighten to blocking later
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ventry:scan
+          args: --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk-docker.sarif
+
+      - name: Upload container scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-docker.sarif
+          category: snyk-docker
