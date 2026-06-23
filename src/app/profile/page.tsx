@@ -54,6 +54,8 @@ async function ProfilePageContent() {
       dateOfBirth: true,
       pronouns: true,
       showAge: true,
+      showExactBirthdate: true,
+      socialLinks: true,
       createdAt: true,
       updatedAt: true,
     }
@@ -71,9 +73,9 @@ async function ProfilePageContent() {
         <Typography variant="h3" component="h1" gutterBottom>
           Profile Settings
         </Typography>
-        
+
         <Paper elevation={2} sx={{ p: 4, mt: 3 }}>
-          <ProfilePageClient user={{ ...user, profilePictures }} />
+          <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
         </Paper>
       </Box>
     </Container>

@@ -28,6 +28,8 @@ model User {
   dateOfBirth          DateTime?
   pronouns             String?
   showAge              Boolean              @default(true)
+  showExactBirthdate   Boolean              @default(false)
+  socialLinks          Json                 @default("{}")
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   isAdmin              Boolean              @default(false)
