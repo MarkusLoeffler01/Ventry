@@ -21,6 +21,7 @@ import AuthTemplate from "./template";
 import PasswordStrengthMeter from "./PasswordStrengthMeter";
 import { registerSchema } from "@/types/schemas/client/register";
 import type { RegisterSchema } from "@/types/schemas/client/register";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
 
 export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -40,6 +41,8 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
 
   // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
   const password = watch("password");
+  // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
+  const username = watch("username") || "";
 
   const onSubmit = async (data: RegisterSchema, e?: React.BaseSyntheticEvent) => {
     e?.preventDefault();
@@ -114,9 +117,10 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="Username"
           autoComplete="username"
+          inputProps={{ maxLength: DISPLAY_NAME_MAX_LENGTH }}
           {...register("username")}
           error={!!errors.username}
-          helperText={errors.username?.message || " "}
+          helperText={errors.username?.message || `${username.length}/${DISPLAY_NAME_MAX_LENGTH}`}
         />
 
         <Alert severity="info" sx={{ mt: 2, mb: 1 }}>

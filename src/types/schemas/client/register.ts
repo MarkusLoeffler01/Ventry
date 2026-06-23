@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
 
 const registerSchema = z
   .object({
@@ -9,7 +10,8 @@ const registerSchema = z
     username: z
       .string()
       .trim()
-      .min(3, "Mindestens 3 Zeichen erforderlich"),
+      .min(3, "Mindestens 3 Zeichen erforderlich")
+      .max(DISPLAY_NAME_MAX_LENGTH, `Maximal ${DISPLAY_NAME_MAX_LENGTH} Zeichen erlaubt`),
     legalName: z
       .string()
       .trim()

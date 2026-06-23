@@ -22,12 +22,14 @@ model ProfilePicture {
 
 model User {
   id                   String               @id @default(cuid(2))
-  name                 String?              @unique
+  name                 String?              @unique @db.VarChar(255)
   email                String               @unique
   bio                  String?
   dateOfBirth          DateTime?
   pronouns             String?
   showAge              Boolean              @default(true)
+  showExactBirthdate   Boolean              @default(false)
+  socialLinks          Json                 @default("{}")
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   isAdmin              Boolean              @default(false)

@@ -13,7 +13,7 @@ interface ProfileBioProps {
 
 export default function ProfileBio({ bio }: ProfileBioProps) {
   return (
-    <Card variant="outlined" sx={{ bgcolor: 'grey.50' }}>
+    <Card variant="outlined">
       <CardContent>
         <Typography 
           variant="h6" 
