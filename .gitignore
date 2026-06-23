@@ -63,6 +63,7 @@ next-env.d.ts
 !/package-lock.json
 /*.md
 /.*
+!/.docker
 !/.github/
 !/.github/scripts/
 !/.github/scripts/*.mjs
@@ -70,3 +71,5 @@ next-env.d.ts
 !/.github/workflows/*.yml
 !/.github/pull_request_template.md
 scripts/migrate-project-issues.sh
+
+!.docker/docker-compose.local.yml

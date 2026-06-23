@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: myapp-postgres-local
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
+      POSTGRES_DB: ventry
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_local_data:
