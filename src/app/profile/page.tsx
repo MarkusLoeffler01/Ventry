@@ -3,7 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import ProfilePageClient from "@/components/profile/ProfilePageClient";
-import { Container, Box, Typography, Paper } from "@mui/material";
+import { Container, Box, Typography, Button } from "@mui/material";
+import { Visibility } from "@mui/icons-material";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
 
@@ -54,6 +55,8 @@ async function ProfilePageContent() {
       dateOfBirth: true,
       pronouns: true,
       showAge: true,
+      showExactBirthdate: true,
+      socialLinks: true,
       createdAt: true,
       updatedAt: true,
     }
@@ -66,15 +69,25 @@ async function ProfilePageContent() {
   const profilePictures = await refreshSignedUrls(user.profilePictures);
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Profile Settings
-        </Typography>
-        
-        <Paper elevation={2} sx={{ p: 4, mt: 3 }}>
-          <ProfilePageClient user={{ ...user, profilePictures }} />
-        </Paper>
+    <Container maxWidth="md">
+      <Box sx={{ py: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="h5" component="h1" fontWeight={700}>
+            Profile Settings
+          </Typography>
+          {user.name && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Visibility />}
+              href={`/profile/${encodeURIComponent(user.name)}`}
+              target="_blank"
+            >
+              Preview
+            </Button>
+          )}
+        </Box>
+        <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
       </Box>
     </Container>
   );

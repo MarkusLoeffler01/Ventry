@@ -23,5 +23,7 @@ declare namespace NodeJS {
         SUPABASE_BUCKET_ID: string;
 
         SMTP_FROM?: string;
+
+        GIPHY_API_KEY?: string;
     }
 }

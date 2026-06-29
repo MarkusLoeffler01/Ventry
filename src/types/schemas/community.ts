@@ -102,5 +102,36 @@ export const reactToCommunityPostSchema = z.object({
   reaction: z.enum(communityReactionSchemaValues),
 });
 
+export const moderateCommunityPostSchema = z.object({
+  action: z.enum(["approve", "reject", "remove", "pin", "unpin"]),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export const bulkModerateCommunityPostsSchema = z.object({
+  eventId: z.number().int().positive(),
+  postIds: z.array(z.string().min(1)).min(1).max(100),
+  action: z.enum(["remove", "approve", "reject"]),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export const createCommunityCommentSchema = z
+  .object({
+    content: z.string().trim().max(2000).optional(),
+    imageUrls: z.array(z.url()).max(1).default([]),
+    gifUrl: z.url().optional(),
+    mentionedUserIds: z.array(z.string()).default([]),
+  })
+  .refine(d => d.content?.trim() || d.imageUrls.length > 0 || d.gifUrl, {
+    message: "Comment needs content, an image, or a GIF",
+  });
+
+export const listCommunityCommentsSchema = z.object({
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(5),
+});
+
 export type CreateCommunityPostInput = z.infer<typeof createCommunityPostSchema>;
+export type CreateCommunityCommentInput = z.infer<typeof createCommunityCommentSchema>;
 export type CommunityFeedbackInput = z.infer<typeof communityFeedbackEntrySchema>;
+export type ModerateCommunityPostInput = z.infer<typeof moderateCommunityPostSchema>;
+export type BulkModerateCommunityPostsInput = z.infer<typeof bulkModerateCommunityPostsSchema>;

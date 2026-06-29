@@ -6,6 +6,14 @@ vi.mock("@/lib/user/profilePicture", () => ({
   refreshSignedUrls: vi.fn(async pictures => pictures),
 }));
 
+vi.mock("@/lib/prisma/prisma", () => ({
+  prisma: {
+    registration: {
+      findMany: vi.fn(),
+    },
+  },
+}));
+
 const attendee: BadgeAttendee = {
   id: "reg-1",
   registrationId: "reg-1",

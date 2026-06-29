@@ -58,14 +58,23 @@ export async function POST(req: NextRequest) {
     await assertCanWriteInCommunity(actor, event);
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const processedBuffer = await sharp(bytes)
-      .rotate()
-      .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
-      .toFormat("jpeg", { quality: 82 })
-      .toBuffer();
 
-    const fileName = `community-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
-    const uploadResult = await uploadCommunityImage(processedBuffer, event.id, actor.id, fileName);
+    let processedBuffer: Buffer;
+    let fileName: string;
+
+    if (file.type === "image/gif") {
+      processedBuffer = bytes;
+      fileName = `community-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.gif`;
+    } else {
+      processedBuffer = await sharp(bytes)
+        .rotate()
+        .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
+        .toFormat("jpeg", { quality: 82 })
+        .toBuffer();
+      fileName = `community-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+    }
+
+    const uploadResult = await uploadCommunityImage(processedBuffer, event.id, actor.id, fileName, file.type === "image/gif" ? "image/gif" : "image/jpeg");
     const signedUrlData = await getSignedUrl(uploadResult.path, 365 * 24 * 60 * 60);
 
     return NextResponse.json(
