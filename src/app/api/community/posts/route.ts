@@ -9,6 +9,7 @@ import {
   deriveCommunityPostTags,
   loadCommunityActor,
   loadCommunityEvent,
+  refreshCommunityPostsProfilePictures,
   serializeCommunityPost,
 } from "@/lib/community/server";
 import { getSession } from "@/lib/auth/session";
@@ -60,6 +61,7 @@ export async function GET(req: NextRequest) {
     const page = hasMore ? posts.slice(0, parsed.data.limit) : posts;
 
     const mentionedUsersById = await buildMentionMapForPosts(page);
+    await refreshCommunityPostsProfilePictures(page);
 
     return NextResponse.json(
       {
@@ -144,6 +146,7 @@ export async function POST(req: NextRequest) {
       },
       include: communityPostInclude,
     });
+    await refreshCommunityPostsProfilePictures([post]);
 
     return NextResponse.json(
       {
