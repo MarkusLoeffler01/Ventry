@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
 
 const prismaMock = vi.hoisted(() => ({
   notification: {
@@ -15,12 +14,6 @@ vi.mock("@/lib/auth/session", () => ({ getSession: () => getSessionMock() }));
 import { PATCH } from "./route";
 
 const USER_ID = "user-1";
-
-function req() {
-  return new NextRequest("http://localhost/api/notifications/read-all", {
-    method: "PATCH",
-  });
-}
 
 describe("PATCH /api/notifications/read-all", () => {
   beforeEach(() => {

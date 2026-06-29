@@ -39,12 +39,12 @@ export async function POST(
   }
 
   const auth = await checkEventAdminAuth(post.eventId, req.headers);
-  if (!auth.authorized) {
+  if (!auth.authorized || !auth.user) {
     return NextResponse.json({ error: auth.error }, { status: 403 });
   }
 
   const actor = {
-    id: auth.user!.id,
+    id: auth.user.id,
     isAdmin: true,
     adminId: auth.adminId || null,
   };
@@ -91,14 +91,14 @@ export async function POST(
 
   if (action === "approve") {
     const baseUrl = process.env.BETTER_AUTH_URL ?? "";
-    const eventUrl = `${baseUrl}/events/${post.eventId}/community`;
+    const eventPath = `/events/${post.eventId}/community#post-${post.id}`;
 
     createNotification(
       post.authorId,
       NotificationType.COMMUNITY,
       "Your post was approved",
       undefined,
-      eventUrl,
+      eventPath,
     ).catch(() => null);
 
     sendCommunityDigest(post.eventId, {

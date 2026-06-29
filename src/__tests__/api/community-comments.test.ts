@@ -13,6 +13,12 @@ vi.mock("@/lib/prisma/prisma", () => ({
   },
 }));
 
+const createNotificationMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/notifications", () => ({
+  createNotification: createNotificationMock,
+}));
+
 import { prisma } from "@/lib/prisma/prisma";
 
 const getSessionMock = vi.fn();
@@ -146,11 +152,13 @@ describe("GET /api/community/posts/[postId]/comments", () => {
 describe("POST /api/community/posts/[postId]/comments", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createNotificationMock.mockResolvedValue({});
     getSessionMock.mockReturnValue({ user: { id: USER_ID } });
     p.communityPost.findUnique.mockResolvedValue({ id: POST_ID, eventId: EVENT_ID, status: PostStatus.APPROVED, authorId: USER_ID });
     p.user.findUnique.mockResolvedValue({ id: USER_ID, isAdmin: false, adminProfile: null });
     p.event.findUnique.mockResolvedValue(mockEvent);
     p.user.findMany.mockResolvedValue([]);
+    p.communityComment.findMany.mockResolvedValue([]);
   });
 
   it("returns 401 without session", async () => {
@@ -175,6 +183,73 @@ describe("POST /api/community/posts/[postId]/comments", () => {
     expect(res.status).toBe(201);
     expect(body.comment.id).toBe(COMMENT_ID);
     expect(body.pending).toBe(false);
+  });
+
+  it("notifies the post author with a direct comment anchor", async () => {
+    p.communityPost.findUnique.mockResolvedValue({
+      id: POST_ID,
+      eventId: EVENT_ID,
+      status: PostStatus.APPROVED,
+      authorId: "post-author",
+    });
+    p.user.findUnique
+      .mockResolvedValueOnce({ id: USER_ID, isAdmin: false, adminProfile: null })
+      .mockResolvedValueOnce({ name: "Test User" });
+    p.communityComment.create.mockResolvedValue({ ...mockCommentRow, content: "hi", mentionedUserIds: [] });
+
+    const res = await POST(req(`http://localhost/comments`, "POST", { content: "hi" }), PARAMS);
+
+    expect(res.status).toBe(201);
+    expect(createNotificationMock).toHaveBeenCalledWith(
+      "post-author",
+      "COMMENT",
+      "Test User commented on your post",
+      undefined,
+      `/events/${EVENT_ID}/community#post-${POST_ID}-comment-${COMMENT_ID}`,
+    );
+  });
+
+  it("notifies a mentioned prior commenter as a reply", async () => {
+    const priorCommenter = { id: "user-john", name: "John Doe" };
+    p.user.findMany
+      .mockResolvedValueOnce([priorCommenter])
+      .mockResolvedValueOnce([priorCommenter]);
+    p.user.findUnique
+      .mockResolvedValueOnce({ id: USER_ID, isAdmin: false, adminProfile: null })
+      .mockResolvedValueOnce({ name: "Test User" });
+    p.communityComment.findMany.mockResolvedValueOnce([{ authorId: "user-john" }]);
+    p.communityComment.create.mockResolvedValue({
+      ...mockCommentRow,
+      content: "Hey @John_Doe",
+      mentionedUserIds: ["user-john"],
+    });
+
+    const res = await POST(req(`http://localhost/comments`, "POST", { content: "Hey @John_Doe" }), PARAMS);
+
+    expect(res.status).toBe(201);
+    expect(createNotificationMock).toHaveBeenCalledWith(
+      "user-john",
+      "COMMENT",
+      "Test User replied to your comment",
+      undefined,
+      `/events/${EVENT_ID}/community#post-${POST_ID}-comment-${COMMENT_ID}`,
+    );
+  });
+
+  it("does not notify for moderated comments that are still pending", async () => {
+    p.event.findUnique.mockResolvedValue({ ...mockEvent, communityModerated: true, communityModerateComments: true });
+    p.communityPost.findUnique.mockResolvedValue({
+      id: POST_ID,
+      eventId: EVENT_ID,
+      status: PostStatus.APPROVED,
+      authorId: "post-author",
+    });
+    p.communityComment.create.mockResolvedValue({ ...mockCommentRow, status: PostStatus.PENDING, mentionedUserIds: [] });
+
+    const res = await POST(req(`http://localhost/comments`, "POST", { content: "hi" }), PARAMS);
+
+    expect(res.status).toBe(201);
+    expect(createNotificationMock).not.toHaveBeenCalled();
   });
 
   it("resolves @name tokens and stores user IDs in mentionedUserIds", async () => {

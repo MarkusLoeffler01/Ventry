@@ -5,6 +5,7 @@ const prismaMock = vi.hoisted(() => ({
   notification: {
     findMany: vi.fn(),
     count: vi.fn(),
+    deleteMany: vi.fn(),
   },
 }));
 
@@ -13,7 +14,7 @@ vi.mock("@/lib/prisma/prisma", () => ({ prisma: prismaMock }));
 const getSessionMock = vi.fn();
 vi.mock("@/lib/auth/session", () => ({ getSession: () => getSessionMock() }));
 
-import { GET } from "./route";
+import { DELETE, GET } from "./route";
 
 const USER_ID = "user-1";
 
@@ -31,8 +32,8 @@ function makeNotification(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function req(url: string) {
-  return new NextRequest(url, { method: "GET" });
+function req(url: string, method = "GET") {
+  return new NextRequest(url, { method });
 }
 
 describe("GET /api/notifications", () => {
@@ -114,5 +115,30 @@ describe("GET /api/notifications", () => {
     const res = await GET(req("http://localhost/api/notifications"));
     const body = await res.json() as { unreadCount: number };
     expect(body.unreadCount).toBe(1);
+  });
+});
+
+describe("DELETE /api/notifications", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getSessionMock.mockResolvedValue({ user: { id: USER_ID } });
+    prismaMock.notification.deleteMany.mockResolvedValue({ count: 4 });
+  });
+
+  it("returns 401 without session", async () => {
+    getSessionMock.mockResolvedValue(null);
+    const res = await DELETE();
+    expect(res.status).toBe(401);
+  });
+
+  it("deletes all notifications for current user", async () => {
+    const res = await DELETE();
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { deleted: number };
+    expect(body.deleted).toBe(4);
+    expect(prismaMock.notification.deleteMany).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+    });
   });
 });
