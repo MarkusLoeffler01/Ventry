@@ -147,7 +147,7 @@ describe("POST /api/community/posts/[postId]/comments", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getSessionMock.mockReturnValue({ user: { id: USER_ID } });
-    p.communityPost.findUnique.mockResolvedValue({ id: POST_ID, eventId: EVENT_ID, status: PostStatus.APPROVED });
+    p.communityPost.findUnique.mockResolvedValue({ id: POST_ID, eventId: EVENT_ID, status: PostStatus.APPROVED, authorId: USER_ID });
     p.user.findUnique.mockResolvedValue({ id: USER_ID, isAdmin: false, adminProfile: null });
     p.event.findUnique.mockResolvedValue(mockEvent);
     p.user.findMany.mockResolvedValue([]);

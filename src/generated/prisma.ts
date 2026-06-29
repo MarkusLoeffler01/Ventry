@@ -2,6 +2,7 @@ export {
   CommunityFeedbackType,
   CommunityPostType,
   ModerationAction,
+  NotificationType,
   PaymentStatus,
   PostStatus,
   Prisma,

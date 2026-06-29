@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { PostStatus } from "@/generated/prisma";
+import { NotificationType, PostStatus } from "@/generated/prisma";
 import {
   CommunityError,
   assertCanWriteInCommunity,
@@ -10,6 +10,7 @@ import {
   serializeCommunityComment,
 } from "@/lib/community/server";
 import { getSession } from "@/lib/auth/session";
+import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma/prisma";
 import { createCommunityCommentSchema, listCommunityCommentsSchema } from "@/types/schemas/community";
 
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
 
     const post = await prisma.communityPost.findUnique({
       where: { id: postId },
-      select: { id: true, eventId: true, status: true },
+      select: { id: true, eventId: true, status: true, authorId: true },
     });
 
     if (!post || post.status === PostStatus.DELETED) {
@@ -149,6 +150,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
     });
 
     const mentionedUsersById = await buildMentionedUsersMap(mentionedUserIds);
+
+    if (post.authorId !== actor.id) {
+      const commenterName = await prisma.user
+        .findUnique({ where: { id: actor.id }, select: { name: true } })
+        .then((u) => u?.name ?? "Someone");
+      const eventUrl = `${process.env.BETTER_AUTH_URL ?? ""}/events/${post.eventId}/community`;
+      createNotification(
+        post.authorId,
+        NotificationType.COMMENT,
+        `${commenterName} commented on your post`,
+        undefined,
+        eventUrl,
+      ).catch(() => null);
+    }
 
     return NextResponse.json(
       {

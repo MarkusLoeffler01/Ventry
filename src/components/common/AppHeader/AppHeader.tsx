@@ -11,6 +11,7 @@ import Button from "@mui/material/Button";
 import Link from "next/link";
 import { useSession } from "@/lib/auth/client";
 import { usePathname } from "next/navigation";
+import NotificationBell from "@/components/common/NotificationBell/NotificationBell";
 
 type ProfilePictureEntry = { signedUrl: string | null; isPrimary: boolean; order: number };
 type UserProfileResponse = { profilePictures?: ProfilePictureEntry[]; image?: string | null };
@@ -134,7 +135,7 @@ export default function AppHeader() {
                         {user ? "Logout" : "Login"}
                     </Button>}
 
-                    
+                    {user && <NotificationBell />}
 
                     {user ? (
                         <Link href="/profile" style={{ textDecoration: "none" }}>
