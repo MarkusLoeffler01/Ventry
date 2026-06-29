@@ -11,7 +11,9 @@ import Paper from "@mui/material/Paper";
 import Popover from "@mui/material/Popover";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import CloseIcon from "@mui/icons-material/Close";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import Link from "next/link";
 
@@ -88,6 +90,12 @@ export default function NotificationBell() {
     setUnreadCount(0);
   };
 
+  const clearAll = async () => {
+    await fetch("/api/notifications", { method: "DELETE" });
+    setNotifications([]);
+    setUnreadCount(0);
+  };
+
   const deleteNotification = async (id: string, wasUnread: boolean) => {
     await fetch(`/api/notifications/${id}`, { method: "DELETE" });
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -116,15 +124,22 @@ export default function NotificationBell() {
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         PaperProps={{ sx: { width: 380, maxHeight: 520 } }}
       >
-        <Box sx={{ px: 2, pt: 2, pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ px: 2, pt: 2, pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
           <Typography variant="subtitle1" fontWeight={700}>
             Notifications
           </Typography>
-          {unreadCount > 0 && (
-            <Button size="small" onClick={markAllRead} sx={{ fontSize: 12 }}>
-              Mark all as read
-            </Button>
-          )}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            {unreadCount > 0 && (
+              <Button size="small" onClick={markAllRead} sx={{ fontSize: 12 }}>
+                Mark all as read
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <Button size="small" color="error" onClick={clearAll} sx={{ fontSize: 12 }}>
+                Clear all
+              </Button>
+            )}
+          </Box>
         </Box>
 
         <Tabs
@@ -203,17 +218,32 @@ export default function NotificationBell() {
                       {new Date(n.createdAt).toLocaleDateString()}
                     </Typography>
                   </Box>
-                  <IconButton
-                    size="small"
-                    sx={{ alignSelf: "flex-start", opacity: 0.4, "&:hover": { opacity: 1 } }}
-                    aria-label="Dismiss"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteNotification(n.id, !n.read);
-                    }}
-                  >
-                    <Typography fontSize={14} lineHeight={1}>×</Typography>
-                  </IconButton>
+                  <Tooltip title="Delete notification">
+                    <IconButton
+                      size="small"
+                      color="error"
+                      sx={{
+                        alignSelf: "flex-start",
+                        width: 32,
+                        height: 32,
+                        flexShrink: 0,
+                        opacity: 0.75,
+                        bgcolor: "action.hover",
+                        "&:hover": {
+                          opacity: 1,
+                          bgcolor: "error.light",
+                          color: "error.contrastText",
+                        },
+                      }}
+                      aria-label="Delete notification"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(n.id, !n.read);
+                      }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Paper>
             ))
