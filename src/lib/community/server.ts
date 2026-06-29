@@ -46,6 +46,7 @@ export const communityCommentInclude = {
       id: true,
       name: true,
       image: true,
+      isAdmin: true,
       profilePictures: {
         orderBy: [
           { isPrimary: "desc" as const },
@@ -75,6 +76,7 @@ export const communityPostInclude = {
       id: true,
       name: true,
       image: true,
+      isAdmin: true,
       profilePictures: {
         orderBy: [
           { isPrimary: "desc" as const },
@@ -381,6 +383,7 @@ export function serializeCommunityComment(
       id: comment.author.id,
       name: comment.author.name || "Attendee",
       imageUrl: comment.author.profilePictures[0]?.signedUrl || comment.author.image || null,
+      isAdmin: comment.author.isAdmin,
     },
     mentionedUsers: comment.mentionedUserIds
       .map(id => mentionedUsersById?.get(id))
@@ -434,6 +437,7 @@ export function serializeCommunityPost(
       id: post.author.id,
       name: post.author.name || "Attendee",
       imageUrl: post.author.profilePictures[0]?.signedUrl || post.author.image || null,
+      isAdmin: post.author.isAdmin,
     },
     reactions: reactionCounts,
     viewerReactions,

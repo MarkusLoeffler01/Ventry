@@ -5,6 +5,7 @@ import {
   Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -233,7 +234,7 @@ export default function CommentList({
                   </Avatar>
                 </NextLink>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={0.5} alignItems="baseline" flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
                     <MuiLink
                       component={NextLink}
                       href={`/profile/${comment.author.id}`}
@@ -244,6 +245,15 @@ export default function CommentList({
                         {comment.author.name}
                       </Typography>
                     </MuiLink>
+                    {comment.author.isAdmin ? (
+                      <Chip
+                        label="Organizer"
+                        size="small"
+                        color="secondary"
+                        variant="filled"
+                        sx={{ fontSize: "0.55rem", height: 16, fontWeight: 700 }}
+                      />
+                    ) : null}
                     <Typography variant="caption" color="text.secondary">
                       {createdAt}
                     </Typography>
