@@ -22,6 +22,7 @@ export type CommunityCommentView = {
     id: string;
     name: string;
     imageUrl: string | null;
+    isAdmin: boolean;
   };
   mentionedUsers: { id: string; name: string }[];
 };
@@ -46,6 +47,7 @@ export type CommunityPostView = {
     id: string;
     name: string;
     imageUrl: string | null;
+    isAdmin: boolean;
   };
   reactions: Record<CommunityReactionKey, number>;
   viewerReactions: string[];
