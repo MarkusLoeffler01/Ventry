@@ -58,8 +58,6 @@ async function getPublishedEvents(): Promise<PublicEvent[]> {
         orderBy: { startDate: "asc" },
     }) as unknown as PublicEventRow[];
 
-    console.log(events);
-
     return events.map((event) => ({
         id: event.id,
         name: event.name,
