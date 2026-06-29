@@ -7,12 +7,18 @@ vi.mock("@/lib/prisma/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/user/profilePicture", () => ({
+  refreshSignedUrls: vi.fn(async pictures => pictures),
+}));
+
 import { prisma } from "@/lib/prisma/prisma";
-import { buildMentionMapForPosts, serializeCommunityPost } from "@/lib/community/server";
+import { refreshSignedUrls } from "@/lib/user/profilePicture";
+import { buildMentionMapForPosts, refreshCommunityPostsProfilePictures, serializeCommunityPost } from "@/lib/community/server";
 import type { CommunityPostWithInclude } from "@/lib/community/server";
 
 type P = { user: { findMany: ReturnType<typeof vi.fn> } };
 const p = prisma as unknown as P;
+const mockedRefreshSignedUrls = refreshSignedUrls as unknown as ReturnType<typeof vi.fn>;
 
 // ─── buildMentionMapForPosts ───────────────────────────────────────────────────
 
@@ -112,6 +118,8 @@ function makePost(comments: { mentionedUserIds: string[] }[]): CommunityPostWith
 }
 
 describe("serializeCommunityPost — mention pass-through to preloaded comments", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("passes mentionedUsersById to preloaded comment serialization", () => {
     const mentionMap = new Map([["u-alice", { id: "u-alice", name: "Alice" }]]);
     const post = makePost([{ mentionedUserIds: ["u-alice"] }]);
@@ -144,5 +152,31 @@ describe("serializeCommunityPost — mention pass-through to preloaded comments"
     const result = serializeCommunityPost(post, null, new Map());
 
     expect(result.commentCount).toBe(2);
+  });
+
+  it("refreshes author and comment profile pictures before serialization", async () => {
+    const post = makePost([{ mentionedUserIds: [] }]);
+    const stalePicture = {
+      id: "pic-1",
+      signedUrl: "https://cdn.example.com/stale",
+      storagePath: "users/author-1/profile.jpg",
+      cachedUntil: new Date("2025-01-01"),
+      isPrimary: true,
+    };
+    post.author.profilePictures = [stalePicture];
+    post.comments[0].author.profilePictures = [stalePicture];
+    mockedRefreshSignedUrls.mockResolvedValueOnce([
+      {
+        ...stalePicture,
+        signedUrl: "https://cdn.example.com/refreshed",
+        cachedUntil: new Date("2026-01-02"),
+      },
+    ]);
+
+    await refreshCommunityPostsProfilePictures([post]);
+
+    expect(mockedRefreshSignedUrls).toHaveBeenCalledWith([stalePicture]);
+    expect(serializeCommunityPost(post, null).author.imageUrl).toBe("https://cdn.example.com/refreshed");
+    expect(serializeCommunityPost(post, null).comments[0].author.imageUrl).toBe("https://cdn.example.com/refreshed");
   });
 });

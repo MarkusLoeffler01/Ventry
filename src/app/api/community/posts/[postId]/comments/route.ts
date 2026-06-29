@@ -7,6 +7,7 @@ import {
   communityCommentInclude,
   loadCommunityActor,
   loadCommunityEvent,
+  refreshCommunityCommentsProfilePictures,
   serializeCommunityComment,
 } from "@/lib/community/server";
 import { getSession } from "@/lib/auth/session";
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
 
     const allMentionedIds = [...new Set(page.flatMap(c => c.mentionedUserIds))];
     const mentionedUsersById = await buildMentionedUsersMap(allMentionedIds);
+    await refreshCommunityCommentsProfilePictures(page);
 
     return NextResponse.json(
       {
@@ -154,6 +156,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
     });
 
     const mentionedUsersById = await buildMentionedUsersMap(mentionedUserIds);
+    await refreshCommunityCommentsProfilePictures([comment]);
 
     if (comment.status === PostStatus.APPROVED) {
       const commenterName = await prisma.user

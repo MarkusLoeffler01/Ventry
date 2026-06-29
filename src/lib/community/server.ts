@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma";
 import { CommunityFeedbackType, CommunityPostType, ModerationAction, PostStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma/prisma";
+import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import type { CommunityCommentView } from "@/components/events/community/types";
 
 export const COMMUNITY_REACTIONS = ["LIKE", "LOVE", "CELEBRATE", "HELPFUL"] as const;
@@ -53,7 +54,10 @@ export const communityCommentInclude = {
         ],
         take: 1,
         select: {
+          id: true,
           signedUrl: true,
+          storagePath: true,
+          cachedUntil: true,
           isPrimary: true,
         },
       },
@@ -79,7 +83,10 @@ export const communityPostInclude = {
         ],
         take: 1,
         select: {
+          id: true,
           signedUrl: true,
+          storagePath: true,
+          cachedUntil: true,
           isPrimary: true,
         },
       },
@@ -109,7 +116,10 @@ export const communityPostInclude = {
             ],
             take: 1,
             select: {
+              id: true,
               signedUrl: true,
+              storagePath: true,
+              cachedUntil: true,
               isPrimary: true,
             },
           },
@@ -145,6 +155,16 @@ export type CommunityEventAccess = {
   communityModerated: boolean;
   communityModerateComments: boolean;
   communityAttendeesOnly: boolean;
+};
+
+type CommunityAuthorWithProfilePictures = {
+  profilePictures: {
+    id: string;
+    signedUrl: string | null;
+    storagePath: string;
+    cachedUntil: Date | string | null;
+    isPrimary: boolean;
+  }[];
 };
 
 function isCommunityFeedbackType(value: unknown): value is typeof CommunityFeedbackType[keyof typeof CommunityFeedbackType] {
@@ -308,6 +328,40 @@ export async function buildMentionMapForPosts(
     select: { id: true, name: true },
   });
   return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User" }]));
+}
+
+async function refreshCommunityAuthorsProfilePictures(authors: CommunityAuthorWithProfilePictures[]) {
+  const picturesById = new Map<string, CommunityAuthorWithProfilePictures["profilePictures"][number]>();
+
+  for (const author of authors) {
+    for (const picture of author.profilePictures) {
+      picturesById.set(picture.id, picture);
+    }
+  }
+
+  if (picturesById.size === 0) {
+    return;
+  }
+
+  const refreshedPictures = await refreshSignedUrls([...picturesById.values()]);
+  const refreshedById = new Map(refreshedPictures.map(picture => [picture.id, picture]));
+
+  for (const author of authors) {
+    author.profilePictures = author.profilePictures.map(picture => refreshedById.get(picture.id) ?? picture);
+  }
+}
+
+export async function refreshCommunityPostsProfilePictures(posts: CommunityPostWithInclude[]) {
+  await refreshCommunityAuthorsProfilePictures(
+    posts.flatMap(post => [
+      post.author,
+      ...post.comments.map(comment => comment.author),
+    ]),
+  );
+}
+
+export async function refreshCommunityCommentsProfilePictures(comments: CommunityCommentWithInclude[]) {
+  await refreshCommunityAuthorsProfilePictures(comments.map(comment => comment.author));
 }
 
 export function serializeCommunityComment(
