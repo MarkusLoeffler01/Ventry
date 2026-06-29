@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/generated/prisma", () => ({
+  NotificationType: {
+    EVENT: "EVENT",
+  },
   SupportTicketStatus: {
     OPEN: "OPEN",
     IN_PROGRESS: "IN_PROGRESS",
@@ -42,6 +45,12 @@ vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(),
 }));
 
+const createNotificationMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/notifications", () => ({
+  createNotification: createNotificationMock,
+}));
+
 import * as adminTicketUpdateRoute from "@/app/api/admin/event/[id]/support-tickets/[ticketId]/route";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
@@ -71,6 +80,7 @@ describe("App Router: /api/admin/event/[id]/support-tickets/[ticketId]", () => {
     });
     mockedRenderHtml.mockResolvedValue("<html />");
     mockedSendMail.mockResolvedValue(undefined);
+    createNotificationMock.mockResolvedValue({});
   });
 
   it("returns 422 when no update fields are provided", async () => {
@@ -183,6 +193,13 @@ describe("App Router: /api/admin/event/[id]/support-tickets/[ticketId]", () => {
       "jamie@example.com",
       "Support Ticket Updated: Furavia",
       "<html />",
+    );
+    expect(createNotificationMock).toHaveBeenCalledWith(
+      "user-1",
+      "EVENT",
+      "Support ticket updated: Furavia",
+      "Status changed from OPEN to RESOLVED",
+      "/events/7",
     );
   });
 

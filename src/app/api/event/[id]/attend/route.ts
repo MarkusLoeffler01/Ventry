@@ -36,6 +36,36 @@ type RegistrationEvent = Prisma.EventGetPayload<{
     include: typeof registrationEventInclude;
 }>;
 
+function isTicketIdUniqueConstraintError(error: unknown) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        return false;
+    }
+
+    const target = (error.meta as { target?: string[] | string } | undefined)?.target;
+    if (Array.isArray(target)) {
+        return target.includes("ticketId");
+    }
+
+    if (typeof target === "string") {
+        return target.includes("ticketId");
+    }
+
+    return error.message.includes("ticketId");
+}
+
+async function syncRegistrationTicketSequence() {
+    await prisma.$queryRawUnsafe(`
+        SELECT setval(
+            pg_get_serial_sequence('"Registration"', 'ticketId'),
+            GREATEST(
+                COALESCE((SELECT MAX("ticketId") FROM "Registration"), 1),
+                (SELECT last_value FROM "Registration_ticketId_seq")
+            ),
+            true
+        )
+    `);
+}
+
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -187,7 +217,7 @@ export async function POST(
         const requiresApprovalBeforePayment = Boolean(event.requireApproval);
 
         // 3. Database Transaction
-        const result = await prisma.$transaction(async (tx) => {
+        const runRegistrationTransaction = () => prisma.$transaction(async (tx) => {
             // Check existing registration
             const existing = await tx.registration.findUnique({
                 where: { userId_eventId: { userId: session.user.id, eventId } },
@@ -332,6 +362,18 @@ export async function POST(
         }, {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable
         });
+
+        let result: Awaited<ReturnType<typeof runRegistrationTransaction>>;
+        try {
+            result = await runRegistrationTransaction();
+        } catch (error) {
+            if (!isTicketIdUniqueConstraintError(error)) {
+                throw error;
+            }
+
+            await syncRegistrationTicketSequence();
+            result = await runRegistrationTransaction();
+        }
 
         return NextResponse.json({ 
             message: result.status === 'WAITLISTED' ? "Added to waitlist" : "Registration successful",

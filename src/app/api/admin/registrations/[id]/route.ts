@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
-import type { Prisma } from "@/generated/prisma";
+import { NotificationType, type Prisma } from "@/generated/prisma";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import RegistrationUpdateMail from "@/components/emails/RegistrationUpdateMail";
 import { sendMail } from "@/lib/mail";
 import { cancelRegistrationAndReleaseCapacity, syncReleasedProductStocks } from "@/lib/events/registration-capacity";
+import { createNotification } from "@/lib/notifications";
 
 type FinanceAction = "NONE" | "UPCHARGE_REQUIRED" | "MANUAL_REFUND_RECOMMENDED";
 
@@ -36,6 +37,21 @@ function toNumber(value: unknown) {
 
 function toMoney(value: number) {
     return Number(value.toFixed(2));
+}
+
+function summarizeRegistrationChanges(changes: Array<{ label: string; old: string; new: string }>) {
+    const statusChange = changes.find((change) => change.label === "Registration Status");
+    if (statusChange) {
+        return `Status changed from ${statusChange.old} to ${statusChange.new}`;
+    }
+
+    const paymentChange = changes.find((change) => change.label === "Payment Status");
+    if (paymentChange) {
+        return `Payment status changed from ${paymentChange.old} to ${paymentChange.new}`;
+    }
+
+    const labels = changes.slice(0, 3).map((change) => change.label);
+    return labels.length > 0 ? `Updated: ${labels.join(", ")}` : undefined;
 }
 
 // PATCH /api/admin/registrations/[id] - Update registration details by admin
@@ -392,6 +408,21 @@ export async function PATCH(
                 );
             } catch (mailError) {
                 console.error("Failed to send registration update email:", mailError);
+            }
+
+            try {
+                const statusChanged = changes.some((change) => change.label === "Registration Status");
+                await createNotification(
+                    registration.updatedReg.userId,
+                    NotificationType.EVENT,
+                    statusChanged
+                        ? `Registration status updated: ${registration.updatedReg.event.name}`
+                        : `Registration updated: ${registration.updatedReg.event.name}`,
+                    summarizeRegistrationChanges(changes),
+                    `/events/${registration.updatedReg.event.id}`,
+                );
+            } catch (notificationError) {
+                console.error("Failed to create registration update notification:", notificationError);
             }
         }
 
