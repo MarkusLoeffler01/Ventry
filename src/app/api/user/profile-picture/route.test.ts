@@ -23,6 +23,7 @@ vi.mock("@/lib/supabase", () => ({
 
 vi.mock("@/lib/user/profilePicture", () => ({
   add: vi.fn(),
+  refreshSignedUrls: vi.fn(),
   remove: vi.fn(),
   setPrimary: vi.fn(),
 }));
@@ -44,22 +45,23 @@ import * as profilePictureRoute from "@/app/api/user/profile-picture/route";
 import { getUserIdFromRequest } from "@/lib/helpers/user";
 import { prisma } from "@/lib/prisma/prisma";
 import { getSignedUrl, uploadProfilePicture } from "@/lib/supabase";
-import { add, remove, setPrimary } from "@/lib/user/profilePicture";
+import { add, refreshSignedUrls, remove, setPrimary } from "@/lib/user/profilePicture";
 
 const mockedGetUserIdFromRequest = getUserIdFromRequest as unknown as ReturnType<typeof vi.fn>;
 const mockedFindUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
-const mockedUpdatePicture = prisma.profilePicture.update as unknown as ReturnType<typeof vi.fn>;
 const mockedFindPicture = prisma.profilePicture.findFirst as unknown as ReturnType<typeof vi.fn>;
 const mockedFindPictureById = prisma.profilePicture.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockedUploadProfilePicture = uploadProfilePicture as unknown as ReturnType<typeof vi.fn>;
 const mockedGetSignedUrl = getSignedUrl as unknown as ReturnType<typeof vi.fn>;
 const mockedAddPicture = add as unknown as ReturnType<typeof vi.fn>;
+const mockedRefreshSignedUrls = refreshSignedUrls as unknown as ReturnType<typeof vi.fn>;
 const mockedRemovePicture = remove as unknown as ReturnType<typeof vi.fn>;
 const mockedSetPrimary = setPrimary as unknown as ReturnType<typeof vi.fn>;
 
 describe("App Router: /api/user/profile-picture", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedRefreshSignedUrls.mockImplementation(async pictures => pictures);
   });
 
   describe("GET", () => {
@@ -73,32 +75,39 @@ describe("App Router: /api/user/profile-picture", () => {
     });
 
     it("refreshes expired signed URLs before returning pictures", async () => {
+      const profilePictures = [
+        {
+          id: "pic-stale",
+          storagePath: "users/user-1/stale.jpg",
+          signedUrl: "https://old.example.com/stale",
+          cachedUntil: new Date("2026-04-01T10:00:00.000Z"),
+          isPrimary: true,
+          order: 0,
+          createdAt: new Date("2026-03-31T10:00:00.000Z"),
+        },
+        {
+          id: "pic-fresh",
+          storagePath: "users/user-1/fresh.jpg",
+          signedUrl: "https://cdn.example.com/fresh",
+          cachedUntil: new Date("2099-04-01T10:00:00.000Z"),
+          isPrimary: false,
+          order: 1,
+          createdAt: new Date("2026-03-30T10:00:00.000Z"),
+        },
+      ];
+      const refreshedProfilePictures = [
+        {
+          ...profilePictures[0],
+          signedUrl: "https://cdn.example.com/stale-refreshed",
+          cachedUntil: new Date("2026-04-01T11:00:00.000Z"),
+        },
+        profilePictures[1],
+      ];
+
       mockedFindUser.mockResolvedValue({
-        profilePictures: [
-          {
-            id: "pic-stale",
-            storagePath: "users/user-1/stale.jpg",
-            signedUrl: "https://old.example.com/stale",
-            cachedUntil: new Date("2026-04-01T10:00:00.000Z"),
-            isPrimary: true,
-            order: 0,
-            createdAt: new Date("2026-03-31T10:00:00.000Z"),
-          },
-          {
-            id: "pic-fresh",
-            storagePath: "users/user-1/fresh.jpg",
-            signedUrl: "https://cdn.example.com/fresh",
-            cachedUntil: new Date("2099-04-01T10:00:00.000Z"),
-            isPrimary: false,
-            order: 1,
-            createdAt: new Date("2026-03-30T10:00:00.000Z"),
-          },
-        ],
+        profilePictures,
       });
-      mockedGetSignedUrl.mockResolvedValue({
-        signedUrl: "https://cdn.example.com/stale-refreshed",
-        expiresIn: 3600,
-      });
+      mockedRefreshSignedUrls.mockResolvedValue(refreshedProfilePictures);
 
       const response = await profilePictureRoute.GET(
         new NextRequest("http://localhost/api/user/profile-picture?userId=user-1"),
@@ -108,14 +117,7 @@ describe("App Router: /api/user/profile-picture", () => {
       const payload = await response.json();
       expect(payload.profilePictures).toHaveLength(2);
       expect(payload.profilePictures[0].signedUrl).toBe("https://cdn.example.com/stale-refreshed");
-      expect(mockedGetSignedUrl).toHaveBeenCalledWith("users/user-1/stale.jpg", 24 * 60 * 60);
-      expect(mockedUpdatePicture).toHaveBeenCalledWith({
-        where: { id: "pic-stale" },
-        data: {
-          signedUrl: "https://cdn.example.com/stale-refreshed",
-          cachedUntil: expect.any(Date),
-        },
-      });
+      expect(mockedRefreshSignedUrls).toHaveBeenCalledWith(profilePictures);
     });
   });
 

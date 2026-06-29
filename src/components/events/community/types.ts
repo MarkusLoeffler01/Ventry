@@ -9,6 +9,23 @@ export type CommunityFeedbackItem = {
 
 export type CommunityReactionKey = "LIKE" | "LOVE" | "CELEBRATE" | "HELPFUL";
 
+export type CommunityCommentView = {
+  id: string;
+  postId: string;
+  authorId: string;
+  content: string | null;
+  imageUrls: string[];
+  gifUrl: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "DELETED";
+  createdAt: string;
+  author: {
+    id: string;
+    name: string;
+    imageUrl: string | null;
+  };
+  mentionedUsers: { id: string; name: string }[];
+};
+
 export type CommunityPostView = {
   id: string;
   eventId: number;
@@ -32,4 +49,6 @@ export type CommunityPostView = {
   };
   reactions: Record<CommunityReactionKey, number>;
   viewerReactions: string[];
+  commentCount: number;
+  comments: CommunityCommentView[];
 };

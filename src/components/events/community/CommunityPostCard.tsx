@@ -4,6 +4,8 @@ import {
   Avatar,
   Box,
   Button,
+  Chip,
+  Divider,
   IconButton,
   Link as MuiLink,
   Paper,
@@ -12,10 +14,12 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { Celebration, Delete, Favorite, Lightbulb, Link as LinkIcon, ThumbUp } from "@mui/icons-material";
+import { Celebration, CheckCircle, Delete, Favorite, Lightbulb, Link as LinkIcon, PushPin, PushPinOutlined, ThumbDown, ThumbUp } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import Image from "next/image";
 import NextLink from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import CommentList from "./CommentList";
 import type { CommunityPostView, CommunityReactionKey } from "./types";
 
 const reactionConfig: Array<{
@@ -46,21 +50,40 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+type ModerateAction = "approve" | "reject" | "pin" | "unpin" | "remove";
+
+const STATUS_CHIP_COLOR = {
+  PENDING: "warning",
+  APPROVED: "success",
+  REJECTED: "error",
+  DELETED: "default",
+} as const;
+
 interface CommunityPostCardProps {
   post: CommunityPostView;
   canDelete: boolean;
+  canModerate?: boolean;
+  communityModerated?: boolean;
   deleteDisabled?: boolean;
+  moderateDisabled?: boolean;
   reactionDisabled?: boolean;
+  composerDisabled?: boolean;
   onDelete: (postId: string) => void;
+  onModerate?: (postId: string, action: ModerateAction) => void;
   onReact: (postId: string, reaction: CommunityReactionKey) => void;
 }
 
 export default function CommunityPostCard({
   post,
   canDelete,
+  canModerate,
+  communityModerated = true,
   deleteDisabled,
+  moderateDisabled,
   reactionDisabled,
+  composerDisabled,
   onDelete,
+  onModerate,
   onReact,
 }: CommunityPostCardProps) {
   const createdAt = new Intl.DateTimeFormat("en-US", {
@@ -69,11 +92,46 @@ export default function CommunityPostCard({
   }).format(new Date(post.createdAt));
   const showMainContent = Boolean(post.content && !(post.type === "FEEDBACK" && post.feedbacks.length > 0));
 
+  useEffect(() => {
+    const scrollToPost = () => {
+      if (decodeURIComponent(window.location.hash.slice(1)) !== `post-${post.id}`) return;
+
+      requestAnimationFrame(() => {
+        document.getElementById(`post-${post.id}`)?.scrollIntoView({ block: "center" });
+      });
+    };
+
+    scrollToPost();
+    window.addEventListener("hashchange", scrollToPost);
+    return () => window.removeEventListener("hashchange", scrollToPost);
+  }, [post.id]);
+
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+    <Paper
+      id={`post-${post.id}`}
+      variant="outlined"
+      sx={{
+        p: 2.5,
+        borderRadius: 2,
+        scrollMarginTop: 96,
+        transition: theme => theme.transitions.create(
+          ["background-color", "border-color", "box-shadow"],
+          { duration: theme.transitions.duration.short },
+        ),
+        "&:target": {
+          bgcolor: "action.hover",
+          borderColor: "primary.main",
+          boxShadow: theme => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.16)}`,
+        },
+        [`&:has([id^="post-${post.id}-comment-"]:target)`]: {
+          borderColor: "primary.main",
+          boxShadow: theme => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.12)}`,
+        },
+      }}
+    >
       <Stack spacing={2}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <NextLink href={`/profile/${post.author.id}`} style={{ textDecoration: "none" }}>
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          <NextLink href={`/profile/${post.author.id}`} style={{ textDecoration: "none", flexShrink: 0 }}>
             <Avatar
               src={post.author.imageUrl || undefined}
               alt={post.author.name}
@@ -83,7 +141,7 @@ export default function CommunityPostCard({
             </Avatar>
           </NextLink>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
               <MuiLink
                 component={NextLink}
                 href={`/profile/${post.author.id}`}
@@ -94,6 +152,20 @@ export default function CommunityPostCard({
                   {post.author.name}
                 </Typography>
               </MuiLink>
+              {post.pinned ? (
+                <Tooltip title="Pinned post">
+                  <PushPin sx={{ fontSize: "0.95rem" }} color="primary" />
+                </Tooltip>
+              ) : null}
+              {canModerate ? (
+                <Chip
+                  label={post.status}
+                  size="small"
+                  color={STATUS_CHIP_COLOR[post.status] ?? "default"}
+                  variant="outlined"
+                  sx={{ fontSize: "0.65rem", height: 20 }}
+                />
+              ) : null}
             </Stack>
             <Typography variant="caption" color="text.secondary">
               {createdAt}
@@ -108,6 +180,7 @@ export default function CommunityPostCard({
                   color="error"
                   disabled={deleteDisabled}
                   onClick={() => onDelete(post.id)}
+                  sx={{ flexShrink: 0 }}
                 >
                   <Delete fontSize="small" />
                 </IconButton>
@@ -191,6 +264,50 @@ export default function CommunityPostCard({
           </Box>
         ) : null}
 
+        {canModerate && onModerate ? (
+          <>
+            <Divider />
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap alignItems="center">
+              {post.status === "PENDING" ? (
+                <Tooltip title="Approve">
+                  <span>
+                    <IconButton size="small" color="success" disabled={moderateDisabled} onClick={() => onModerate(post.id, "approve")}>
+                      <CheckCircle fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              ) : null}
+              {communityModerated && post.status !== "REJECTED" && post.status !== "DELETED" ? (
+                <Tooltip title="Reject">
+                  <span>
+                    <IconButton size="small" color="error" disabled={moderateDisabled} onClick={() => onModerate(post.id, "reject")}>
+                      <ThumbDown fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              ) : null}
+              {post.status !== "DELETED" ? (
+                <Tooltip title={post.pinned ? "Unpin" : "Pin to top"}>
+                  <span>
+                    <IconButton size="small" color={post.pinned ? "primary" : "default"} disabled={moderateDisabled} onClick={() => onModerate(post.id, post.pinned ? "unpin" : "pin")}>
+                      {post.pinned ? <PushPin fontSize="small" /> : <PushPinOutlined fontSize="small" />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              ) : null}
+              {post.status !== "DELETED" ? (
+                <Tooltip title="Remove post">
+                  <span>
+                    <IconButton size="small" color="error" disabled={moderateDisabled} onClick={() => onModerate(post.id, "remove")}>
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              ) : null}
+            </Stack>
+          </>
+        ) : null}
+
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {reactionConfig.map(reaction => {
             const active = post.viewerReactions.includes(reaction.key);
@@ -211,6 +328,15 @@ export default function CommunityPostCard({
             );
           })}
         </Stack>
+
+        <CommentList
+          postId={post.id}
+          eventId={post.eventId}
+          initialComments={post.comments}
+          totalCount={post.commentCount}
+          canDelete={canDelete}
+          composerDisabled={composerDisabled}
+        />
       </Stack>
     </Paper>
   );
