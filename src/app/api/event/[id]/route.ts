@@ -23,6 +23,9 @@ export async function GET(
             }
         });
 
+        console.log("Event details fetched:", event);
+        console.log(event);
+
         if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
         return NextResponse.json({ event }, { status: 200 });

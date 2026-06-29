@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { USER_CONFIG } from "@/lib/config";
 import { getUserIdFromRequest } from "@/lib/helpers/user";
 import { uploadProfilePicture, getSignedUrl } from "@/lib/supabase";
-import { add, remove, setPrimary } from "@/lib/user/profilePicture";
+import { add, refreshSignedUrls, remove, setPrimary } from "@/lib/user/profilePicture";
 import { prisma } from "@/lib/prisma/prisma";
 
 // GET: Retrieve a user's profile pictures
@@ -33,36 +33,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // Validate and refresh expired signed URLs
-        const now = new Date();
-        const validatedPictures = await Promise.all(
-            user.profilePictures.map(async (picture) => {
-                if (!picture.signedUrl || !picture.cachedUntil || picture.cachedUntil <= now) {
-                    try {
-                        const { signedUrl, expiresIn } = await getSignedUrl(picture.storagePath, 24 * 60 * 60);
-                        
-                        await prisma.profilePicture.update({
-                            where: { id: picture.id },
-                            data: {
-                                signedUrl,
-                                cachedUntil: new Date(Date.now() + expiresIn * 1000)
-                            }
-                        });
-                        
-                        return {
-                            ...picture,
-                            signedUrl,
-                            cachedUntil: new Date(Date.now() + expiresIn * 1000)
-                        };
-                    } catch (error) {
-                        console.error(`Failed to refresh signed URL for picture ${picture.id}:`, error);
-                        return picture;
-                    }
-                }
-                
-                return picture;
-            })
-        );
+        const validatedPictures = await refreshSignedUrls(user.profilePictures);
 
         return NextResponse.json({ profilePictures: validatedPictures }, { status: 200 });
     } catch (error) {

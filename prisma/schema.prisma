@@ -60,6 +60,7 @@ model User {
   communityComments    CommunityComment[]
   postReactions        PostReaction[]
   postModerationLogs   PostModerationLog[] @relation("UserPostModerationLogs")
+  notifications        Notification[]
 
   @@map("user")
 }
@@ -152,6 +153,7 @@ model Event {
   communityModerated  Boolean         @default(true)
   communityModerateComments Boolean   @default(false)
   communityAttendeesOnly Boolean      @default(true)
+  lastDigestSentAt    DateTime?
   badgeTemplates      BadgeTemplate[]
   owner               Admin?          @relation(fields: [ownerId], references: [id])
   checkInLogs         RegistrationCheckInLog[]
@@ -288,6 +290,7 @@ model Registration {
   checkedInAt       DateTime?
   checkedInByAdminId String?
   checkInCount      Int                   @default(0)
+  communityNotifications Boolean          @default(true)
   payments          Payment[]
   checkInLogs       RegistrationCheckInLog[]
   checkedInBy       Admin?                @relation("RegistrationCheckedInByAdmin", fields: [checkedInByAdminId], references: [id])
@@ -531,4 +534,25 @@ enum ModerationAction {
   DELETED
   PINNED
   UNPINNED
+}
+
+enum NotificationType {
+  COMMENT
+  EVENT
+  COMMUNITY
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
 }
