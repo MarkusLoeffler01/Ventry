@@ -91,7 +91,7 @@ export async function POST(
 
   if (action === "approve") {
     const baseUrl = process.env.BETTER_AUTH_URL ?? "";
-    const eventPath = `/events/${post.eventId}/community#post-${post.id}`;
+    const eventPath = `/events/${post.eventId}#post-${post.id}`;
 
     createNotification(
       post.authorId,

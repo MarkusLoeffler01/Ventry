@@ -14,7 +14,7 @@ import { usePathname } from "next/navigation";
 import NotificationBell from "@/components/common/NotificationBell/NotificationBell";
 
 type ProfilePictureEntry = { signedUrl: string | null; isPrimary: boolean; order: number };
-type UserProfileResponse = { profilePictures?: ProfilePictureEntry[]; image?: string | null };
+type ProfilePictureResponse = { profilePictures?: ProfilePictureEntry[] };
 
 /**
  * AppHeader – persistent sticky navigation bar.
@@ -32,21 +32,36 @@ export default function AppHeader() {
 
     const [visible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
-    const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+    const [profilePictureState, setProfilePictureState] = useState<{ userId: string; url: string | null } | null>(null);
+    const profileImageUrl = profilePictureState && profilePictureState.userId === user?.id
+        ? profilePictureState.url
+        : user?.image ?? null;
 
     useEffect(() => {
         if (!user?.id) {
-            setProfileImageUrl(null);
             return;
         }
-        fetch(`/api/user?userId=${user.id}`)
-            .then(r => r.ok ? r.json() as Promise<UserProfileResponse> : null)
+
+        const controller = new AbortController();
+
+        fetch(`/api/user/profile-picture?userId=${encodeURIComponent(user.id)}`, {
+            signal: controller.signal,
+        })
+            .then(r => r.ok ? r.json() as Promise<ProfilePictureResponse> : null)
             .then(data => {
                 const pics = data?.profilePictures ?? [];
                 const primary = pics.find(p => p.isPrimary) ?? pics[0] ?? null;
-                setProfileImageUrl(primary?.signedUrl ?? user.image ?? null);
+                setProfilePictureState({ userId: user.id, url: primary?.signedUrl ?? user.image ?? null });
             })
-            .catch(() => null);
+            .catch((error: unknown) => {
+                if (error instanceof DOMException && error.name === "AbortError") {
+                    return;
+                }
+
+                setProfilePictureState({ userId: user.id, url: user.image ?? null });
+            });
+
+        return () => controller.abort();
     }, [user?.id, user?.image]);
 
     useEffect(() => {

@@ -205,7 +205,7 @@ describe("POST /api/community/posts/[postId]/comments", () => {
       "COMMENT",
       "Test User commented on your post",
       undefined,
-      `/events/${EVENT_ID}/community#post-${POST_ID}-comment-${COMMENT_ID}`,
+      `/events/${EVENT_ID}#post-${POST_ID}-comment-${COMMENT_ID}`,
     );
   });
 
@@ -232,7 +232,7 @@ describe("POST /api/community/posts/[postId]/comments", () => {
       "COMMENT",
       "Test User replied to your comment",
       undefined,
-      `/events/${EVENT_ID}/community#post-${POST_ID}-comment-${COMMENT_ID}`,
+      `/events/${EVENT_ID}#post-${POST_ID}-comment-${COMMENT_ID}`,
     );
   });
 

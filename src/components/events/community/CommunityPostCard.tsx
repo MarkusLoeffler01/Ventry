@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Celebration, CheckCircle, Delete, Favorite, Lightbulb, Link as LinkIcon, PushPin, PushPinOutlined, ThumbDown, ThumbUp } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import Image from "next/image";
 import NextLink from "next/link";
 import { useEffect, type ReactNode } from "react";
@@ -113,9 +114,18 @@ export default function CommunityPostCard({
         p: 2.5,
         borderRadius: 2,
         scrollMarginTop: 96,
-        transition: theme => theme.transitions.create("background-color", { duration: theme.transitions.duration.short }),
+        transition: theme => theme.transitions.create(
+          ["background-color", "border-color", "box-shadow"],
+          { duration: theme.transitions.duration.short },
+        ),
         "&:target": {
           bgcolor: "action.hover",
+          borderColor: "primary.main",
+          boxShadow: theme => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.16)}`,
+        },
+        [`&:has([id^="post-${post.id}-comment-"]:target)`]: {
+          borderColor: "primary.main",
+          boxShadow: theme => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.12)}`,
         },
       }}
     >

@@ -30,7 +30,7 @@ function parseMentionNames(content: string | null | undefined): string[] {
 }
 
 function buildCommentLink(eventId: number, postId: string, commentId: string) {
-  return `/events/${eventId}/community#post-${postId}-comment-${commentId}`;
+  return `/events/${eventId}#post-${postId}-comment-${commentId}`;
 }
 
 async function buildMentionedUsersMap(userIds: string[]): Promise<Map<string, { id: string; name: string }>> {
