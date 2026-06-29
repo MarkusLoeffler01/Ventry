@@ -1,7 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PostStatus } from "@/generated/prisma";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
-import { buildMentionMapForPosts, communityPostInclude, serializeCommunityPost } from "@/lib/community/server";
+import {
+  buildMentionMapForPosts,
+  communityPostInclude,
+  refreshCommunityPostsProfilePictures,
+  serializeCommunityPost,
+} from "@/lib/community/server";
 import { prisma } from "@/lib/prisma/prisma";
 
 const VALID_STATUSES = Object.values(PostStatus);
@@ -42,6 +47,7 @@ export async function GET(
   const page = hasMore ? posts.slice(0, limit) : posts;
 
   const mentionedUsersById = await buildMentionMapForPosts(page);
+  await refreshCommunityPostsProfilePictures(page);
 
   return NextResponse.json({
     posts: page.map(p => serializeCommunityPost(p, auth.user?.id, mentionedUsersById)),
