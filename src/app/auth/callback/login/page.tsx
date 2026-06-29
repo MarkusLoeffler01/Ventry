@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
+import { connection } from "next/server";
 import { getSession } from '@/lib/auth/session';
 import { prisma } from '@/lib/prisma/prisma';
-import { Suspense } from "react";
 
 interface LoginCallbackPageProps {
     searchParams: Promise<{
@@ -10,35 +10,8 @@ interface LoginCallbackPageProps {
     }>;
 }
 
-/**
- * OAuth Login Callback Handler (WITH PASSWORD PROMPT)
- * 
- * This handles OAuth sign-in attempts from the login page.
- * 
- * Flow for EXISTING accounts:
- * 1. User clicks "Sign in with Google/GitHub" on login page
- * 2. OAuth completes
- * 3. better-auth checks if account exists with this email
- * 4. If yes → error "account exists"
- * 5. This callback intercepts → redirects to /login with link_required=true
- * 6. User sees password prompt on login page
- * 7. After login → check for pending links → redirect to /link-account
- * 
- * Flow for NEW accounts:
- * 1. User clicks "Sign in with Google/GitHub"
- * 2. OAuth completes
- * 3. better-auth creates new user + OAuth account
- * 4. User logged in → redirect to dashboard
- */
-export default function LoginCallbackPage({ searchParams }: LoginCallbackPageProps) {
-    return (
-        <Suspense fallback={null}>
-            <LoginCallbackPageContent searchParams={searchParams} />
-        </Suspense>
-    );
-}
-
-async function LoginCallbackPageContent({ searchParams }: LoginCallbackPageProps) {
+export default async function LoginCallbackPage({ searchParams }: LoginCallbackPageProps) {
+    await connection();
     const params = await searchParams;
     
     // Handle better-auth's "account exists" error
@@ -86,6 +59,4 @@ async function LoginCallbackPageContent({ searchParams }: LoginCallbackPageProps
 
     // No session and no error - something unexpected
     redirect('/login');
-
-    return null;
 }
