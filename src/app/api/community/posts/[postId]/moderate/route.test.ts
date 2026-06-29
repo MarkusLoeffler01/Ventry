@@ -180,7 +180,7 @@ describe("POST /api/community/posts/[postId]/moderate", () => {
       "COMMUNITY",
       "Your post was approved",
       undefined,
-      "/events/7/community#post-post-abc",
+      "/events/7#post-post-abc",
     );
   });
 

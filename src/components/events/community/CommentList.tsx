@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Delete, Reply } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import NextLink from "next/link";
 import CommentComposer from "./CommentComposer";
 import type { CommunityCommentView } from "./types";
@@ -137,14 +138,22 @@ export default function CommentList({
     const index = comments.findIndex(comment => comment.id === targetCommentId);
     if (index === -1) return;
 
-    setVisibleCount(current => Math.max(current, index + 1));
+    const frame = requestAnimationFrame(() => {
+      setVisibleCount(current => Math.max(current, index + 1));
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [comments, targetCommentId]);
 
   useEffect(() => {
     if (!targetCommentId || loadingMore) return;
     if (comments.some(comment => comment.id === targetCommentId) || nextCursor === null) return;
 
-    void handleLoadMore();
+    const timeout = setTimeout(() => {
+      void handleLoadMore();
+    }, 0);
+
+    return () => clearTimeout(timeout);
   }, [comments, handleLoadMore, loadingMore, nextCursor, targetCommentId]);
 
   useEffect(() => {
@@ -201,9 +210,16 @@ export default function CommentList({
                 sx={{
                   borderRadius: 1,
                   scrollMarginTop: 96,
-                  transition: theme => theme.transitions.create("background-color", { duration: theme.transitions.duration.short }),
+                  outline: "1px solid transparent",
+                  outlineOffset: 2,
+                  transition: theme => theme.transitions.create(
+                    ["background-color", "outline-color", "box-shadow"],
+                    { duration: theme.transitions.duration.short },
+                  ),
                   "&:target": {
-                    bgcolor: "action.hover",
+                    bgcolor: theme => alpha(theme.palette.primary.main, 0.12),
+                    boxShadow: theme => `0 0 0 6px ${alpha(theme.palette.primary.main, 0.08)}`,
+                    outlineColor: "primary.main",
                   },
                 }}
               >
