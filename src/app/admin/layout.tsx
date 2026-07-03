@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Divider, IconButton, Tooltip } from "@mui/material";
 import { Event, Dashboard, People, Settings, Home, SupportAgent, Payments, ChevronLeft, ChevronRight, Business } from "@mui/icons-material";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/common/AppHeader/AppHeader";
 import AdminOrgFilterSelect from "@/components/admin/AdminOrgFilterSelect";
 
@@ -24,33 +25,18 @@ const secondaryLinks = [
   { href: "/", label: "Back to Site", Icon: Home },
 ];
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const activeDrawerWidth = expanded ? drawerWidth : collapsedDrawerWidth;
+type NavLink = { href: string; label: string; Icon: typeof Dashboard };
 
-  const renderLink = ({ href, label, Icon }: { href: string; label: string; Icon: typeof Dashboard }) => (
-    <ListItem disablePadding key={href} sx={{ display: "block" }}>
+function NavLinkItem({ href, label, Icon, expanded }: NavLink & { expanded: boolean }) {
+  return (
+    <ListItem disablePadding sx={{ display: "block" }}>
       <Tooltip title={expanded ? "" : label} placement="right">
         <ListItemButton
           component={Link}
           href={href}
-          sx={{
-            minHeight: 48,
-            justifyContent: expanded ? "initial" : "center",
-            px: 2,
-          }}
+          sx={{ minHeight: 48, justifyContent: expanded ? "initial" : "center", px: 2 }}
         >
-          <ListItemIcon
-            sx={{
-              minWidth: 0,
-              mr: expanded ? 2 : 0,
-              justifyContent: "center",
-            }}
-          >
+          <ListItemIcon sx={{ minWidth: 0, mr: expanded ? 2 : 0, justifyContent: "center" }}>
             <Icon />
           </ListItemIcon>
           {expanded ? <ListItemText primary={label} /> : null}
@@ -58,6 +44,34 @@ export default function AdminLayout({
       </Tooltip>
     </ListItem>
   );
+}
+
+function AdminNavLinksInner({ links, expanded }: { links: NavLink[]; expanded: boolean }) {
+  const searchParams = useSearchParams();
+  const orgFilter = searchParams.get("orgFilter");
+  return links.map(({ href, label, Icon }) => {
+    const resolvedHref = orgFilter ? `${href}?orgFilter=${encodeURIComponent(orgFilter)}` : href;
+    return <NavLinkItem key={href} href={resolvedHref} label={label} Icon={Icon} expanded={expanded} />;
+  });
+}
+
+function AdminNavLinks({ links, expanded }: { links: NavLink[]; expanded: boolean }) {
+  return (
+    <Suspense fallback={links.map(({ href, label, Icon }) => (
+      <NavLinkItem key={href} href={href} label={label} Icon={Icon} expanded={expanded} />
+    ))}>
+      <AdminNavLinksInner links={links} expanded={expanded} />
+    </Suspense>
+  );
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const activeDrawerWidth = expanded ? drawerWidth : collapsedDrawerWidth;
 
   return (
     <Box
@@ -99,11 +113,11 @@ export default function AdminLayout({
         <Divider />
         <Box sx={{ overflow: 'auto' }}>
           <List>
-            {primaryLinks.map(renderLink)}
+            <AdminNavLinks links={primaryLinks} expanded={expanded} />
           </List>
           <Divider />
           <List>
-            {secondaryLinks.map(renderLink)}
+            <AdminNavLinks links={secondaryLinks} expanded={expanded} />
           </List>
         </Box>
       </Drawer>
