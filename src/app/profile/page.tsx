@@ -59,6 +59,7 @@ async function ProfilePageContent() {
       socialLinks: true,
       createdAt: true,
       updatedAt: true,
+      adminProfile: { select: { type: true } },
     }
   });
 
@@ -67,6 +68,7 @@ async function ProfilePageContent() {
   }
 
   const profilePictures = await refreshSignedUrls(user.profilePictures);
+  const isOrganization = user.adminProfile?.type === "ORGANIZATION";
 
   return (
     <Container maxWidth="md">
@@ -87,7 +89,10 @@ async function ProfilePageContent() {
             </Button>
           )}
         </Box>
-        <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
+        <ProfilePageClient
+          user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }}
+          isOrganization={isOrganization}
+        />
       </Box>
     </Container>
   );

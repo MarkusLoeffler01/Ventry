@@ -20,7 +20,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
   }
 
-  const auth = await checkEventAdminAuth(eventId, req.headers);
+  const auth = await checkEventAdminAuth(eventId, req.headers, "COMMUNITY");
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: 403 });
   }

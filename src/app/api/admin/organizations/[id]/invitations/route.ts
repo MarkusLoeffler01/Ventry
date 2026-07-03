@@ -2,7 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/prisma";
 import { checkAdminAuth } from "@/lib/auth/admin";
-import { AdminOrgPermission, AdminInvitationStatus } from "@/generated/prisma";
+import { AdminOrgPermission, AdminInvitationStatus, NotificationType } from "@/generated/prisma";
+import { renderComponentToHTML } from "@/lib/helpers/html";
+import { sendMail } from "@/lib/mail";
+import { createNotification } from "@/lib/notifications";
+import OrgInvitationMail from "@/components/emails/OrgInvitationMail";
+
+function getAppBaseUrl() {
+  return process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || "https://local.dev:3443";
+}
 
 const createInvitationSchema = z.object({
   email: z.string().email(),
@@ -33,6 +41,7 @@ export async function GET(
     where: { organizationId: orgId },
     select: {
       id: true,
+      token: true,
       invitedEmail: true,
       permissions: true,
       status: true,
@@ -59,7 +68,11 @@ export async function POST(
 
   const org = await prisma.adminOrganization.findUnique({
     where: { id: orgId },
-    select: { ownerId: true },
+    select: {
+      name: true,
+      ownerId: true,
+      owner: { select: { user: { select: { name: true } } } },
+    },
   });
   if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
   if (org.ownerId !== auth.adminId) {
@@ -99,8 +112,15 @@ export async function POST(
 
   const invitedUser = await prisma.user.findUnique({
     where: { email: body.email },
-    select: { adminProfile: { select: { id: true } } },
+    select: { id: true, isAdmin: true, adminProfile: { select: { id: true } } },
   });
+
+  if (!invitedUser?.isAdmin || !invitedUser.adminProfile) {
+    return NextResponse.json(
+      { error: "No admin account found for this email. Only existing organizer accounts can be invited." },
+      { status: 404 },
+    );
+  }
 
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -108,12 +128,45 @@ export async function POST(
     data: {
       organizationId: orgId,
       invitedEmail: body.email,
-      invitedAdminId: invitedUser?.adminProfile?.id ?? null,
+      invitedAdminId: invitedUser.adminProfile.id,
       invitedByAdminId: auth.adminId,
       permissions: body.permissions,
       expiresAt,
     },
   });
+
+  const inviterName = org.owner.user.name || "An organizer";
+  const acceptUrl = `${getAppBaseUrl()}/admin/invite/${invitation.token}`;
+  const expiresAtFormatted = expiresAt.toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  try {
+    const html = await renderComponentToHTML(OrgInvitationMail, {
+      orgName: org.name,
+      inviterName,
+      invitedEmail: body.email,
+      acceptUrl,
+      expiresAt: expiresAtFormatted,
+    });
+    await sendMail(body.email, `You've been invited to join ${org.name} on Ventry`, html);
+  } catch (err) {
+    console.error("Failed to send invitation email:", err);
+  }
+
+  try {
+    await createNotification(
+        invitedUser.id,
+        NotificationType.SYSTEM,
+        `You've been invited to join ${org.name}`,
+        `${inviterName} invited you to become an organizer for ${org.name}.`,
+        `/admin/invite/${invitation.token}`,
+      );
+  } catch (err) {
+    console.error("Failed to send invitation notification:", err);
+  }
 
   return NextResponse.json({ invitation }, { status: 201 });
 }

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { Container, Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Divider, IconButton, Tooltip } from "@mui/material";
-import { Event, Dashboard, People, Settings, Home, SupportAgent, Payments, ChevronLeft, ChevronRight } from "@mui/icons-material";
+import { Event, Dashboard, People, Settings, Home, SupportAgent, Payments, ChevronLeft, ChevronRight, Business } from "@mui/icons-material";
 import Link from "next/link";
 import AppHeader from "@/components/common/AppHeader/AppHeader";
+import AdminOrgFilterSelect from "@/components/admin/AdminOrgFilterSelect";
 
 const drawerWidth = 240;
 const collapsedDrawerWidth = 72;
@@ -12,6 +13,7 @@ const collapsedDrawerWidth = 72;
 const primaryLinks = [
   { href: "/admin", label: "Dashboard", Icon: Dashboard },
   { href: "/admin/events", label: "Events", Icon: Event },
+  { href: "/admin/organization", label: "Organization", Icon: Business },
   { href: "/admin/users", label: "Users", Icon: People },
   { href: "/admin/tickets", label: "Tickets", Icon: SupportAgent },
   { href: "/admin/billing", label: "Billing", Icon: Payments },
@@ -118,6 +120,7 @@ export default function AdminLayout({
       >
         <Toolbar />
         <Container maxWidth="xl" disableGutters>
+          <AdminOrgFilterSelect />
           {children}
         </Container>
       </Box>

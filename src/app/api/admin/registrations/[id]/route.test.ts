@@ -17,6 +17,12 @@ const prismaMock = vi.hoisted(() => ({
   registrationItem: {
     findMany: vi.fn(),
   },
+  event: {
+    findFirst: vi.fn(),
+  },
+  adminOrganizationMembership: {
+    findMany: vi.fn(),
+  },
   $transaction: vi.fn(),
 }));
 
@@ -24,6 +30,8 @@ vi.mock("@/lib/prisma/prisma", () => ({ prisma: prismaMock }));
 
 vi.mock("@/lib/auth/admin", () => ({
   checkAdminAuth: vi.fn(),
+  adminEventFilter: vi.fn(),
+  checkEventAdminAuth: vi.fn(),
   forbiddenResponse: vi.fn((error?: string) =>
     new Response(JSON.stringify({ error: error ?? "Forbidden" }), {
       status: 403,
@@ -52,12 +60,14 @@ vi.mock("@/lib/notifications", () => ({
 }));
 
 import { PATCH } from "./route";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter, checkEventAdminAuth } from "@/lib/auth/admin";
 import { syncReleasedProductStocks } from "@/lib/events/registration-capacity";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import { sendMail } from "@/lib/mail";
 
 const mockedCheckAdminAuth = checkAdminAuth as unknown as ReturnType<typeof vi.fn>;
+const mockedAdminEventFilter = adminEventFilter as unknown as ReturnType<typeof vi.fn>;
+const mockedCheckEventAdminAuth = checkEventAdminAuth as unknown as ReturnType<typeof vi.fn>;
 const mockedSyncReleasedProductStocks = syncReleasedProductStocks as unknown as ReturnType<typeof vi.fn>;
 const mockedRenderHtml = renderComponentToHTML as unknown as ReturnType<typeof vi.fn>;
 const mockedSendMail = sendMail as unknown as ReturnType<typeof vi.fn>;
@@ -137,8 +147,13 @@ describe("PATCH /api/admin/registrations/[id]", () => {
     vi.clearAllMocks();
     mockedCheckAdminAuth.mockResolvedValue({
       authorized: true,
+      adminId: "admin-1",
       user: { id: "admin-user-1", email: "admin@example.com" },
     });
+    mockedAdminEventFilter.mockResolvedValue({ OR: [{ ownerId: "admin-1" }] });
+    mockedCheckEventAdminAuth.mockResolvedValue({ authorized: true, adminId: "admin-1" });
+    prismaMock.event.findFirst.mockResolvedValue({ id: 7 });
+    prismaMock.adminOrganizationMembership.findMany.mockResolvedValue([]);
     mockedSyncReleasedProductStocks.mockResolvedValue(undefined);
     mockedRenderHtml.mockResolvedValue("<html />");
     mockedSendMail.mockResolvedValue(undefined);

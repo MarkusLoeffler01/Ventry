@@ -50,16 +50,13 @@ export async function POST(
     return NextResponse.json({ error: "This invitation was sent to a different email address" }, { status: 403 });
   }
 
-  // Auto-create admin profile if user doesn't have one yet
+  if (!user.isAdmin || !user.adminProfile?.id) {
+    return NextResponse.json({ error: "You must have an organizer account to accept this invitation" }, { status: 403 });
+  }
+
+  const adminId = user.adminProfile.id;
+
   await prisma.$transaction(async tx => {
-    let adminId = user.adminProfile?.id;
-
-    if (!adminId) {
-      await tx.user.update({ where: { id: session.user.id }, data: { isAdmin: true } });
-      const admin = await tx.admin.create({ data: { userId: session.user.id } });
-      adminId = admin.id;
-    }
-
     // Check not already a member
     const existing = await tx.adminOrganizationMembership.findUnique({
       where: { adminId_organizationId: { adminId, organizationId: orgId } },
@@ -77,10 +74,7 @@ export async function POST(
 
     await tx.adminInvitation.update({
       where: { id: invitation.id },
-      data: {
-        status: AdminInvitationStatus.ACCEPTED,
-        invitedAdminId: adminId,
-      },
+      data: { status: AdminInvitationStatus.ACCEPTED, invitedAdminId: adminId },
     });
   });
 
