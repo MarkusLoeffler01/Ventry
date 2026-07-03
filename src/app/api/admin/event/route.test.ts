@@ -14,12 +14,16 @@ vi.mock("@/lib/prisma/prisma", () => ({
             findMany: vi.fn(),
             create: vi.fn()
         },
+        adminOrganization: {
+            findFirst: vi.fn()
+        },
         $transaction: vi.fn()
     }
 }));
 
 vi.mock("@/lib/auth/admin", () => ({
     checkAdminAuth: vi.fn(),
+    adminEventFilter: vi.fn(),
     forbiddenResponse: vi.fn((error?: string) =>
         new Response(JSON.stringify({ error: error ?? "Forbidden" }), {
             status: 403,
@@ -32,15 +36,17 @@ vi.mock("@/lib/auth/admin", () => ({
 
 import * as adminRoute from "@/app/api/admin/event/route";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter, forbiddenResponse } from "@/lib/auth/admin";
 import { adminCreateEventSchema } from "@/types/schemas/event/admin";
 import { Prisma } from "@/generated/prisma";
 
 const mockedCheckAdminAuth = checkAdminAuth as unknown as ReturnType<typeof vi.fn>;
+const mockedAdminEventFilter = adminEventFilter as unknown as ReturnType<typeof vi.fn>;
 const mockedForbiddenResponse = forbiddenResponse as unknown as ReturnType<typeof vi.fn>;
 const mockedCreate = prisma.event.create as unknown as ReturnType<typeof vi.fn>;
 const mockedTransaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 const mockedCreateParse = adminCreateEventSchema.parse as unknown as ReturnType<typeof vi.fn>;
+const mockedOrgFindFirst = prisma.adminOrganization.findFirst as unknown as ReturnType<typeof vi.fn>;
 
 function postRequest(url: string, body: unknown) {
     return new NextRequest(url, {
@@ -104,6 +110,8 @@ describe("App Router: /api/admin/event", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockedCheckAdminAuth.mockResolvedValue({ authorized: true, adminId: "admin-1" });
+        mockedAdminEventFilter.mockResolvedValue({ OR: [{ ownerId: "admin-1" }] });
+        mockedOrgFindFirst.mockResolvedValue(null);
     });
 
     it("returns 403 for unauthorized admins", async () => {

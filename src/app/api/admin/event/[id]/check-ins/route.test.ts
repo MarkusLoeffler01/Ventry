@@ -11,7 +11,6 @@ vi.mock("@/lib/prisma/prisma", () => ({
 }));
 
 vi.mock("@/lib/auth/admin", () => ({
-  checkAdminAuth: vi.fn(),
   forbiddenResponse: vi.fn((error?: string) =>
     new Response(JSON.stringify({ error: error ?? "Forbidden" }), {
       status: 403,
@@ -20,12 +19,16 @@ vi.mock("@/lib/auth/admin", () => ({
   ),
 }));
 
+vi.mock("@/lib/auth/event-admin", () => ({
+  checkEventAdminAuth: vi.fn(),
+}));
+
 import * as snapshotRoute from "@/app/api/admin/event/[id]/check-ins/snapshot/route";
 import * as batchRoute from "@/app/api/admin/event/[id]/check-ins/batch/route";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 
-const mockedCheckAdminAuth = checkAdminAuth as unknown as ReturnType<typeof vi.fn>;
+const mockedCheckEventAdminAuth = checkEventAdminAuth as unknown as ReturnType<typeof vi.fn>;
 const mockedFindEvent = prisma.event.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockedTransaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 
@@ -65,7 +68,7 @@ function createTx(overrides: Record<string, unknown> = {}) {
 describe("App Router: admin event check-ins", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedCheckAdminAuth.mockResolvedValue({ authorized: true, adminId: "admin-1" });
+    mockedCheckEventAdminAuth.mockResolvedValue({ authorized: true, adminId: "admin-1" });
   });
 
   it("returns a minimal snapshot without address fields", async () => {
