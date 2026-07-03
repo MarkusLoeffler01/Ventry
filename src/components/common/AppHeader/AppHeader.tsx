@@ -127,14 +127,14 @@ export default function AppHeader() {
                     </Link>
 
                     {user?.isAdmin && (
-                        <Typography
-                            component={Link}
-                            href={isInAdminArea ? "/" : "/admin"}
-                            variant="h6"
-                            sx={{ color: "#f50057", fontWeight: "bold", textDecoration: "none", "&:hover": { opacity: 0.8 }, transition: "opacity 0.2s", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }}
-                        >
-                            {isInAdminArea ? "← Leave admin area" : "Admin"}
-                        </Typography>
+                        <Link href={isInAdminArea ? "/" : "/admin"} style={{ textDecoration: "none" }}>
+                            <Typography
+                                variant="h6"
+                                sx={{ color: "#f50057", fontWeight: "bold", "&:hover": { opacity: 0.8 }, transition: "opacity 0.2s", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }}
+                            >
+                                {isInAdminArea ? "← Leave admin area" : "Admin"}
+                            </Typography>
+                        </Link>
                     )}
                 </Box>
                 

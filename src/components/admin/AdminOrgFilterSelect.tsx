@@ -22,6 +22,9 @@ function AdminOrgFilterSelectInner() {
 
   if (!orgs || orgs.length === 0) return null;
 
+  const knownValues = new Set(["all", "personal", ...orgs.map((o) => o.id)]);
+  const selectValue = knownValues.has(orgFilter) ? orgFilter : "all";
+
   const handleChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") {
@@ -39,7 +42,7 @@ function AdminOrgFilterSelectInner() {
         <InputLabel id="org-filter-label">Organization</InputLabel>
         <Select
           labelId="org-filter-label"
-          value={orgFilter}
+          value={selectValue}
           label="Organization"
           onChange={(e) => handleChange(e.target.value as string)}
         >
