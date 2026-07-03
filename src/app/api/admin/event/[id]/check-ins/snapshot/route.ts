@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { forbiddenResponse } from "@/lib/auth/admin";
+import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { getCheckInEligibility, resolveCheckInProducts, resolveTicketTier } from "@/lib/tickets/check-in";
 import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 
@@ -9,14 +10,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const authResult = await checkAdminAuth(req.headers);
-    if (!authResult.authorized) {
-      return forbiddenResponse(authResult.error);
-    }
-
     const eventId = Number((await params).id);
     if (Number.isNaN(eventId)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    const authResult = await checkEventAdminAuth(eventId, req.headers);
+    if (!authResult.authorized) {
+      return forbiddenResponse(authResult.error);
     }
 
     const event = await prisma.event.findUnique({

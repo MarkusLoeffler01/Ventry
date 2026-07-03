@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma/prisma";
 import type { Prisma } from "@/generated/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter, forbiddenResponse } from "@/lib/auth/admin";
 import { adminCreateEventSchema } from "@/types/schemas/event/admin";
 import { z } from "zod";
 
@@ -52,7 +52,8 @@ function toPersistedProducts(products: CreateEventData["products"]) {
 
 function buildCreateEventArgs(
     validatedData: CreateEventData,
-    adminId: string
+    adminId: string,
+    organizationId?: string | null,
 ) {
     return {
         data: {
@@ -66,6 +67,7 @@ function buildCreateEventArgs(
             customFields: validatedData.customFields as Prisma.InputJsonValue,
             schedule: validatedData.schedule as Prisma.InputJsonValue,
             ownerId: adminId,
+            ...(organizationId ? { organizationId } : {}),
             location: {
                 create: validatedData.location
             },
@@ -132,7 +134,7 @@ async function resetEventCreateSequences(tx: Prisma.TransactionClient) {
     `;
 }
 
-// GET /api/admin/event - List all events for admins
+// GET /api/admin/event - List events owned by or accessible to this admin
 export async function GET(_req: NextRequest) {
     try {
         const authResult = await checkAdminAuth();
@@ -140,7 +142,13 @@ export async function GET(_req: NextRequest) {
             return forbiddenResponse(authResult.error);
         }
 
+        if (!authResult.adminId) {
+            return NextResponse.json({ error: "Admin profile incomplete" }, { status: 403 });
+        }
+
+        const eventFilter = await adminEventFilter(authResult.adminId);
         const events = await prisma.event.findMany({
+            where: eventFilter,
             include: {
                 location: true,
                 _count: {
@@ -169,10 +177,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Admin profile incomplete" }, { status: 403 });
         }
 
+        // If the admin owns an organization, associate new events with it so all org members can access them
+        const ownedOrg = await prisma.adminOrganization.findFirst({
+            where: { ownerId: authResult.adminId },
+            select: { id: true },
+        });
+
         const body = await req.json();
         const validatedData = adminCreateEventSchema.parse(body);
         const createPayload = prepareCreatePayload(validatedData);
-        const createArgs = buildCreateEventArgs(createPayload, authResult.adminId);
+        const createArgs = buildCreateEventArgs(createPayload, authResult.adminId, ownedOrg?.id);
 
         const event = await prisma.event.create(createArgs).catch(async (error) => {
             if (!isEventIdUniqueConstraintError(error)) {

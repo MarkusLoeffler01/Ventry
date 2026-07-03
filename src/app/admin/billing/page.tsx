@@ -14,7 +14,7 @@ import Chip from "@mui/material/Chip";
 import { AttachMoney, TrendingUp, Cancel, HourglassEmpty } from "@mui/icons-material";
 import StatCard from "@/components/admin/StatCard/StatCard";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter } from "@/lib/auth/admin";
 import { redirect } from "next/navigation";
 
 const fmt = (amount: number) =>
@@ -27,14 +27,19 @@ const statusColor: Record<string, "success" | "warning" | "error" | "default"> =
     REFUNDED: "default",
 };
 
-async function getBillingData() {
+export async function getBillingData(adminId: string, orgScope?: string) {
+    const eventFilter = await adminEventFilter(adminId, orgScope);
+    const paymentEventFilter = { registration: { event: eventFilter } };
+
     const [byStatus, recentPayments, revenueByEvent] = await Promise.all([
         prisma.payment.groupBy({
             by: ["paymentStatus"],
+            where: paymentEventFilter,
             _sum: { amount: true },
             _count: { _all: true },
         }),
         prisma.payment.findMany({
+            where: paymentEventFilter,
             orderBy: { createdAt: "desc" },
             take: 20,
             include: {
@@ -44,7 +49,7 @@ async function getBillingData() {
         }),
         prisma.payment.groupBy({
             by: ["registrationId"],
-            where: { paymentStatus: "COMPLETED" },
+            where: { paymentStatus: "COMPLETED", ...paymentEventFilter },
             _sum: { amount: true },
         }),
     ]);
@@ -65,8 +70,8 @@ async function getBillingData() {
     return { completed, pending, failed, refunded, stripeFees, netRevenue, recentPayments, revenueByEvent };
 }
 
-async function BillingContent() {
-    const data = await getBillingData();
+async function BillingContent({ adminId, orgScope }: { adminId: string; orgScope?: string }) {
+    const data = await getBillingData(adminId, orgScope);
 
     return (
         <>
@@ -186,9 +191,14 @@ async function BillingContent() {
     );
 }
 
-export default async function AdminBillingPage() {
+type Props = { searchParams: Promise<{ orgFilter?: string }> };
+
+export default async function AdminBillingPage({ searchParams }: Props) {
     const auth = await checkAdminAuth();
     if (!auth.authorized) redirect("/login");
+    if (!auth.adminId) redirect("/unauthorized");
+
+    const { orgFilter } = await searchParams;
 
     return (
         <Box>
@@ -204,7 +214,7 @@ export default async function AdminBillingPage() {
                         </Grid>
                     ))}
                 >
-                    <BillingContent />
+                    <BillingContent adminId={auth.adminId} orgScope={orgFilter} />
                 </Suspense>
             </Grid>
         </Box>

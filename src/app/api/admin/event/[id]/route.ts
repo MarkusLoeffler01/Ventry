@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
 import type { Prisma } from "@/generated/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { forbiddenResponse } from "@/lib/auth/admin";
+import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { adminUpdateEventSchema } from "@/types/schemas/event/admin";
 import { z } from "zod";
 
@@ -11,13 +12,13 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const authResult = await checkAdminAuth();
+        const id = Number((await params).id);
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+        const authResult = await checkEventAdminAuth(id);
         if (!authResult.authorized) {
             return forbiddenResponse(authResult.error);
         }
-
-        const id = Number((await params).id);
-        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const event = await prisma.event.findUnique({
             where: { id },
@@ -47,13 +48,13 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const authResult = await checkAdminAuth();
+        const id = Number((await params).id);
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+        const authResult = await checkEventAdminAuth(id);
         if (!authResult.authorized) {
             return forbiddenResponse(authResult.error);
         }
-
-        const id = Number((await params).id);
-        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         const body = await req.json();
         const validatedData = adminUpdateEventSchema.parse(body);
@@ -117,13 +118,13 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const authResult = await checkAdminAuth();
+        const id = Number((await params).id);
+        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+        const authResult = await checkEventAdminAuth(id);
         if (!authResult.authorized) {
             return forbiddenResponse(authResult.error);
         }
-
-        const id = Number((await params).id);
-        if (Number.isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         // Check if event has registrations
         const registrationCount = await prisma.registration.count({

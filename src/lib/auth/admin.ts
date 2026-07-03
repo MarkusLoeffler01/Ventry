@@ -148,6 +148,43 @@ export async function checkEventAdminAuth(
   }
 }
 
+/**
+ * Returns a Prisma `where` filter that matches events accessible to the given admin.
+ *
+ * orgScope:
+ *   undefined / "all" — personal + all org events (default)
+ *   "personal"        — only directly owned events
+ *   <orgId>           — only events for that org (if admin is a member)
+ */
+export async function adminEventFilter(adminId: string, orgScope?: string) {
+  if (orgScope === "personal") {
+    return { ownerId: adminId };
+  }
+
+  if (orgScope && orgScope !== "all") {
+    const membership = await prisma.adminOrganizationMembership.findFirst({
+      where: { adminId, organizationId: orgScope },
+      select: { organizationId: true },
+    });
+    if (membership) {
+      return { organizationId: orgScope };
+    }
+    // Invalid org or not a member — fall through to "all"
+  }
+
+  const memberships = await prisma.adminOrganizationMembership.findMany({
+    where: { adminId },
+    select: { organizationId: true },
+  });
+  const orgIds = memberships.map((m) => m.organizationId);
+  return {
+    OR: [
+      { ownerId: adminId },
+      ...(orgIds.length > 0 ? [{ organizationId: { in: orgIds } }] : []),
+    ],
+  };
+}
+
 export function unauthorizedResponse(message = "Unauthorized") {
   return NextResponse.json({ error: message }, { status: 401 });
 }

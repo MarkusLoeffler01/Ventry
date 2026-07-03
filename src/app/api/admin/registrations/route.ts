@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter, forbiddenResponse } from "@/lib/auth/admin";
 import type { RegistrationStatus } from "@/generated/prisma";
 import { rethrowIfExpectedPrerenderInterruption } from "@/lib/next/prerender";
 
@@ -16,8 +16,15 @@ export async function GET(req: NextRequest) {
         const eventId = url.searchParams.get("eventId");
         const status = url.searchParams.get("status");
 
+        if (!authResult.adminId) {
+            return NextResponse.json({ error: "Admin profile incomplete" }, { status: 403 });
+        }
+
+        const eventFilter = await adminEventFilter(authResult.adminId);
+
         const registrations = await prisma.registration.findMany({
             where: {
+                event: eventFilter,
                 ...(eventId && { eventId: Number(eventId) }),
                 ...(status && { status: status as RegistrationStatus }),
             },

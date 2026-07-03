@@ -216,9 +216,13 @@ describe("POST /api/admin/organizations/[id]/invitations", () => {
         id: USER_ID, email: "a@b.com", isAdmin: true,
         adminProfile: { id: ADMIN_ID, type: AdminType.ORGANIZATION, organizationMemberships: [] },
       })
-      .mockResolvedValueOnce({ adminProfile: null }); // invitee has no admin profile yet
+      .mockResolvedValueOnce({ id: "user-invited", isAdmin: true, adminProfile: { id: "admin-invited" } }); // invitee is existing admin
 
-    p.adminOrganization.findUnique.mockResolvedValue({ ownerId: ADMIN_ID });
+    p.adminOrganization.findUnique.mockResolvedValue({
+      name: "Test Org",
+      ownerId: ADMIN_ID,
+      owner: { user: { name: "Owner Name" } },
+    });
     p.adminOrganizationMembership.findFirst.mockResolvedValue(null);
     p.adminInvitation.findFirst.mockResolvedValue(null);
     p.adminInvitation.create.mockResolvedValue({ id: "inv-1", token: "tok-abc" });
@@ -256,36 +260,33 @@ describe("POST /api/admin/organizations/[id]/invitations", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Accept invitation — auto-creates admin profile if user not yet admin
+// Accept invitation — requires existing admin account
 // ---------------------------------------------------------------------------
 describe("POST /api/admin/organizations/[id]/invitations/[token]/accept", () => {
-  it("accepting creates membership and sets isAdmin", async () => {
-    getSessionMock.mockResolvedValue({ user: { id: "user-new" } });
+  it("accepting creates membership for existing admin user", async () => {
+    getSessionMock.mockResolvedValue({ user: { id: "user-admin" } });
     p.adminInvitation.findUnique.mockResolvedValue({
       id: "inv-1",
       organizationId: ORG_ID,
-      invitedEmail: "new@example.com",
+      invitedEmail: "admin@example.com",
       permissions: [AdminOrgPermission.COMMUNITY],
       status: AdminInvitationStatus.PENDING,
       expiresAt: new Date(Date.now() + 86_400_000),
     });
     p.user.findUnique.mockResolvedValue({
-      email: "new@example.com",
-      isAdmin: false,
-      adminProfile: null,
+      email: "admin@example.com",
+      isAdmin: true,
+      adminProfile: { id: "admin-existing" },
     });
-    p.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      const newAdmin = { id: "admin-new" };
-      return fn({
-        user: { update: vi.fn() },
-        admin: { create: vi.fn().mockResolvedValue(newAdmin) },
+    p.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
         adminOrganizationMembership: {
           findUnique: vi.fn().mockResolvedValue(null),
           create: vi.fn(),
         },
         adminInvitation: { update: vi.fn() },
-      });
-    });
+      }),
+    );
 
     const res = await acceptInvitation(
       new NextRequest("http://localhost/", { method: "POST" }),

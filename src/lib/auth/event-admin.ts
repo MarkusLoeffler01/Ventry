@@ -1,61 +1,20 @@
-import { checkAdminAuth } from "@/lib/auth/admin";
-import { prisma } from "@/lib/prisma/prisma";
+import {
+  checkEventAdminAuth as _checkEventAdminAuth,
+  type EventAdminAuthResult,
+} from "@/lib/auth/admin";
+import type { AdminOrgPermission } from "@/generated/prisma";
 
-type EventAdminAuthResult = {
-  authorized: boolean;
-  error?: string;
-  adminId?: string;
-  event?: {
-    id: number;
-    name: string;
-  };
-  user?: {
-    id: string;
-    email: string;
-  };
-};
+export type { EventAdminAuthResult };
 
 /**
- * Authorizes admin users for a specific event.
- * If an event has an owner, only that owner can manage event-specific admin data.
+ * Thin wrapper around admin.ts checkEventAdminAuth that preserves the original
+ * (eventId, requestHeaders, requiredPermission?) call signature used by all
+ * event-scoped API routes.
  */
 export async function checkEventAdminAuth(
   eventId: number,
   requestHeaders?: Headers,
+  requiredPermission?: AdminOrgPermission,
 ): Promise<EventAdminAuthResult> {
-  const adminAuth = await checkAdminAuth(requestHeaders);
-  if (!adminAuth.authorized) {
-    return { authorized: false, error: adminAuth.error || "Admin access required" };
-  }
-
-  if (!adminAuth.adminId) {
-    return { authorized: false, error: "Admin profile is missing" };
-  }
-
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: {
-      id: true,
-      name: true,
-      ownerId: true,
-    },
-  });
-
-  if (!event) {
-    return { authorized: false, error: "Event not found" };
-  }
-
-  if (event.ownerId && event.ownerId !== adminAuth.adminId) {
-    return { authorized: false, error: "Only this event's admin can manage this event" };
-  }
-
-  return {
-    authorized: true,
-    adminId: adminAuth.adminId,
-    user: adminAuth.user,
-    event: {
-      id: event.id,
-      name: event.name,
-    },
-  };
+  return _checkEventAdminAuth(eventId, requiredPermission, requestHeaders);
 }
