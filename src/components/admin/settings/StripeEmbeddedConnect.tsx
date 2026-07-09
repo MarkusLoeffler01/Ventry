@@ -15,9 +15,10 @@ import { Box, Button, CircularProgress, Alert, Typography, Tabs, Tab } from '@mu
 
 interface StripeEmbeddedConnectProps {
   isConnected: boolean;
+  supportEmail?: string;
 }
 
-export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedConnectProps) {
+export default function StripeEmbeddedConnect({ isConnected, supportEmail }: StripeEmbeddedConnectProps) {
   const [stripeConnectInstance, setStripeConnectInstance] = useState<StripeConnectInstance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,14 +70,33 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
     window.location.reload();
   };
 
+  const payoutNotice = (
+    <Alert severity="info" sx={{ mb: 2 }}>
+      This is your Stripe payout account, where event revenue is deposited directly by Stripe.
+      It is separate from the{" "}
+      <Box component="a" href="/admin/billing" sx={{ color: 'inherit', fontWeight: 'bold' }}>
+        Ventry billing page
+      </Box>
+      , which tracks platform fees and invoices. If the two ever disagree, please contact{" "}
+      {supportEmail ? (
+        <Box component="a" href={`mailto:${supportEmail}`} sx={{ color: 'inherit', fontWeight: 'bold' }}>
+          {supportEmail}
+        </Box>
+      ) : (
+        "support"
+      )}.
+    </Alert>
+  );
+
   if (stripeConnectInstance) {
     return (
       <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
         {isConnected ? (
           <Box>
+            {payoutNotice}
             <ConnectNotificationBanner />
-            
-            <Tabs 
+
+            <Tabs
               value={dashboardTab} 
               onChange={(_, v) => setDashboardTab(v)} 
               sx={{ borderBottom: 1, borderColor: 'divider', mb: 3, mt: 2 }}
@@ -130,6 +150,8 @@ export default function StripeEmbeddedConnect({ isConnected }: StripeEmbeddedCon
 
   return (
     <Box>
+      {payoutNotice}
+
       {isConnected ? (
         <Alert severity="success" sx={{ mb: 2 }}>
           <Typography variant="body1" fontWeight="bold">

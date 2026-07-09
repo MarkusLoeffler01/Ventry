@@ -127,12 +127,14 @@ export default function LoginPageClient() {
     }
   }, []);
 
+  const newUserCallbackURL = `/complete-profile?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+
   const handleGoogleSignIn = async () => {
-    await authClient.signIn.social({ provider: "google", callbackURL: callbackUrl });
+    await authClient.signIn.social({ provider: "google", callbackURL: callbackUrl, newUserCallbackURL });
   };
 
   const handleGitHubSignIn = async () => {
-    await authClient.signIn.social({ provider: "github", callbackURL: callbackUrl });
+    await authClient.signIn.social({ provider: "github", callbackURL: callbackUrl, newUserCallbackURL });
   };
 
   const handleLinkingLogin = async (e: React.FormEvent) => {

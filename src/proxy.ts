@@ -14,6 +14,12 @@ export async function proxy(req: NextRequest) {
     const res = NextResponse.next();
     const pathname = req.nextUrl.pathname;
 
+    // Block navigation anywhere until the profile-completion step is done
+    // (covers SSO signups that skip RegisterWizard, and any pre-existing
+    // incomplete account).
+    const profileCheck = await mws.profileCompletion.middleware(req);
+    if (profileCheck && profileCheck.status !== 200) return profileCheck;
+
     // Apply specific route middlewares
     for(const { pattern, mw } of routes) {
         if(pattern.test(req.nextUrl)) {
@@ -47,7 +53,10 @@ export const config = {
         "/admin",
         "/admin/:path*",
         // Match all API routes (we filter out auth and user routes in the middleware function)
-        "/api/:path*"
+        "/api/:path*",
+        // Match all page routes (excluding static assets and files) so the
+        // profile-completion gate runs on every navigation.
+        "/((?!api|_next/static|_next/image|.*\\..*).*)",
     ]
 }
 
