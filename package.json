@@ -71,6 +71,7 @@
     "next": "16.2.9",
     "nodemailer": "^8.0.7",
     "pg": "^8.20.0",
+    "qr.js": "^0.0.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "react-easy-crop": "^5.5.6",
