@@ -24,6 +24,12 @@ vi.mock("@/lib/community/server", () => ({
   softDeletePost: vi.fn(),
 }));
 
+const createNotificationMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/notifications", () => ({
+  createNotification: createNotificationMock,
+}));
+
 import * as moderateRoute from "./route";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { softDeletePost } from "@/lib/community/server";
@@ -47,6 +53,10 @@ function activePost(overrides: Record<string, unknown> = {}) {
   return {
     id: "post-abc",
     eventId: 7,
+    authorId: "post-author",
+    type: "TEXT",
+    content: "Pending post",
+    author: { name: "Post Author" },
     status: "PENDING",
     pinned: false,
     ...overrides,
@@ -64,6 +74,7 @@ function authorizedAdmin() {
 describe("POST /api/community/posts/[postId]/moderate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createNotificationMock.mockResolvedValue({});
     mockedCheckEventAdminAuth.mockResolvedValue(authorizedAdmin());
     mockedFindPost.mockResolvedValue(activePost());
     mockedUpdatePost.mockReturnValue({ query: "update-post" });
@@ -164,6 +175,13 @@ describe("POST /api/community/posts/[postId]/moderate", () => {
     });
     expect(mockedTransaction).toHaveBeenCalledWith(expect.arrayContaining([expect.anything(), expect.anything()]));
     expect(mockedSoftDeletePost).not.toHaveBeenCalled();
+    expect(createNotificationMock).toHaveBeenCalledWith(
+      "post-author",
+      "COMMUNITY",
+      "Your post was approved",
+      undefined,
+      "/events/7#post-post-abc",
+    );
   });
 
   it("rejects post and logs reason atomically", async () => {

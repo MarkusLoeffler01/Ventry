@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { PostStatus } from "@/generated/prisma";
+import { NotificationType, PostStatus } from "@/generated/prisma";
 import {
   CommunityError,
   assertCanWriteInCommunity,
@@ -7,9 +7,11 @@ import {
   communityCommentInclude,
   loadCommunityActor,
   loadCommunityEvent,
+  refreshCommunityCommentsProfilePictures,
   serializeCommunityComment,
 } from "@/lib/community/server";
 import { getSession } from "@/lib/auth/session";
+import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma/prisma";
 import { createCommunityCommentSchema, listCommunityCommentsSchema } from "@/types/schemas/community";
 
@@ -26,6 +28,10 @@ function parseMentionNames(content: string | null | undefined): string[] {
   if (!content) return [];
   const matches = content.match(/@(\S+)/g) ?? [];
   return matches.map(m => m.slice(1).replace(/_/g, " "));
+}
+
+function buildCommentLink(eventId: number, postId: string, commentId: string) {
+  return `/events/${eventId}#post-${postId}-comment-${commentId}`;
 }
 
 async function buildMentionedUsersMap(userIds: string[]): Promise<Map<string, { id: string; name: string }>> {
@@ -77,6 +83,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
 
     const allMentionedIds = [...new Set(page.flatMap(c => c.mentionedUserIds))];
     const mentionedUsersById = await buildMentionedUsersMap(allMentionedIds);
+    await refreshCommunityCommentsProfilePictures(page);
 
     return NextResponse.json(
       {
@@ -107,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
 
     const post = await prisma.communityPost.findUnique({
       where: { id: postId },
-      select: { id: true, eventId: true, status: true },
+      select: { id: true, eventId: true, status: true, authorId: true },
     });
 
     if (!post || post.status === PostStatus.DELETED) {
@@ -149,6 +156,74 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
     });
 
     const mentionedUsersById = await buildMentionedUsersMap(mentionedUserIds);
+    await refreshCommunityCommentsProfilePictures([comment]);
+
+    if (comment.status === PostStatus.APPROVED) {
+      const commenterName = await prisma.user
+        .findUnique({ where: { id: actor.id }, select: { name: true } })
+        .then((u) => u?.name ?? "Someone");
+      const commentUrl = buildCommentLink(post.eventId, postId, comment.id);
+      const notifiedUserIds = new Set<string>();
+
+      if (post.authorId !== actor.id) {
+        notifiedUserIds.add(post.authorId);
+        createNotification(
+          post.authorId,
+          NotificationType.COMMENT,
+          `${commenterName} commented on your post`,
+          undefined,
+          commentUrl,
+        ).catch(() => null);
+      }
+
+      const possibleReplyTargetIds = [...new Set(mentionedUserIds)].filter(
+        userId => userId !== actor.id && !notifiedUserIds.has(userId),
+      );
+
+      if (possibleReplyTargetIds.length > 0) {
+        const replyTargets = await prisma.communityComment.findMany({
+          where: {
+            postId,
+            authorId: { in: possibleReplyTargetIds },
+            id: { not: comment.id },
+            status: PostStatus.APPROVED,
+            deletedAt: null,
+          },
+          select: { authorId: true },
+          distinct: ["authorId"],
+        });
+
+        await Promise.allSettled(
+          replyTargets.map((target) => {
+            notifiedUserIds.add(target.authorId);
+            return createNotification(
+              target.authorId,
+              NotificationType.COMMENT,
+              `${commenterName} replied to your comment`,
+              undefined,
+              commentUrl,
+            );
+          }),
+        );
+
+        const replyTargetIds = new Set(replyTargets.map(target => target.authorId));
+        const mentionOnlyTargetIds = possibleReplyTargetIds.filter(
+          userId => !replyTargetIds.has(userId),
+        );
+
+        await Promise.allSettled(
+          mentionOnlyTargetIds.map(userId =>
+            createNotification(
+              userId,
+              NotificationType.COMMENT,
+              `${commenterName} mentioned you in a comment`,
+              undefined,
+              commentUrl,
+            ),
+          ),
+        );
+      }
+    }
 
     return NextResponse.json(
       {

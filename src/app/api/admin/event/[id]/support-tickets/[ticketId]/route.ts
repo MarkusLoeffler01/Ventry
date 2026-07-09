@@ -1,13 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
-import { SupportTicketStatus } from "@/generated/prisma";
+import { NotificationType, SupportTicketStatus } from "@/generated/prisma";
 import { forbiddenResponse } from "@/lib/auth/admin";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { prisma } from "@/lib/prisma/prisma";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import { sendMail } from "@/lib/mail";
 import SupportTicketStatusMail from "@/components/emails/SupportTicketStatusMail";
+import { createNotification } from "@/lib/notifications";
 
 const updateSupportTicketSchema = z
   .object({
@@ -63,7 +64,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
     }
 
-    const authResult = await checkEventAdminAuth(eventId, req.headers);
+    const authResult = await checkEventAdminAuth(eventId, req.headers, "SUPPORT_TICKETS");
     if (!authResult.authorized) {
       if (authResult.error === "Event not found") {
         return NextResponse.json({ error: authResult.error }, { status: 404 });
@@ -145,6 +146,20 @@ export async function PATCH(
         );
       } catch (mailError) {
         console.error("Failed to send support ticket update email:", mailError);
+      }
+
+      try {
+        await createNotification(
+          updated.user.id,
+          NotificationType.EVENT,
+          `Support ticket updated: ${existing.event.name}`,
+          statusChanged
+            ? `Status changed from ${existing.status} to ${updated.status}`
+            : "An organizer replied to your support ticket",
+          `/events/${existing.event.id}`,
+        );
+      } catch (notificationError) {
+        console.error("Failed to create support ticket update notification:", notificationError);
       }
     }
 

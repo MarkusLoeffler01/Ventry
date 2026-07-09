@@ -1,4 +1,5 @@
-FROM node:25-alpine AS base
+FROM node:24-alpine AS base
+
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
@@ -24,8 +25,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV DATABASE_URL="prisma+postgres://dummy:dummy@dummy/dummy?api_key=dummy"
-RUN npx prisma generate && npm run build
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost/dummy"
+ENV BETTER_AUTH_SECRET="build-placeholder"
+RUN npx prisma generate && npm run build:docker
 
 FROM base AS runner
 WORKDIR /app

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Divider, Paper, Stack, Typography } from "@mui/material";
 import { Settings } from "@mui/icons-material";
 import NextLink from "next/link";
@@ -65,7 +65,7 @@ export default function CommunitySection({
     return null;
   }, [communityOpenAfterEnd, currentUserId, eventEnded]);
 
-  const loadPosts = async (cursor?: string | null) => {
+  const loadPosts = useCallback(async (cursor?: string | null) => {
     cursor ? setLoadingMore(true) : setLoading(true);
     setError(null);
 
@@ -97,12 +97,11 @@ export default function CommunitySection({
     } finally {
       cursor ? setLoadingMore(false) : setLoading(false);
     }
-  };
+  }, [eventId]);
 
   useEffect(() => {
     void loadPosts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, [loadPosts]);
 
   const handlePostCreated = (post: CommunityPostView, pending: boolean) => {
     if (!pending) {
@@ -287,7 +286,6 @@ export default function CommunitySection({
                 deleteDisabled={!currentUserId || actionPostId === post.id}
                 moderateDisabled={Boolean(moderatingPostId)}
                 reactionDisabled={!currentUserId || Boolean(composerDisabledReason)}
-                currentUserId={currentUserId}
                 composerDisabled={Boolean(composerDisabledReason)}
                 onDelete={handleDelete}
                 onModerate={canModerate ? handleModerate : undefined}

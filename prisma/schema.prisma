@@ -60,24 +60,80 @@ model User {
   communityComments    CommunityComment[]
   postReactions        PostReaction[]
   postModerationLogs   PostModerationLog[] @relation("UserPostModerationLogs")
+  notifications        Notification[]
 
   @@map("user")
 }
 
 model Admin {
-  id                   String                @id @default(cuid())
-  userId               String                @unique
-  stripeConnectId      String?
-  notes                String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  checkedInRegistrations Registration[]      @relation("RegistrationCheckedInByAdmin")
-  checkInLogs          RegistrationCheckInLog[]
-  eventsOwned          Event[]
-  history              RegistrationHistory[]
-  supportTicketUpdates SupportTicket[]       @relation("AdminSupportTicketUpdates")
-  postModerationLogs   PostModerationLog[]   @relation("AdminPostModerationLogs")
+  id                      String                        @id @default(cuid())
+  userId                  String                        @unique
+  type                    AdminType                     @default(INDIVIDUAL)
+  stripeConnectId         String?
+  notes                   String?
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  user                    User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkedInRegistrations  Registration[]                @relation("RegistrationCheckedInByAdmin")
+  checkInLogs             RegistrationCheckInLog[]
+  eventsOwned             Event[]
+  history                 RegistrationHistory[]
+  supportTicketUpdates    SupportTicket[]               @relation("AdminSupportTicketUpdates")
+  postModerationLogs      PostModerationLog[]           @relation("AdminPostModerationLogs")
+  organizationsOwned      AdminOrganization[]           @relation("OwnedOrganizations")
+  organizationMemberships AdminOrganizationMembership[]
+  sentInvitations         AdminInvitation[]             @relation("SentInvitations")
+  receivedInvitations     AdminInvitation[]             @relation("ReceivedInvitations")
+}
+
+model AdminOrganization {
+  id          String                        @id @default(cuid())
+  name        String
+  slug        String                        @unique
+  description String?
+  logoUrl     String?
+  ownerId     String
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+  owner       Admin                         @relation("OwnedOrganizations", fields: [ownerId], references: [id])
+  members     AdminOrganizationMembership[]
+  events      Event[]                       @relation("OrgEvents")
+  invitations AdminInvitation[]
+}
+
+model AdminOrganizationMembership {
+  id             String               @id @default(cuid())
+  adminId        String
+  organizationId String
+  permissions    AdminOrgPermission[]
+  joinedAt       DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  admin          Admin                @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  organization   AdminOrganization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, organizationId])
+  @@index([organizationId])
+}
+
+model AdminInvitation {
+  id               String                @id @default(cuid())
+  organizationId   String
+  invitedEmail     String
+  invitedAdminId   String?
+  invitedByAdminId String
+  permissions      AdminOrgPermission[]
+  status           AdminInvitationStatus @default(PENDING)
+  token            String                @unique @default(cuid())
+  expiresAt        DateTime
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  organization     AdminOrganization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedAdmin     Admin?                @relation("ReceivedInvitations", fields: [invitedAdminId], references: [id])
+  invitedByAdmin   Admin                 @relation("SentInvitations", fields: [invitedByAdminId], references: [id])
+
+  @@index([organizationId])
+  @@index([token])
+  @@index([invitedEmail])
 }
 
 model Account {
@@ -147,13 +203,16 @@ model Event {
   requiresHotel       Boolean         @default(false)
   requireApproval     Boolean         @default(false)
   scanOnce            Boolean         @default(false)
+  organizationId      String?
   communityEnabled    Boolean         @default(false)
   communityOpenAfterEnd Boolean       @default(true)
   communityModerated  Boolean         @default(true)
   communityModerateComments Boolean   @default(false)
   communityAttendeesOnly Boolean      @default(true)
+  lastDigestSentAt    DateTime?
   badgeTemplates      BadgeTemplate[]
   owner               Admin?          @relation(fields: [ownerId], references: [id])
+  organization        AdminOrganization? @relation("OrgEvents", fields: [organizationId], references: [id])
   checkInLogs         RegistrationCheckInLog[]
   location            Location?
   products            Product[]
@@ -288,6 +347,7 @@ model Registration {
   checkedInAt       DateTime?
   checkedInByAdminId String?
   checkInCount      Int                   @default(0)
+  communityNotifications Boolean          @default(true)
   payments          Payment[]
   checkInLogs       RegistrationCheckInLog[]
   checkedInBy       Admin?                @relation("RegistrationCheckedInByAdmin", fields: [checkedInByAdminId], references: [id])
@@ -531,4 +591,44 @@ enum ModerationAction {
   DELETED
   PINNED
   UNPINNED
+}
+
+enum AdminType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+enum AdminOrgPermission {
+  COMMUNITY
+  SUPPORT_TICKETS
+  EVENT_APPROVAL
+  STRIPE_FINANCES
+}
+
+enum AdminInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum NotificationType {
+  COMMENT
+  EVENT
+  COMMUNITY
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
 }

@@ -87,6 +87,7 @@ interface User {
 
 interface ProfilePageClientProps {
   user: User;
+  isOrganization?: boolean;
 }
 
 interface ProfileFormData {
@@ -132,7 +133,7 @@ const sectionSx = {
   bgcolor: 'background.paper',
 };
 
-export default function ProfilePageClient({ user }: ProfilePageClientProps) {
+export default function ProfilePageClient({ user, isOrganization = false }: ProfilePageClientProps) {
   const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
@@ -410,10 +411,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                 <Badge color="action" sx={{ flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="subtitle1" fontWeight={700}>
-                    Check-in Identity
+                    {isOrganization ? "Organization Details" : "Check-in Identity"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Legal name and address for on-site verification.
+                    {isOrganization
+                      ? "Legal name and address of your organization."
+                      : "Legal name and address for on-site verification."}
                   </Typography>
                 </Box>
                 <Chip
@@ -502,56 +505,60 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             multiline
             rows={4}
             fullWidth
-            placeholder="Tell us about yourself..."
+            placeholder={isOrganization ? "Tell us about your organization..." : "Tell us about yourself..."}
             inputProps={{ maxLength: 500 }}
             helperText={`${formData.bio.length}/500 characters`}
           />
 
-          <TextField
-            label="Date of Birth"
-            type="date"
-            value={formData.dateOfBirth}
-            onChange={handleInputChange('dateOfBirth')}
-            fullWidth
-            helperText="Your age will only be shown if you enable it in privacy settings"
-            InputLabelProps={{ shrink: true }}
-          />
-
-          {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip
-                label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
-                color={formData.showAge ? 'primary' : 'default'}
-                icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+          {!isOrganization && (
+            <>
+              <TextField
+                label="Date of Birth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={handleInputChange('dateOfBirth')}
+                fullWidth
+                helperText="Your age will only be shown if you enable it in privacy settings"
+                InputLabelProps={{ shrink: true }}
               />
-              <Typography variant="body2" color="text.secondary">
-                {formData.showAge ? 'Visible to others' : 'Hidden from others'}
-              </Typography>
-            </Box>
-          )}
 
-          <TextField
-            label="Pronouns"
-            value={formData.pronouns}
-            onChange={handleInputChange('pronouns')}
-            select
-            fullWidth
-            helperText="Help others know how to refer to you"
-          >
-            {PRONOUN_OPTIONS.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            ))}
-          </TextField>
-          {formData.pronouns === "choose my own pronouns" && (
-            <TextField
-              label="Custom Pronouns"
-              type="text"
-              value={formData.customPronouns}
-              onChange={handleInputChange('customPronouns')}
-              fullWidth
-            />
+              {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Chip
+                    label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
+                    color={formData.showAge ? 'primary' : 'default'}
+                    icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {formData.showAge ? 'Visible to others' : 'Hidden from others'}
+                  </Typography>
+                </Box>
+              )}
+
+              <TextField
+                label="Pronouns"
+                value={formData.pronouns}
+                onChange={handleInputChange('pronouns')}
+                select
+                fullWidth
+                helperText="Help others know how to refer to you"
+              >
+                {PRONOUN_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {formData.pronouns === "choose my own pronouns" && (
+                <TextField
+                  label="Custom Pronouns"
+                  type="text"
+                  value={formData.customPronouns}
+                  onChange={handleInputChange('customPronouns')}
+                  fullWidth
+                />
+              )}
+            </>
           )}
         </Stack>
       </Box>
@@ -621,63 +628,67 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Stack>
       </Box>
 
-      <Box sx={sectionSx}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 2 }}>
-          <Box>
-            <Typography variant="h5" fontWeight={700}>
-              Privacy Settings
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Control what appears on your public profile.
-            </Typography>
-          </Box>
-          <Chip
-            icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
-            label={formData.showAge ? 'Age visible' : 'Age hidden'}
-            color={formData.showAge ? 'primary' : 'default'}
-            size="small"
-          />
-        </Stack>
-
-        <Stack spacing={2}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={formData.showAge}
-                onChange={(e) => setFormData(prev => ({ ...prev, showAge: e.target.checked }))}
-              />
-            }
-            label="Show my age publicly"
-          />
-          <Typography variant="body2" color="text.secondary">
-            When enabled, your age will be visible to other users.
-          </Typography>
-
-          {formData.showAge && (
-            <>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.showExactBirthdate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, showExactBirthdate: e.target.checked }))}
-                  />
-                }
-                label="Show exact birth date (not just age)"
-              />
-              <Typography variant="body2" color="text.secondary">
-                When enabled, your exact birth date is shown in addition to your age.
+      {!isOrganization && (
+        <Box sx={sectionSx}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 2 }}>
+            <Box>
+              <Typography variant="h5" fontWeight={700}>
+                Privacy Settings
               </Typography>
-            </>
-          )}
-        </Stack>
-      </Box>
+              <Typography variant="body2" color="text.secondary">
+                Control what appears on your public profile.
+              </Typography>
+            </Box>
+            <Chip
+              icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+              label={formData.showAge ? 'Age visible' : 'Age hidden'}
+              color={formData.showAge ? 'primary' : 'default'}
+              size="small"
+            />
+          </Stack>
 
-      <Box sx={sectionSx}>
-        <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
-          My Registrations
-        </Typography>
-        <MyRegistrations userId={user.id} />
-      </Box>
+          <Stack spacing={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.showAge}
+                  onChange={(e) => setFormData(prev => ({ ...prev, showAge: e.target.checked }))}
+                />
+              }
+              label="Show my age publicly"
+            />
+            <Typography variant="body2" color="text.secondary">
+              When enabled, your age will be visible to other users.
+            </Typography>
+
+            {formData.showAge && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.showExactBirthdate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, showExactBirthdate: e.target.checked }))}
+                    />
+                  }
+                  label="Show exact birth date (not just age)"
+                />
+                <Typography variant="body2" color="text.secondary">
+                  When enabled, your exact birth date is shown in addition to your age.
+                </Typography>
+              </>
+            )}
+          </Stack>
+        </Box>
+      )}
+
+      {!isOrganization && (
+        <Box sx={sectionSx}>
+          <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
+            My Registrations
+          </Typography>
+          <MyRegistrations userId={user.id} />
+        </Box>
+      )}
 
       <Box>
         <LinkedAccounts

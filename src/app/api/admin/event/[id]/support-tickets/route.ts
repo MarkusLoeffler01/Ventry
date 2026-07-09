@@ -47,7 +47,7 @@ export async function GET(
       return NextResponse.json({ error: "Invalid event id" }, { status: 400 });
     }
 
-    const authResult = await checkEventAdminAuth(eventId, req.headers);
+    const authResult = await checkEventAdminAuth(eventId, req.headers, "SUPPORT_TICKETS");
     if (!authResult.authorized) {
       if (authResult.error === "Event not found") {
         return NextResponse.json({ error: authResult.error }, { status: 404 });

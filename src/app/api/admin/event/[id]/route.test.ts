@@ -22,7 +22,6 @@ vi.mock("@/lib/prisma/prisma", () => ({
 }));
 
 vi.mock("@/lib/auth/admin", () => ({
-    checkAdminAuth: vi.fn(),
     forbiddenResponse: vi.fn((error?: string) =>
         new Response(JSON.stringify({ error: error ?? "Forbidden" }), {
             status: 403,
@@ -33,12 +32,17 @@ vi.mock("@/lib/auth/admin", () => ({
     )
 }));
 
+vi.mock("@/lib/auth/event-admin", () => ({
+    checkEventAdminAuth: vi.fn()
+}));
+
 import * as adminRoute from "@/app/api/admin/event/[id]/route";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { forbiddenResponse } from "@/lib/auth/admin";
+import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { adminUpdateEventSchema } from "@/types/schemas/event/admin";
 
-const mockedCheckAdminAuth = checkAdminAuth as unknown as ReturnType<typeof vi.fn>;
+const mockedCheckEventAdminAuth = checkEventAdminAuth as unknown as ReturnType<typeof vi.fn>;
 const mockedForbiddenResponse = forbiddenResponse as unknown as ReturnType<typeof vi.fn>;
 const mockedFindUnique = prisma.event.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockedUpdate = prisma.event.update as unknown as ReturnType<typeof vi.fn>;
@@ -65,12 +69,12 @@ function deleteRequest(url: string) {
 describe("App Router: /api/admin/event/[id]", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockedCheckAdminAuth.mockResolvedValue({ authorized: true });
+        mockedCheckEventAdminAuth.mockResolvedValue({ authorized: true });
     });
 
     describe("GET", () => {
         it("returns 403 for unauthorized admins", async () => {
-            mockedCheckAdminAuth.mockResolvedValue({ authorized: false, error: "Forbidden" });
+            mockedCheckEventAdminAuth.mockResolvedValue({ authorized: false, error: "Forbidden" });
 
             const response = await adminRoute.GET(
                 getRequest("http://localhost/api/admin/event/7"),

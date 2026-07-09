@@ -78,7 +78,8 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
       showAge: true,
       showExactBirthdate: true,
       socialLinks: true,
-      pronouns: true
+      pronouns: true,
+      adminProfile: { select: { type: true } },
     }
   });
 
@@ -87,20 +88,21 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
   }
 
   const validatedPictures = await refreshSignedUrls(user.profilePictures as ProfilePicture[]);
-  const age = user.dateOfBirth ? calculateAge(user.dateOfBirth) : null;
+  const isOrganization = user.adminProfile?.type === "ORGANIZATION";
+  const age = !isOrganization && user.dateOfBirth ? calculateAge(user.dateOfBirth) : null;
   const socialLinks = user.socialLinks as SocialLinks | null;
 
-  const hasContent = user.bio || user.dateOfBirth || user.pronouns || validatedPictures.length > 1;
+  const hasContent = user.bio || (!isOrganization && (user.dateOfBirth || user.pronouns)) || validatedPictures.length > 1;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ overflow: 'hidden', mb: 3 }}>
         <ProfileHeader
           name={user.name}
-          pronouns={user.pronouns}
+          pronouns={isOrganization ? null : user.pronouns}
           profilePictures={validatedPictures}
           age={age}
-          showAge={user.showAge}
+          showAge={!isOrganization && user.showAge}
           country={user.country}
           socialLinks={socialLinks}
         />
@@ -114,13 +116,15 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
 
             {user.bio && <ProfileBio bio={user.bio} />}
 
-            <PersonalInfo
-              dateOfBirth={user.dateOfBirth}
-              showAge={user.showAge}
-              showExactBirthdate={user.showExactBirthdate}
-              pronouns={user.pronouns}
-              age={age}
-            />
+            {!isOrganization && (
+              <PersonalInfo
+                dateOfBirth={user.dateOfBirth}
+                showAge={user.showAge}
+                showExactBirthdate={user.showExactBirthdate}
+                pronouns={user.pronouns}
+                age={age}
+              />
+            )}
           </Stack>
         </CardContent>
       </Paper>

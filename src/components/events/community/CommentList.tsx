@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -14,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Delete, Reply } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import NextLink from "next/link";
 import CommentComposer from "./CommentComposer";
 import type { CommunityCommentView } from "./types";
@@ -33,7 +35,7 @@ function initials(name: string) {
 
 function renderCommentText(text: string, mentionedUsers: { id: string; name: string }[]) {
   const parts = text.split(/(@\S+)/g);
-  return parts.map((part, i) => {
+  return parts.map((part) => {
     if (!part.startsWith("@")) return part;
     const token = part.slice(1);
     const nameToMatch = token.replace(/_/g, " ");
@@ -41,7 +43,7 @@ function renderCommentText(text: string, mentionedUsers: { id: string; name: str
     if (user) {
       return (
         <MuiLink
-          key={i}
+          key={`mention-${user.id}-${token}`}
           component={NextLink}
           href={`/profile/${user.id}`}
           fontWeight={700}
@@ -51,7 +53,7 @@ function renderCommentText(text: string, mentionedUsers: { id: string; name: str
         </MuiLink>
       );
     }
-    return <strong key={i}>{part}</strong>;
+    return <strong key={`unresolved-mention-${token}`}>{part}</strong>;
   });
 }
 
@@ -60,7 +62,6 @@ interface CommentListProps {
   eventId: number;
   initialComments: CommunityCommentView[];
   totalCount: number;
-  currentUserId?: string | null;
   canDelete: boolean;
   composerDisabled?: boolean;
 }
@@ -70,7 +71,6 @@ export default function CommentList({
   eventId,
   initialComments,
   totalCount,
-  currentUserId,
   canDelete,
   composerDisabled,
 }: CommentListProps) {
@@ -83,6 +83,7 @@ export default function CommentList({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [displayedTotal, setDisplayedTotal] = useState(totalCount);
   const [prefillRequest, setPrefillRequest] = useState<{ value: string; seq: number } | null>(null);
+  const [targetCommentId, setTargetCommentId] = useState<string | null>(null);
 
   const handleCommentCreated = (comment: CommunityCommentView, pending: boolean) => {
     if (!pending) {
@@ -97,7 +98,7 @@ export default function CommentList({
     setPrefillRequest(prev => ({ value: mention, seq: (prev?.seq ?? 0) + 1 }));
   };
 
-  const handleLoadMore = async () => {
+  const handleLoadMore = useCallback(async () => {
     setLoadingMore(true);
     try {
       const params = new URLSearchParams({ limit: String(LOAD_MORE_STEP) });
@@ -119,7 +120,56 @@ export default function CommentList({
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [comments, nextCursor, postId]);
+
+  useEffect(() => {
+    const updateTargetComment = () => {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      const prefix = `post-${postId}-comment-`;
+      setTargetCommentId(hash.startsWith(prefix) ? hash.slice(prefix.length) : null);
+    };
+
+    updateTargetComment();
+    window.addEventListener("hashchange", updateTargetComment);
+    return () => window.removeEventListener("hashchange", updateTargetComment);
+  }, [postId]);
+
+  useEffect(() => {
+    if (!targetCommentId) return;
+    const index = comments.findIndex(comment => comment.id === targetCommentId);
+    if (index === -1) return;
+
+    const frame = requestAnimationFrame(() => {
+      setVisibleCount(current => Math.max(current, index + 1));
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [comments, targetCommentId]);
+
+  useEffect(() => {
+    if (!targetCommentId || loadingMore) return;
+    if (comments.some(comment => comment.id === targetCommentId) || nextCursor === null) return;
+
+    const timeout = setTimeout(() => {
+      void handleLoadMore();
+    }, 0);
+
+    return () => clearTimeout(timeout);
+  }, [comments, handleLoadMore, loadingMore, nextCursor, targetCommentId]);
+
+  useEffect(() => {
+    if (!targetCommentId) return;
+    const index = comments.findIndex(comment => comment.id === targetCommentId);
+    if (index === -1 || index >= visibleCount) return;
+
+    const frame = requestAnimationFrame(() => {
+      document
+        .getElementById(`post-${postId}-comment-${targetCommentId}`)
+        ?.scrollIntoView({ block: "center" });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [comments, postId, targetCommentId, visibleCount]);
 
   const handleDelete = async (commentId: string) => {
     setDeletingId(commentId);
@@ -152,7 +202,28 @@ export default function CommentList({
             }).format(new Date(comment.createdAt));
 
             return (
-              <Stack key={comment.id} direction="row" spacing={1} alignItems="flex-start">
+              <Stack
+                id={`post-${postId}-comment-${comment.id}`}
+                key={comment.id}
+                direction="row"
+                spacing={1}
+                alignItems="flex-start"
+                sx={{
+                  borderRadius: 1,
+                  scrollMarginTop: 96,
+                  outline: "1px solid transparent",
+                  outlineOffset: 2,
+                  transition: theme => theme.transitions.create(
+                    ["background-color", "outline-color", "box-shadow"],
+                    { duration: theme.transitions.duration.short },
+                  ),
+                  "&:target": {
+                    bgcolor: theme => alpha(theme.palette.primary.main, 0.12),
+                    boxShadow: theme => `0 0 0 6px ${alpha(theme.palette.primary.main, 0.08)}`,
+                    outlineColor: "primary.main",
+                  },
+                }}
+              >
                 <NextLink href={`/profile/${comment.author.id}`} style={{ textDecoration: "none", flexShrink: 0 }}>
                   <Avatar
                     src={comment.author.imageUrl || undefined}
@@ -163,7 +234,7 @@ export default function CommentList({
                   </Avatar>
                 </NextLink>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={0.5} alignItems="baseline" flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
                     <MuiLink
                       component={NextLink}
                       href={`/profile/${comment.author.id}`}
@@ -174,6 +245,15 @@ export default function CommentList({
                         {comment.author.name}
                       </Typography>
                     </MuiLink>
+                    {comment.author.isAdmin ? (
+                      <Chip
+                        label="Organizer"
+                        size="small"
+                        color="secondary"
+                        variant="filled"
+                        sx={{ fontSize: "0.55rem", height: 16, fontWeight: 700 }}
+                      />
+                    ) : null}
                     <Typography variant="caption" color="text.secondary">
                       {createdAt}
                     </Typography>

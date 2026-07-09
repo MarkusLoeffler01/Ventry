@@ -15,9 +15,10 @@ import {
   Typography,
 } from "@mui/material";
 import { Celebration, CheckCircle, Delete, Favorite, Lightbulb, Link as LinkIcon, PushPin, PushPinOutlined, ThumbDown, ThumbUp } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import Image from "next/image";
 import NextLink from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import CommentList from "./CommentList";
 import type { CommunityPostView, CommunityReactionKey } from "./types";
 
@@ -66,7 +67,6 @@ interface CommunityPostCardProps {
   deleteDisabled?: boolean;
   moderateDisabled?: boolean;
   reactionDisabled?: boolean;
-  currentUserId?: string | null;
   composerDisabled?: boolean;
   onDelete: (postId: string) => void;
   onModerate?: (postId: string, action: ModerateAction) => void;
@@ -81,7 +81,6 @@ export default function CommunityPostCard({
   deleteDisabled,
   moderateDisabled,
   reactionDisabled,
-  currentUserId,
   composerDisabled,
   onDelete,
   onModerate,
@@ -93,8 +92,43 @@ export default function CommunityPostCard({
   }).format(new Date(post.createdAt));
   const showMainContent = Boolean(post.content && !(post.type === "FEEDBACK" && post.feedbacks.length > 0));
 
+  useEffect(() => {
+    const scrollToPost = () => {
+      if (decodeURIComponent(window.location.hash.slice(1)) !== `post-${post.id}`) return;
+
+      requestAnimationFrame(() => {
+        document.getElementById(`post-${post.id}`)?.scrollIntoView({ block: "center" });
+      });
+    };
+
+    scrollToPost();
+    window.addEventListener("hashchange", scrollToPost);
+    return () => window.removeEventListener("hashchange", scrollToPost);
+  }, [post.id]);
+
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+    <Paper
+      id={`post-${post.id}`}
+      variant="outlined"
+      sx={{
+        p: 2.5,
+        borderRadius: 2,
+        scrollMarginTop: 96,
+        transition: theme => theme.transitions.create(
+          ["background-color", "border-color", "box-shadow"],
+          { duration: theme.transitions.duration.short },
+        ),
+        "&:target": {
+          bgcolor: "action.hover",
+          borderColor: "primary.main",
+          boxShadow: theme => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.16)}`,
+        },
+        [`&:has([id^="post-${post.id}-comment-"]:target)`]: {
+          borderColor: "primary.main",
+          boxShadow: theme => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.12)}`,
+        },
+      }}
+    >
       <Stack spacing={2}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <NextLink href={`/profile/${post.author.id}`} style={{ textDecoration: "none", flexShrink: 0 }}>
@@ -118,6 +152,15 @@ export default function CommunityPostCard({
                   {post.author.name}
                 </Typography>
               </MuiLink>
+              {post.author.isAdmin ? (
+                <Chip
+                  label="Organizer"
+                  size="small"
+                  color="secondary"
+                  variant="filled"
+                  sx={{ fontSize: "0.6rem", height: 18, fontWeight: 700 }}
+                />
+              ) : null}
               {post.pinned ? (
                 <Tooltip title="Pinned post">
                   <PushPin sx={{ fontSize: "0.95rem" }} color="primary" />
@@ -300,7 +343,6 @@ export default function CommunityPostCard({
           eventId={post.eventId}
           initialComments={post.comments}
           totalCount={post.commentCount}
-          currentUserId={currentUserId}
           canDelete={canDelete}
           composerDisabled={composerDisabled}
         />

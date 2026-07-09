@@ -1,17 +1,12 @@
-import { 
-  Box, 
-  Typography, 
-  Container, 
-  Paper
-} from '@mui/material';
-import RegisterForm from '@/components/auth/RegisterForm';
-import { Suspense } from 'react';
-import PageLoadingState from '@/components/common/PageLoadingState';
+import { Box, Container, Paper, Typography } from "@mui/material";
+import { Suspense } from "react";
+import PageLoadingState from "@/components/common/PageLoadingState";
+import RegisterWizard from "@/components/auth/RegisterWizard";
 
-export default function RegisterPage({ 
-  searchParams 
-}: { 
-  searchParams: Promise<{ callbackUrl?: string }> 
+export default function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   return (
     <Suspense fallback={<PageLoadingState />}>
@@ -28,29 +23,36 @@ async function RegisterPageContent({
   const { callbackUrl } = await searchParams;
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center',
-        minHeight: '100vh',
-        py: 4
-      }}>
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            width: '100%', 
-            maxWidth: 600, 
-            display: 'flex', 
-            flexDirection: 'column',
-            p: { xs: 2, md: 4 }
+    <Container maxWidth="sm">
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          minHeight: "100vh",
+          py: 6,
+        }}
+      >
+        <Paper
+          elevation={0}
+          variant="outlined"
+          sx={{
+            width: "100%",
+            p: { xs: 3, sm: 5 },
+            borderRadius: 3,
           }}
         >
-          <Typography component="h1" variant="h4" align="center" sx={{ mt: 4 }}>
-            Sign up
+          <Typography
+            component="h1"
+            variant="h4"
+            fontWeight={700}
+            align="center"
+            sx={{ mb: 4 }}
+          >
+            Create your account
           </Typography>
-          
-          <RegisterForm callbackUrl={callbackUrl}/>
+
+          <RegisterWizard callbackUrl={callbackUrl} />
         </Paper>
       </Box>
     </Container>
