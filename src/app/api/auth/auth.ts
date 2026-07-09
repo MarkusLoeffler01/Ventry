@@ -196,7 +196,7 @@ export const auth = betterAuth({
                     emailVerified: true // GitHub emails are verified
                 }
             },
-            disableSignUp: true // Allow new users to sign up via GitHub
+            disableSignUp: false // Allow new users to sign up via GitHub
         }
     },
     events: {

@@ -54,7 +54,7 @@ async function AdminSettingsPageContent() {
                 <Typography variant="h6" gutterBottom>Payout Settings</Typography>
                 <Divider sx={{ mb: 3 }} />
                 
-                <StripeEmbeddedConnect isConnected={isConnected} />
+                <StripeEmbeddedConnect isConnected={isConnected} supportEmail={process.env.SUPPORT_EMAIL} />
             </Paper>
         </Box>
     );

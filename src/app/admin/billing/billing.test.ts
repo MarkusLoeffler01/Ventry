@@ -18,14 +18,27 @@ vi.mock("@/app/api/auth/auth", () => ({
 
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 
+vi.mock("@/lib/stripe", () => ({
+    calculatePlatformFeeAmount: (amountInCents: number) => {
+        const feePercent = Number(process.env.PLATFORM_FEE_PERCENT) || 0;
+        if (feePercent <= 0) return 0;
+        return Math.floor((amountInCents * feePercent) / 100);
+    },
+}));
+
 import { getBillingData } from "./billing-data";
 
 function mockPaymentQueries(overrides: {
     groupBy?: unknown[];
-    findMany?: unknown[];
+    recentPayments?: unknown[];
+    completedForFeeEstimate?: { amount: number; registration: { eventId: number } }[];
 } = {}) {
     prismaMock.payment.groupBy.mockResolvedValue(overrides.groupBy ?? []);
-    prismaMock.payment.findMany.mockResolvedValue(overrides.findMany ?? []);
+    // findMany is called twice with different shapes: recent payments
+    // (include) vs the fee-estimate query (select) — dispatch on that.
+    prismaMock.payment.findMany.mockImplementation((args: { select?: unknown }) =>
+        Promise.resolve(args?.select ? (overrides.completedForFeeEstimate ?? []) : (overrides.recentPayments ?? [])),
+    );
 }
 
 describe("getBillingData — event scoping", () => {
@@ -108,7 +121,40 @@ describe("getBillingData — event scoping", () => {
         expect(data.pending).toEqual({ sum: 200, count: 2 });
         // stripeFees = 4 * 0.25 + 1000 * 0.015 = 1 + 15 = 16
         expect(data.stripeFees).toBeCloseTo(16);
+        // no PLATFORM_FEE_PERCENT configured in this test env -> no platform fee
+        expect(data.platformFees).toBe(0);
         expect(data.netRevenue).toBeCloseTo(984);
+    });
+
+    it("platform fee estimate is a per-event switch: under threshold = free, at/over = fee on all its tickets", async () => {
+        const originalPercent = process.env.PLATFORM_FEE_PERCENT;
+        const originalThreshold = process.env.PLATFORM_FEE_FREE_TICKET_THRESHOLD;
+        process.env.PLATFORM_FEE_PERCENT = "2";
+        process.env.PLATFORM_FEE_FREE_TICKET_THRESHOLD = "2";
+
+        prismaMock.adminOrganizationMembership.findMany.mockResolvedValue([]);
+        mockPaymentQueries({
+            groupBy: [{ paymentStatus: "COMPLETED", _sum: { amount: 500 }, _count: { _all: 5 } }],
+            completedForFeeEstimate: [
+                // event 1: 4 tickets, at/over the threshold of 2 -> ALL 4 fee'd
+                { amount: 100, registration: { eventId: 1 } },
+                { amount: 100, registration: { eventId: 1 } },
+                { amount: 100, registration: { eventId: 1 } },
+                { amount: 100, registration: { eventId: 1 } },
+                // event 2: only 1 ticket, under the threshold -> free
+                { amount: 100, registration: { eventId: 2 } },
+            ],
+        });
+
+        const data = await getBillingData("admin-individual");
+
+        // event 1: 4 * (100 * 2%) = 8; event 2: 0
+        expect(data.platformFees).toBeCloseTo(8);
+
+        if (originalPercent === undefined) delete process.env.PLATFORM_FEE_PERCENT;
+        else process.env.PLATFORM_FEE_PERCENT = originalPercent;
+        if (originalThreshold === undefined) delete process.env.PLATFORM_FEE_FREE_TICKET_THRESHOLD;
+        else process.env.PLATFORM_FEE_FREE_TICKET_THRESHOLD = originalThreshold;
     });
 
     it("completed payment query includes paymentStatus filter alongside event scope", async () => {

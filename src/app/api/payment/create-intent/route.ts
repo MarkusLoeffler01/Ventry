@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
-import { stripe } from "@/lib/stripe";
+import { stripe, calculatePlatformFeeAmount } from "@/lib/stripe";
+import { shouldApplyPlatformFeeForEvent } from "@/lib/billing/platformFee";
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,10 +45,15 @@ export async function POST(req: NextRequest) {
     }
 
     const eventOwnerStripeId = payment.registration.event.owner?.stripeConnectId;
+    const amountInCents = Math.round(payment.amount * 100); // Stripe expects cents
+    const applicationFeeAmount =
+        eventOwnerStripeId && (await shouldApplyPlatformFeeForEvent(payment.registration.eventId))
+            ? calculatePlatformFeeAmount(amountInCents)
+            : 0;
 
     // Create PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(payment.amount * 100), // Stripe expects cents
+      amount: amountInCents,
       currency: payment.currency.toLowerCase(),
       automatic_payment_methods: {
         enabled: true,
@@ -63,6 +69,7 @@ export async function POST(req: NextRequest) {
           destination: eventOwnerStripeId,
         },
         on_behalf_of: eventOwnerStripeId,
+        ...(applicationFeeAmount > 0 && { application_fee_amount: applicationFeeAmount }),
       }),
     });
 
