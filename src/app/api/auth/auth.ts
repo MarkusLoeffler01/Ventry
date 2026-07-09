@@ -181,7 +181,7 @@ export const auth = betterAuth({
                     emailVerified: profile.email_verified
                 }
             },
-            disableSignUp: true // Allow new users to sign up via Google
+            disableSignUp: false // Allow new users to sign up via Google
         },
         github: {
             enabled: true,
