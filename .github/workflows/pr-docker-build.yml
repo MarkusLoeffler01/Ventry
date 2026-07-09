@@ -1,0 +1,49 @@
+name: PR Docker Build
+
+on:
+  workflow_run:
+    workflows:
+      - PR Tests
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    if: |
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0].base.ref == 'dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.workflow_run.pull_requests[0].number }}/merge
+
+      - name: Resolve build metadata
+        id: build_metadata
+        run: |
+          tag="$(git describe --tags --abbrev=0 2>/dev/null || node -p "'v' + JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+
+          echo "commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: |
+            BETTER_AUTH_URL=https://dev-ventry.m-loeffler.de
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+            NEXT_PUBLIC_GIT_COMMIT=${{ steps.build_metadata.outputs.commit }}
+            NEXT_PUBLIC_GIT_TAG=${{ steps.build_metadata.outputs.tag }}
+            NEXT_PUBLIC_BUILD_DATE=${{ steps.build_metadata.outputs.build_date }}

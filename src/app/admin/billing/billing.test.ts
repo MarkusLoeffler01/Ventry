@@ -18,9 +18,7 @@ vi.mock("@/app/api/auth/auth", () => ({
 
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 
-import { getBillingData } from "./page";
-
-const emptyPaymentStatus = { paymentStatus: "COMPLETED", _sum: { amount: 0 }, _count: { _all: 0 } };
+import { getBillingData } from "./billing-data";
 
 function mockPaymentQueries(overrides: {
     groupBy?: unknown[];
