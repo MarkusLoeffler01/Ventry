@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { optionalCountryCodeSchema } from "@/types/schemas/country";
 
 // Enhanced user schema with new profile fields
 export const enhancedUserSchema = z.object({
@@ -14,7 +15,7 @@ export const enhancedUserSchema = z.object({
   addressCity: z.string().max(120).optional().nullable(),
   addressState: z.string().max(120).optional().nullable(),
   addressPostalCode: z.string().max(40).optional().nullable(),
-  addressCountry: z.string().max(120).optional().nullable(),
+  addressCountry: optionalCountryCodeSchema,
   profilePictures: z.array(z.object({
     id: z.string(),
     signedUrl: z.string().url().nullable(),

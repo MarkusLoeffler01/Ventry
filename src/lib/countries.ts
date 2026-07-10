@@ -210,3 +210,25 @@ export function getCountryFlag(isoCode: string): string {
 export function getCountryByCode(code: string): Country | undefined {
   return COUNTRIES.find((c) => c.code === code.toUpperCase());
 }
+
+export function getCountryByName(name: string): Country | undefined {
+  const normalized = name.trim().toLowerCase();
+  return COUNTRIES.find((country) => country.name.toLowerCase() === normalized);
+}
+
+export function isCountryCode(value: string): boolean {
+  return getCountryByCode(value) !== undefined;
+}
+
+export function normalizeCountryCode(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const byCode = getCountryByCode(trimmed);
+  if (byCode) return byCode.code;
+
+  const byName = getCountryByName(trimmed);
+  return byName?.code ?? null;
+}

@@ -28,13 +28,15 @@ import {
   VisibilityOff,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import authClient from "@/lib/auth/client";
 import PasswordStrengthMeter from "./PasswordStrengthMeter";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { requiredCountryCodeSchema } from "@/types/schemas/country";
+import CountryAutocomplete from "@/components/common/CountryAutocomplete";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -65,7 +67,7 @@ const personalSchema = z.object({
   addressCity: z.string().trim().min(2, "Required"),
   addressState: z.string().trim().optional(),
   addressPostalCode: z.string().trim().min(2, "Required"),
-  addressCountry: z.string().trim().min(2, "Required"),
+  addressCountry: requiredCountryCodeSchema,
 });
 
 const orgSchema = z.object({
@@ -648,17 +650,22 @@ export default function RegisterWizard({
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Country"
-                autoComplete="country-name"
-                {...personalForm.register("addressCountry")}
-                error={!!personalForm.formState.errors.addressCountry}
-                helperText={
-                  personalForm.formState.errors.addressCountry?.message || " "
-                }
+              <Controller
+                control={personalForm.control}
+                name="addressCountry"
+                defaultValue=""
+                render={({ field }) => (
+                  <CountryAutocomplete
+                    required
+                    margin="normal"
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    error={!!personalForm.formState.errors.addressCountry}
+                    helperText={
+                      personalForm.formState.errors.addressCountry?.message || " "
+                    }
+                  />
+                )}
               />
             </Grid>
           </Grid>

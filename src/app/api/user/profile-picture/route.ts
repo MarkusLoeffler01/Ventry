@@ -1,10 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
 import { USER_CONFIG } from "@/lib/config";
 import { getUserIdFromRequest } from "@/lib/helpers/user";
 import { uploadProfilePicture, getSignedUrl } from "@/lib/supabase";
 import { add, refreshSignedUrls, remove, setPrimary } from "@/lib/user/profilePicture";
 import { prisma } from "@/lib/prisma/prisma";
+import { buildJpegCompressionCandidate, isStorageSizeError } from "@/lib/images/compression";
+
+const MAX_PROFILE_PICTURE_BYTES = USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB * 1024 * 1024;
+const MAX_PROFILE_PICTURE_STORAGE_BYTES = USER_CONFIG.MAX_PROFILE_PIC_STORAGE_SIZE_MB * 1024 * 1024;
+const PROFILE_PICTURE_COMPRESSION_ATTEMPTS = [
+    { width: 1600, quality: 78 },
+    { width: 1400, quality: 70 },
+    { width: 1200, quality: 62 },
+    { width: 1000, quality: 54 },
+    { width: 800, quality: 46 },
+];
+
+function profilePictureTooLargeResponse() {
+    return NextResponse.json({
+        error: `File size exceeds ${USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB}MB limit`
+    }, { status: 400 });
+}
 
 // GET: Retrieve a user's profile pictures
 export async function GET(req: NextRequest) {
@@ -50,7 +66,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const formData = await req.formData();
+        let formData: FormData;
+        try {
+            formData = await req.formData();
+        } catch {
+            return profilePictureTooLargeResponse();
+        }
+
         const file = formData.get("file") as File | null;
         const isPrimary = formData.get("isPrimary") === "true";
 
@@ -58,23 +80,50 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
         }
 
-        const bytes = Buffer.from(await file.arrayBuffer());
-
-        if (bytes.length > USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB * 1024 * 1024) {
-            return NextResponse.json({ 
-                error: `File size exceeds ${USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB}MB limit` 
-            }, { status: 400 });
+        if (typeof file.arrayBuffer !== "function") {
+            return NextResponse.json({ error: "Invalid file uploaded" }, { status: 400 });
         }
 
-        // Process image with sharp: remove metadata, convert to jpeg, quality 70%
-        const processedBuffer = await sharp(bytes)
-            .toFormat('jpeg', { quality: 70 })
-            .toBuffer();
+        if (typeof file.size === "number" && file.size > MAX_PROFILE_PICTURE_BYTES) {
+            return profilePictureTooLargeResponse();
+        }
 
-        // Upload to Supabase using the processed buffer
-        // We generate a new filename since we converted to jpeg
+        let bytes: Buffer;
+        try {
+            bytes = Buffer.from(await file.arrayBuffer());
+        } catch {
+            return profilePictureTooLargeResponse();
+        }
+
+        if (bytes.length > MAX_PROFILE_PICTURE_BYTES) {
+            return profilePictureTooLargeResponse();
+        }
+
         const fileName = `profile-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-        const uploadResult = await uploadProfilePicture(processedBuffer, userId, fileName);
+        let uploadResult: Awaited<ReturnType<typeof uploadProfilePicture>> | null = null;
+
+        for (const attempt of PROFILE_PICTURE_COMPRESSION_ATTEMPTS) {
+            const candidate = await buildJpegCompressionCandidate(bytes, attempt);
+
+            if (candidate.buffer.length > MAX_PROFILE_PICTURE_STORAGE_BYTES) {
+                continue;
+            }
+
+            try {
+                uploadResult = await uploadProfilePicture(candidate.buffer, userId, fileName);
+                break;
+            } catch (error) {
+                if (!isStorageSizeError(error)) {
+                    throw error;
+                }
+            }
+        }
+
+        if (!uploadResult) {
+            return NextResponse.json({
+                error: `Could not optimize image below ${USER_CONFIG.MAX_PROFILE_PIC_STORAGE_SIZE_MB}MB`
+            }, { status: 413 });
+        }
         
         // Generate signed URL with 24h expiry
         const signedUrlData = await getSignedUrl(uploadResult.path, 24 * 60 * 60); // 24 hours

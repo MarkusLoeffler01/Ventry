@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { requiredCountryCodeSchema } from "@/types/schemas/country";
 
 const registerSchema = z
   .object({
@@ -36,10 +37,7 @@ const registerSchema = z
       .string()
       .trim()
       .min(2, "Postal code is required"),
-    addressCountry: z
-      .string()
-      .trim()
-      .min(2, "Country is required"),
+    addressCountry: requiredCountryCodeSchema,
     password: z
       .string()
       .min(8, "Mindestens 8 Zeichen erforderlich")

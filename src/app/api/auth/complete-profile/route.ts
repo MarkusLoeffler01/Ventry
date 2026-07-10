@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
 import { AdminType } from "@/generated/prisma";
+import { requiredCountryCodeSchema } from "@/types/schemas/country";
 
 const schema = z
   .object({
@@ -12,7 +13,7 @@ const schema = z
     addressCity: z.string().trim().min(2),
     addressState: z.string().trim().optional().nullable(),
     addressPostalCode: z.string().trim().min(2),
-    addressCountry: z.string().trim().min(2),
+    addressCountry: requiredCountryCodeSchema,
     path: z.enum(["ATTENDEE", "ORGANIZER"]),
     organizerType: z.enum(["INDIVIDUAL", "ORGANIZATION"]).optional(),
     orgName: z.string().trim().min(2).max(100).optional(),

@@ -1,16 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+const sharpMocks = vi.hoisted(() => ({
+  sharp: vi.fn(),
+  toBuffer: vi.fn(),
+}));
+
 vi.mock("sharp", () => ({
-  default: vi.fn(() => {
+  default: sharpMocks.sharp,
+}));
+
+function installSharpMock() {
+  sharpMocks.sharp.mockImplementation(() => {
     const pipeline = {
+      rotate: vi.fn(() => pipeline),
+      resize: vi.fn(() => pipeline),
+      jpeg: vi.fn(() => pipeline),
       toFormat: vi.fn(() => pipeline),
-      toBuffer: vi.fn().mockResolvedValue(Buffer.from("processed-image")),
+      toBuffer: sharpMocks.toBuffer,
     };
 
     return pipeline;
-  }),
-}));
+  });
+}
 
 vi.mock("@/lib/helpers/user", () => ({
   getUserIdFromRequest: vi.fn(),
@@ -61,6 +73,8 @@ const mockedSetPrimary = setPrimary as unknown as ReturnType<typeof vi.fn>;
 describe("App Router: /api/user/profile-picture", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sharpMocks.toBuffer.mockResolvedValue(Buffer.from("processed-image"));
+    installSharpMock();
     mockedRefreshSignedUrls.mockImplementation(async pictures => pictures);
   });
 
@@ -188,6 +202,98 @@ describe("App Router: /api/user/profile-picture", () => {
         id: "pic-new",
         path: "users/user-1/profile-new.jpg",
       });
+    });
+
+    it("retries with a smaller image when storage rejects the first optimized candidate", async () => {
+      mockedGetUserIdFromRequest.mockResolvedValue("user-1");
+      sharpMocks.toBuffer
+        .mockResolvedValueOnce(Buffer.from("first-optimized-image"))
+        .mockResolvedValueOnce(Buffer.from("second-optimized-image"));
+      mockedUploadProfilePicture
+        .mockRejectedValueOnce(Object.assign(new Error("File size exceeds limit"), { statusCode: 413 }))
+        .mockResolvedValueOnce({ path: "users/user-1/profile-new.jpg" });
+      mockedGetSignedUrl.mockResolvedValue({
+        signedUrl: "https://cdn.example.com/profile-new",
+        expiresIn: 86400,
+      });
+      mockedFindPicture.mockResolvedValue({
+        id: "pic-new",
+        userID: "user-1",
+        storagePath: "users/user-1/profile-new.jpg",
+      });
+
+      const mockFile = {
+        size: 1024,
+        arrayBuffer: vi.fn().mockResolvedValue(Buffer.from("raw-image")),
+      } as unknown as File;
+
+      const request = {
+        formData: vi.fn().mockResolvedValue({
+          get: vi.fn((key: string) => {
+            if (key === "file") return mockFile;
+            if (key === "isPrimary") return "false";
+            return null;
+          }),
+        }),
+      } as unknown as NextRequest;
+
+      const response = await profilePictureRoute.POST(request);
+
+      expect(response.status).toBe(200);
+      expect(sharpMocks.toBuffer).toHaveBeenCalledTimes(2);
+      expect(mockedUploadProfilePicture).toHaveBeenCalledTimes(2);
+      expect(mockedUploadProfilePicture).toHaveBeenNthCalledWith(
+        2,
+        Buffer.from("second-optimized-image"),
+        "user-1",
+        expect.stringMatching(/^profile-.*\.jpg$/),
+      );
+    });
+
+    it("returns 400 for oversized uploads before processing the file", async () => {
+      mockedGetUserIdFromRequest.mockResolvedValue("user-1");
+
+      const mockFile = {
+        size: 20 * 1024 * 1024 + 1,
+        arrayBuffer: vi.fn(),
+      } as unknown as File;
+
+      const request = {
+        formData: vi.fn().mockResolvedValue({
+          get: vi.fn((key: string) => {
+            if (key === "file") {
+              return mockFile;
+            }
+
+            if (key === "isPrimary") {
+              return "false";
+            }
+
+            return null;
+          }),
+        }),
+      } as unknown as NextRequest;
+
+      const response = await profilePictureRoute.POST(request);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: "File size exceeds 20MB limit" });
+      expect(mockFile.arrayBuffer).not.toHaveBeenCalled();
+      expect(mockedUploadProfilePicture).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when multipart parsing rejects an oversized body", async () => {
+      mockedGetUserIdFromRequest.mockResolvedValue("user-1");
+
+      const request = {
+        formData: vi.fn().mockRejectedValue(new Error("Body exceeded size limit")),
+      } as unknown as NextRequest;
+
+      const response = await profilePictureRoute.POST(request);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: "File size exceeds 20MB limit" });
+      expect(mockedUploadProfilePicture).not.toHaveBeenCalled();
     });
   });
 

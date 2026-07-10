@@ -115,6 +115,73 @@ describe("App Router: /api/user PATCH", () => {
     );
   });
 
+  it("normalizes country fields to ISO country codes", async () => {
+    mockedGetSession.mockResolvedValue({ user: { id: "user-1" } });
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      accounts: [],
+    });
+    prismaMock.user.update.mockImplementation(({ data }) => ({
+      id: "user-1",
+      ...data,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+    }));
+
+    const response = await userRoute.PATCH(
+      patchRequest({
+        id: "user-1",
+        name: "Valid Name",
+        country: "us",
+        addressCountry: "Germany",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          country: "US",
+          addressCountry: "DE",
+        }),
+      }),
+    );
+  });
+
+  it("rejects unchecked country values before updating the user", async () => {
+    mockedGetSession.mockResolvedValue({ user: { id: "user-1" } });
+
+    const response = await userRoute.PATCH(
+      patchRequest({
+        id: "user-1",
+        country: "Narnia",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const payload = await response.json();
+    expect(payload.error.properties.country.errors).toContain("Select a valid country");
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects overlong country values before updating the user", async () => {
+    mockedGetSession.mockResolvedValue({ user: { id: "user-1" } });
+
+    const response = await userRoute.PATCH(
+      patchRequest({
+        id: "user-1",
+        addressCountry: "X".repeat(200),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const payload = await response.json();
+    expect(payload.error.properties.addressCountry.errors).toContain("Country is too long");
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
   it("returns validation errors for invalid profile fields", async () => {
     mockedGetSession.mockResolvedValue({ user: { id: "user-1" } });
 

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 let supabaseClient: ReturnType<typeof createClient> | null = null;
+type StorageBucket = "profile" | "banners";
 
 function getSupabaseClient() {
     if(!supabaseClient) {
@@ -13,6 +14,14 @@ function getSupabaseClient() {
     return supabaseClient;
 }
 
+function getBucketName(bucket: StorageBucket = "profile") {
+    if (bucket === "banners") {
+        return process.env.SUPABASE_BANNERS_BUCKET_ID || "banners";
+    }
+
+    return process.env.SUPABASE_BUCKET_ID;
+}
+
 export async function uploadProfilePicture(file: File | Buffer, userId: string, fileName?: string) {
     const name = fileName || (file as File).name;
     if (!name) {
@@ -20,7 +29,7 @@ export async function uploadProfilePicture(file: File | Buffer, userId: string, 
     }
 
     const { data, error } = await getSupabaseClient().storage
-        .from(process.env.SUPABASE_BUCKET_ID)
+        .from(getBucketName("profile"))
         .upload(`users/${userId}/${name}`, file, {
             cacheControl: '3600',
             upsert: false,
@@ -31,9 +40,9 @@ export async function uploadProfilePicture(file: File | Buffer, userId: string, 
     return data;
 }
 
-export async function uploadEventImage(file: Buffer, fileName: string) {
+export async function uploadEventImage(file: Buffer, fileName: string, bucket: StorageBucket = "profile") {
     const { data, error } = await getSupabaseClient().storage
-        .from(process.env.SUPABASE_BUCKET_ID)
+        .from(getBucketName(bucket))
         .upload(`events/${fileName}`, file, {
             cacheControl: '3600',
             upsert: false,
@@ -46,7 +55,7 @@ export async function uploadEventImage(file: Buffer, fileName: string) {
 
 export async function uploadCommunityImage(file: Buffer, eventId: number, userId: string, fileName: string, contentType: string = "image/jpeg") {
     const { data, error } = await getSupabaseClient().storage
-        .from(process.env.SUPABASE_BUCKET_ID)
+        .from(getBucketName("profile"))
         .upload(`community/${eventId}/${userId}/${fileName}`, file, {
             cacheControl: '3600',
             upsert: false,
@@ -58,9 +67,9 @@ export async function uploadCommunityImage(file: Buffer, eventId: number, userId
 }
 
 
-export async function getSignedUrl(path: string, expiresIn: number = 300) {
+export async function getSignedUrl(path: string, expiresIn: number = 300, bucket: StorageBucket = "profile") {
     const { data, error } = await getSupabaseClient().storage
-        .from(process.env.SUPABASE_BUCKET_ID)
+        .from(getBucketName(bucket))
         .createSignedUrl(path, expiresIn);
 
     if (error) throw error;
@@ -69,7 +78,7 @@ export async function getSignedUrl(path: string, expiresIn: number = 300) {
 
 export async function deleteProfilePicture(objectKey: string) {
     const { data, error } = await getSupabaseClient().storage
-        .from(process.env.SUPABASE_BUCKET_ID)
+        .from(getBucketName("profile"))
         .remove([objectKey]);
         
     if (error) throw error;

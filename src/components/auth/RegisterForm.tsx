@@ -12,7 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 
@@ -22,6 +22,7 @@ import PasswordStrengthMeter from "./PasswordStrengthMeter";
 import { registerSchema } from "@/types/schemas/client/register";
 import type { RegisterSchema } from "@/types/schemas/client/register";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import CountryAutocomplete from "@/components/common/CountryAutocomplete";
 
 export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +32,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     formState: { errors, isSubmitting },
@@ -41,7 +43,6 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
 
   // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
   const password = watch("password");
-  // eslint-disable-next-line react-hooks/incompatible-library -- react-hook-form watch() is intentional
   const username = watch("username") || "";
 
   const onSubmit = async (data: RegisterSchema, e?: React.BaseSyntheticEvent) => {
@@ -191,15 +192,20 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           helperText={errors.addressPostalCode?.message || " "}
         />
 
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          label="Country"
-          autoComplete="country-name"
-          {...register("addressCountry")}
-          error={!!errors.addressCountry}
-          helperText={errors.addressCountry?.message || " "}
+        <Controller
+          control={control}
+          name="addressCountry"
+          defaultValue=""
+          render={({ field }) => (
+            <CountryAutocomplete
+              required
+              margin="normal"
+              value={field.value || ""}
+              onChange={field.onChange}
+              error={!!errors.addressCountry}
+              helperText={errors.addressCountry?.message || " "}
+            />
+          )}
         />
 
         <TextField

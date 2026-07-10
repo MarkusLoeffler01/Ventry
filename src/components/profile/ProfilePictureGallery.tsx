@@ -16,6 +16,7 @@ import {
   Card,
   CardMedia,
   Chip,
+  LinearProgress,
   Stack,
   Fade,
   Paper,
@@ -53,6 +54,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ImageCropper from './ImageCropper';
+import {USER_CONFIG} from "@/lib/config";
+
+const MAX_PROFILE_PICTURE_UPLOAD_BYTES = USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB * 1024 * 1024;
 
 interface ProfilePicture {
   id: string;
@@ -408,6 +412,7 @@ export default function ProfilePictureGallery({
 }: ProfilePictureGalleryProps) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPictureId, setSelectedPictureId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -551,6 +556,7 @@ export default function ProfilePictureGallery({
 
   const processUpload = async (file: File) => {
     setUploading(true);
+    setUploadStatus('Optimizing profile picture');
     setError(null);
 
     try {
@@ -564,9 +570,11 @@ export default function ProfilePictureGallery({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload image');
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || 'Failed to upload image');
       }
 
+      setUploadStatus('Updating gallery');
       const data = await response.json();
       if (!data.url) {
         throw new Error('No image URL returned');
@@ -579,6 +587,7 @@ export default function ProfilePictureGallery({
       setError(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
       setUploading(false);
+      setUploadStatus(null);
     }
   };
 
@@ -592,9 +601,9 @@ export default function ProfilePictureGallery({
       return;
     }
 
-    // Validate file size (max 10MB before crop)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB');
+    // Validate file size before crop and backend optimization.
+    if (file.size > MAX_PROFILE_PICTURE_UPLOAD_BYTES) {
+      setError('File size must be 20MB or smaller');
       return;
     }
 
@@ -766,6 +775,20 @@ export default function ProfilePictureGallery({
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
               {error}
             </Alert>
+          )}
+
+          {uploading && (
+            <Box sx={{ mb: 2 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {uploadStatus || 'Uploading profile picture'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Optimizing
+                </Typography>
+              </Stack>
+              <LinearProgress />
+            </Box>
           )}
 
           {/* Helper text for drag-and-drop */}
@@ -1064,7 +1087,7 @@ export default function ProfilePictureGallery({
             color="text.secondary"
             sx={{ textAlign: 'center', display: { xs: 'none', sm: 'block' } }}
           >
-            Supported formats: JPG, PNG, GIF (max 5MB) • Click to view • Ctrl+Click to select
+            Supported formats: JPG, PNG, GIF (max {USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB}MB) • Click to view • Ctrl+Click to select
           </Typography>
 
           {/* Close Button */}

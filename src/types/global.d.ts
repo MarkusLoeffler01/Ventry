@@ -21,6 +21,7 @@ declare namespace NodeJS {
         SUPABASE_PUBLISHABLE_KEY: string;
         SUPABASE_URL: string;
         SUPABASE_BUCKET_ID: string;
+        SUPABASE_BANNERS_BUCKET_ID?: string;
 
         SMTP_FROM?: string;
 

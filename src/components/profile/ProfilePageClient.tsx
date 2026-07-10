@@ -41,8 +41,9 @@ import {
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
 import MyRegistrations from './MyRegistrations';
-import { COUNTRIES } from '@/lib/countries';
+import { normalizeCountryCode } from '@/lib/countries';
 import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
+import CountryAutocomplete from '@/components/common/CountryAutocomplete';
 
 interface ProfilePicture {
   id: string;
@@ -137,14 +138,14 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
   const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
-    country: user.country || '',
+    country: normalizeCountryCode(user.country) || '',
     legalName: user.legalName || '',
     addressLine1: user.addressLine1 || '',
     addressLine2: user.addressLine2 || '',
     addressCity: user.addressCity || '',
     addressState: user.addressState || '',
     addressPostalCode: user.addressPostalCode || '',
-    addressCountry: user.addressCountry || '',
+    addressCountry: normalizeCountryCode(user.addressCountry) || '',
     bio: user.bio || '',
     dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
     pronouns: user.pronouns || '',
@@ -384,23 +385,12 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
               : `${displayNameLength}/${DISPLAY_NAME_MAX_LENGTH} characters`}
           />
 
-          <TextField
+          <CountryAutocomplete
             label="Country"
             value={formData.country}
-            onChange={handleInputChange('country')}
-            select
-            fullWidth
+            onChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
             helperText="Shown on your profile with a flag"
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            {COUNTRIES.map((c) => (
-              <MenuItem key={c.code} value={c.code}>
-                {String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(0) - 65)}{String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(1) - 65)} {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
 
           <Accordion variant="outlined" disableGutters sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
             <AccordionSummary
@@ -484,12 +474,10 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     autoComplete="postal-code"
                   />
 
-                  <TextField
+                  <CountryAutocomplete
                     label="Address country"
                     value={formData.addressCountry}
-                    onChange={handleInputChange('addressCountry')}
-                    fullWidth
-                    autoComplete="country-name"
+                    onChange={(value) => setFormData(prev => ({ ...prev, addressCountry: value }))}
                   />
                 </Stack>
               </Stack>
