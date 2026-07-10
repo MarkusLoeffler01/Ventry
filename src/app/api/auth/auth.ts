@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma/prisma";
 import { toNextJsHandler } from "better-auth/next-js";
+import { createAuthMiddleware, APIError } from "better-auth/api";
 import { passkey } from "@better-auth/passkey";
 import { lastLoginMethod, twoFactor, multiSession } from "better-auth/plugins";
 import { hashPassword } from "@/lib/bcrypt";
@@ -12,6 +13,7 @@ import WelcomeMail from "@/components/emails/WelcomeMail";
 import EmailVerificationMail from "@/components/emails/EmailVerificationMail";
 import { getTrustedOrigins } from "@/lib/security/origins";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { signUpAdditionalFieldsSchema } from "@/types/schemas/signup";
 
 const cookiePrefix = "VENTRY";
 
@@ -46,6 +48,33 @@ export const auth = betterAuth({
         })
     ],
     session: {},
+    hooks: {
+        before: createAuthMiddleware(async (ctx) => {
+            // Registration writes go straight through better-auth, bypassing any
+            // client-side zod schema entirely, so this is the real validation
+            // boundary for legalName/address*/name on sign-up.
+            if (ctx.path !== "/sign-up/email") {
+                return;
+            }
+
+            const parsed = signUpAdditionalFieldsSchema.safeParse(ctx.body);
+            if (!parsed.success) {
+                throw new APIError("BAD_REQUEST", {
+                    message: parsed.error.issues[0]?.message ?? "Invalid registration data",
+                });
+            }
+
+            return {
+                context: {
+                    ...ctx,
+                    body: {
+                        ...ctx.body,
+                        ...parsed.data,
+                    },
+                },
+            };
+        }),
+    },
     user: {
         additionalFields: {
             isAdmin: {

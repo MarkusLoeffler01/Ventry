@@ -46,7 +46,7 @@ export default function PersonalInfo({
       </Typography>
 
       <Stack spacing={2}>
-        {dateOfBirth && showAge && (
+        {dateOfBirth && showAge && age !== null && (
           <Card variant="outlined">
             <CardContent sx={{ py: 2 }}>
               <Stack direction="row" spacing={2} alignItems="center">

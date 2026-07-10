@@ -14,6 +14,7 @@ import EmptyState from "@/components/profile/EmptyState";
 import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
+import { calculateRealisticAge } from "@/lib/user/birthdate";
 
 interface ProfilePicture {
   id: string;
@@ -29,19 +30,6 @@ interface SocialLinks {
   telegram?: string;
   twitter?: string;
   instagram?: string;
-}
-
-function calculateAge(birthDate: Date): number {
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-
-  return age;
 }
 
 export default function ProfileViewPage({ params }: { params: Promise<{ username: string }> }) {
@@ -89,10 +77,10 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
 
   const validatedPictures = await refreshSignedUrls(user.profilePictures as ProfilePicture[]);
   const isOrganization = user.adminProfile?.type === "ORGANIZATION";
-  const age = !isOrganization && user.dateOfBirth ? calculateAge(user.dateOfBirth) : null;
+  const age = !isOrganization && user.dateOfBirth ? calculateRealisticAge(user.dateOfBirth) : null;
   const socialLinks = user.socialLinks as SocialLinks | null;
 
-  const hasContent = user.bio || (!isOrganization && (user.dateOfBirth || user.pronouns)) || validatedPictures.length > 1;
+  const hasContent = user.bio || (!isOrganization && (age !== null || user.pronouns)) || validatedPictures.length > 1;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -118,7 +106,7 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
 
             {!isOrganization && (
               <PersonalInfo
-                dateOfBirth={user.dateOfBirth}
+                dateOfBirth={age !== null ? user.dateOfBirth : null}
                 showAge={user.showAge}
                 showExactBirthdate={user.showExactBirthdate}
                 pronouns={user.pronouns}

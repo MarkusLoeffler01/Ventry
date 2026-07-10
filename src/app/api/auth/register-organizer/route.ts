@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/prisma";
 import { auth } from "@/app/api/auth/auth";
 import { AdminType } from "@/generated/prisma";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { requiredCountryCodeSchema } from "@/types/schemas/country";
 
 const schema = z
   .object({
@@ -14,13 +15,13 @@ const schema = z
       .min(8)
       .regex(/[A-Z]/)
       .regex(/[0-9]/),
-    legalName: z.string().trim().min(2),
-    addressLine1: z.string().trim().min(2),
-    addressLine2: z.string().trim().optional().nullable(),
-    addressCity: z.string().trim().min(2),
-    addressState: z.string().trim().optional().nullable(),
-    addressPostalCode: z.string().trim().min(2),
-    addressCountry: z.string().trim().min(2),
+    legalName: z.string().trim().min(2).max(200),
+    addressLine1: z.string().trim().min(2).max(200),
+    addressLine2: z.string().trim().max(200).optional().nullable(),
+    addressCity: z.string().trim().min(2).max(120),
+    addressState: z.string().trim().max(120).optional().nullable(),
+    addressPostalCode: z.string().trim().min(2).max(40),
+    addressCountry: requiredCountryCodeSchema,
     organizerType: z.enum(["INDIVIDUAL", "ORGANIZATION"]),
     orgName: z.string().trim().min(2).max(100).optional(),
     orgSlug: z
@@ -80,7 +81,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Create user account via better-auth (handles password hashing + email verification)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const signUpResult = await (auth.api.signUpEmail as any)({
     body: {
       email: data.email,

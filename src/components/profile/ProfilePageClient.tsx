@@ -41,8 +41,11 @@ import {
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
 import MyRegistrations from './MyRegistrations';
-import { COUNTRIES } from '@/lib/countries';
+import { normalizeCountryCode } from '@/lib/countries';
 import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
+import CountryAutocomplete from '@/components/common/CountryAutocomplete';
+import { calculateRealisticAge, getBirthDateBounds } from '@/lib/user/birthdate';
+import { diffPayload } from '@/lib/diffPayload';
 
 interface ProfilePicture {
   id: string;
@@ -56,6 +59,25 @@ interface SocialLinks {
   telegram?: string;
   twitter?: string;
   instagram?: string;
+}
+
+interface ProfileUpdatePayload {
+  name: string;
+  country: string | null;
+  legalName: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  bio: string;
+  dateOfBirth: string | undefined;
+  pronouns: string;
+  showAge: boolean;
+  showExactBirthdate: boolean;
+  socialLinks: SocialLinks;
+  [key: string]: unknown;
 }
 
 interface User {
@@ -125,6 +147,44 @@ const PRONOUN_OPTIONS = [
   'choose my own pronouns'
 ];
 
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Display name',
+  legalName: 'Legal name',
+  addressLine1: 'Address',
+  addressLine2: 'Address line 2',
+  addressCity: 'City',
+  addressState: 'State/Region',
+  addressPostalCode: 'Postal code',
+  country: 'Country',
+  addressCountry: 'Address country',
+  bio: 'Bio',
+  dateOfBirth: 'Date of birth',
+  pronouns: 'Pronouns',
+  socialLinks: 'Social links',
+};
+
+// Server validation errors come back as a zod tree: { properties: { field: { errors: [...] } } }.
+// Without this, a rejected save just says "Failed to update profile" with no clue which field broke.
+function extractApiErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const { error } = payload as { error?: unknown };
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return null;
+
+  const properties = (error as { properties?: Record<string, { errors?: string[] }> }).properties;
+  if (properties) {
+    for (const [field, detail] of Object.entries(properties)) {
+      const message = detail?.errors?.[0];
+      if (message) {
+        return `${FIELD_LABELS[field] || field}: ${message}`;
+      }
+    }
+  }
+
+  const topLevelErrors = (error as { errors?: string[] }).errors;
+  return topLevelErrors?.[0] ?? null;
+}
+
 const sectionSx = {
   p: { xs: 2, md: 2.5 },
   border: '1px solid',
@@ -137,16 +197,18 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
   const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
-    country: user.country || '',
+    country: normalizeCountryCode(user.country) || '',
     legalName: user.legalName || '',
     addressLine1: user.addressLine1 || '',
     addressLine2: user.addressLine2 || '',
     addressCity: user.addressCity || '',
     addressState: user.addressState || '',
     addressPostalCode: user.addressPostalCode || '',
-    addressCountry: user.addressCountry || '',
+    addressCountry: normalizeCountryCode(user.addressCountry) || '',
     bio: user.bio || '',
-    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
+    dateOfBirth: calculateRealisticAge(user.dateOfBirth) !== null && user.dateOfBirth
+      ? new Date(user.dateOfBirth).toISOString().split('T')[0]
+      : '',
     pronouns: user.pronouns || '',
     showAge: user.showAge ?? true,
     showExactBirthdate: user.showExactBirthdate ?? false,
@@ -156,6 +218,28 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       twitter: socialLinks.twitter || '',
       instagram: socialLinks.instagram || '',
     }
+  });
+
+  const baselinePayloadRef = useRef<ProfileUpdatePayload>({
+    name: user.name || '',
+    country: normalizeCountryCode(user.country) || null,
+    legalName: user.legalName || null,
+    addressLine1: user.addressLine1 || null,
+    addressLine2: user.addressLine2 || null,
+    addressCity: user.addressCity || null,
+    addressState: user.addressState || null,
+    addressPostalCode: user.addressPostalCode || null,
+    addressCountry: normalizeCountryCode(user.addressCountry) || null,
+    bio: user.bio || '',
+    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString() : undefined,
+    pronouns: user.pronouns || '',
+    showAge: user.showAge ?? true,
+    showExactBirthdate: user.showExactBirthdate ?? false,
+    socialLinks: {
+      ...(socialLinks.telegram && { telegram: socialLinks.telegram }),
+      ...(socialLinks.twitter && { twitter: socialLinks.twitter }),
+      ...(socialLinks.instagram && { instagram: socialLinks.instagram }),
+    },
   });
 
   const [profilePictures, setProfilePictures] = useState<ProfilePicture[]>(user.profilePictures);
@@ -213,6 +297,17 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       return;
     }
 
+    const selectedBirthDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : null;
+    const birthDateBounds = getBirthDateBounds();
+    if (
+      selectedBirthDate &&
+      (Number.isNaN(selectedBirthDate.getTime()) || calculateRealisticAge(formData.dateOfBirth) === null)
+    ) {
+      setSaving(false);
+      setError(`Birth date must be between ${birthDateBounds.min} and ${birthDateBounds.max}.`);
+      return;
+    }
+
     const socialLinksPayload: SocialLinks = {};
     if (formData.socialLinks.telegram) socialLinksPayload.telegram = formData.socialLinks.telegram;
     if (formData.socialLinks.twitter) socialLinksPayload.twitter = formData.socialLinks.twitter;
@@ -221,34 +316,52 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       ? formData.customPronouns?.trim() || ''
       : formData.pronouns;
 
+    const payload: ProfileUpdatePayload = {
+      name: displayName,
+      country: formData.country || null,
+      legalName: formData.legalName || null,
+      addressLine1: formData.addressLine1 || null,
+      addressLine2: formData.addressLine2 || null,
+      addressCity: formData.addressCity || null,
+      addressState: formData.addressState || null,
+      addressPostalCode: formData.addressPostalCode || null,
+      addressCountry: formData.addressCountry || null,
+      bio: formData.bio,
+      dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
+      pronouns,
+      showAge: formData.showAge,
+      showExactBirthdate: formData.showExactBirthdate,
+      socialLinks: socialLinksPayload,
+    };
+
+    const diff = diffPayload(baselinePayloadRef.current, payload);
+
+    if (Object.keys(diff).length === 0) {
+      setSaving(false);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      return;
+    }
+
     try {
       const response = await fetch('/api/user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          name: displayName,
-          country: formData.country || null,
-          legalName: formData.legalName || null,
-          addressLine1: formData.addressLine1 || null,
-          addressLine2: formData.addressLine2 || null,
-          addressCity: formData.addressCity || null,
-          addressState: formData.addressState || null,
-          addressPostalCode: formData.addressPostalCode || null,
-          addressCountry: formData.addressCountry || null,
-          bio: formData.bio,
-          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
-          pronouns,
-          showAge: formData.showAge,
-          showExactBirthdate: formData.showExactBirthdate,
-          socialLinks: socialLinksPayload,
-        })
+        body: JSON.stringify({ id: user.id, ...diff })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        let message = 'Failed to update profile.';
+        try {
+          const errorPayload = await response.json();
+          message = extractApiErrorMessage(errorPayload) ?? message;
+        } catch {
+          // response body wasn't JSON - stick with the generic message
+        }
+        throw new Error(message);
       }
 
+      baselinePayloadRef.current = payload;
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -298,18 +411,8 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
     }
   };
 
-  const calculateAge = (birthDate: Date) => {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
-
+  const birthDateBounds = getBirthDateBounds();
+  const displayedAge = formData.dateOfBirth ? calculateRealisticAge(formData.dateOfBirth) : null;
   const displayNameLength = formData.name.length;
   const displayNameTooLong = displayNameLength > DISPLAY_NAME_MAX_LENGTH;
   const hasCheckInIdentity = Boolean(
@@ -384,23 +487,12 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
               : `${displayNameLength}/${DISPLAY_NAME_MAX_LENGTH} characters`}
           />
 
-          <TextField
+          <CountryAutocomplete
             label="Country"
             value={formData.country}
-            onChange={handleInputChange('country')}
-            select
-            fullWidth
+            onChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
             helperText="Shown on your profile with a flag"
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            {COUNTRIES.map((c) => (
-              <MenuItem key={c.code} value={c.code}>
-                {String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(0) - 65)}{String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(1) - 65)} {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
 
           <Accordion variant="outlined" disableGutters sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
             <AccordionSummary
@@ -438,6 +530,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   value={formData.legalName}
                   onChange={handleInputChange('legalName')}
                   fullWidth
+                  inputProps={{ maxLength: 200 }}
                   helperText="Used by event staff for ID checks."
                 />
 
@@ -447,6 +540,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   onChange={handleInputChange('addressLine1')}
                   fullWidth
                   autoComplete="street-address"
+                  inputProps={{ maxLength: 200 }}
                 />
 
                 <TextField
@@ -455,6 +549,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   onChange={handleInputChange('addressLine2')}
                   fullWidth
                   autoComplete="address-line2"
+                  inputProps={{ maxLength: 200 }}
                 />
 
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -464,6 +559,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     onChange={handleInputChange('addressCity')}
                     fullWidth
                     autoComplete="address-level2"
+                    inputProps={{ maxLength: 120 }}
                   />
 
                   <TextField
@@ -472,6 +568,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     onChange={handleInputChange('addressState')}
                     fullWidth
                     autoComplete="address-level1"
+                    inputProps={{ maxLength: 120 }}
                   />
                 </Stack>
 
@@ -482,14 +579,13 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     onChange={handleInputChange('addressPostalCode')}
                     fullWidth
                     autoComplete="postal-code"
+                    inputProps={{ maxLength: 40 }}
                   />
 
-                  <TextField
+                  <CountryAutocomplete
                     label="Address country"
                     value={formData.addressCountry}
-                    onChange={handleInputChange('addressCountry')}
-                    fullWidth
-                    autoComplete="country-name"
+                    onChange={(value) => setFormData(prev => ({ ...prev, addressCountry: value }))}
                   />
                 </Stack>
               </Stack>
@@ -520,12 +616,16 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                 fullWidth
                 helperText="Your age will only be shown if you enable it in privacy settings"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: birthDateBounds.min,
+                  max: birthDateBounds.max,
+                }}
               />
 
-              {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
+              {displayedAge !== null && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Chip
-                    label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
+                    label={`Age: ${displayedAge}`}
                     color={formData.showAge ? 'primary' : 'default'}
                     icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
                   />
@@ -556,6 +656,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   value={formData.customPronouns}
                   onChange={handleInputChange('customPronouns')}
                   fullWidth
+                  inputProps={{ maxLength: 50 }}
                 />
               )}
             </>
@@ -586,6 +687,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             onChange={handleSocialChange('telegram')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -601,6 +703,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             onChange={handleSocialChange('twitter')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -616,6 +719,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             onChange={handleSocialChange('instagram')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
