@@ -45,6 +45,7 @@ import { normalizeCountryCode } from '@/lib/countries';
 import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
 import CountryAutocomplete from '@/components/common/CountryAutocomplete';
 import { calculateRealisticAge, getBirthDateBounds } from '@/lib/user/birthdate';
+import { diffPayload } from '@/lib/diffPayload';
 
 interface ProfilePicture {
   id: string;
@@ -58,6 +59,25 @@ interface SocialLinks {
   telegram?: string;
   twitter?: string;
   instagram?: string;
+}
+
+interface ProfileUpdatePayload {
+  name: string;
+  country: string | null;
+  legalName: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  bio: string;
+  dateOfBirth: string | undefined;
+  pronouns: string;
+  showAge: boolean;
+  showExactBirthdate: boolean;
+  socialLinks: SocialLinks;
+  [key: string]: unknown;
 }
 
 interface User {
@@ -200,6 +220,28 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
     }
   });
 
+  const baselinePayloadRef = useRef<ProfileUpdatePayload>({
+    name: user.name || '',
+    country: normalizeCountryCode(user.country) || null,
+    legalName: user.legalName || null,
+    addressLine1: user.addressLine1 || null,
+    addressLine2: user.addressLine2 || null,
+    addressCity: user.addressCity || null,
+    addressState: user.addressState || null,
+    addressPostalCode: user.addressPostalCode || null,
+    addressCountry: normalizeCountryCode(user.addressCountry) || null,
+    bio: user.bio || '',
+    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString() : undefined,
+    pronouns: user.pronouns || '',
+    showAge: user.showAge ?? true,
+    showExactBirthdate: user.showExactBirthdate ?? false,
+    socialLinks: {
+      ...(socialLinks.telegram && { telegram: socialLinks.telegram }),
+      ...(socialLinks.twitter && { twitter: socialLinks.twitter }),
+      ...(socialLinks.instagram && { instagram: socialLinks.instagram }),
+    },
+  });
+
   const [profilePictures, setProfilePictures] = useState<ProfilePicture[]>(user.profilePictures);
 
   const refreshProfilePictures = async () => {
@@ -274,41 +316,52 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       ? formData.customPronouns?.trim() || ''
       : formData.pronouns;
 
+    const payload: ProfileUpdatePayload = {
+      name: displayName,
+      country: formData.country || null,
+      legalName: formData.legalName || null,
+      addressLine1: formData.addressLine1 || null,
+      addressLine2: formData.addressLine2 || null,
+      addressCity: formData.addressCity || null,
+      addressState: formData.addressState || null,
+      addressPostalCode: formData.addressPostalCode || null,
+      addressCountry: formData.addressCountry || null,
+      bio: formData.bio,
+      dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
+      pronouns,
+      showAge: formData.showAge,
+      showExactBirthdate: formData.showExactBirthdate,
+      socialLinks: socialLinksPayload,
+    };
+
+    const diff = diffPayload(baselinePayloadRef.current, payload);
+
+    if (Object.keys(diff).length === 0) {
+      setSaving(false);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      return;
+    }
+
     try {
       const response = await fetch('/api/user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          name: displayName,
-          country: formData.country || null,
-          legalName: formData.legalName || null,
-          addressLine1: formData.addressLine1 || null,
-          addressLine2: formData.addressLine2 || null,
-          addressCity: formData.addressCity || null,
-          addressState: formData.addressState || null,
-          addressPostalCode: formData.addressPostalCode || null,
-          addressCountry: formData.addressCountry || null,
-          bio: formData.bio,
-          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
-          pronouns,
-          showAge: formData.showAge,
-          showExactBirthdate: formData.showExactBirthdate,
-          socialLinks: socialLinksPayload,
-        })
+        body: JSON.stringify({ id: user.id, ...diff })
       });
 
       if (!response.ok) {
         let message = 'Failed to update profile.';
         try {
-          const payload = await response.json();
-          message = extractApiErrorMessage(payload) ?? message;
+          const errorPayload = await response.json();
+          message = extractApiErrorMessage(errorPayload) ?? message;
         } catch {
           // response body wasn't JSON - stick with the generic message
         }
         throw new Error(message);
       }
 
+      baselinePayloadRef.current = payload;
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

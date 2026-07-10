@@ -6,12 +6,18 @@ import EventForm from '@/components/admin/events/EventForm';
 import type { AdminCreateEventInput } from '@/types/schemas/event/admin';
 import { Box } from '@mui/material';
 import type { SerializedEvent } from '@/types/event';
+import { diffPayload } from '@/lib/diffPayload';
 
 import type { InitialData } from '@/components/admin/events/EventForm';
 
 interface EditEventClientProps {
   event: SerializedEvent;
 }
+
+// Structural fields (nested objects/arrays) aren't diffed - EventForm rebuilds
+// them from live component state on every submit, so comparing them against
+// the server snapshot would produce noisy false-positives. Always sent as-is.
+const STRUCTURAL_FIELDS = ["location", "products", "stayPolicy", "customFields", "schedule"] as const;
 
 export default function EditEventClient({ event }: EditEventClientProps) {
   const [loading, setLoading] = useState(false);
@@ -20,10 +26,29 @@ export default function EditEventClient({ event }: EditEventClientProps) {
   const handleSubmit = async (data: AdminCreateEventInput) => {
     setLoading(true);
     try {
+      const baseline = event as unknown as Record<string, unknown>;
+      const submitted = data as unknown as Record<string, unknown>;
+
+      const scalarBaseline: Record<string, unknown> = {};
+      const scalarSubmitted: Record<string, unknown> = {};
+      const structuralPatch: Record<string, unknown> = {};
+
+      for (const key of Object.keys(submitted)) {
+        if ((STRUCTURAL_FIELDS as readonly string[]).includes(key)) {
+          structuralPatch[key] = submitted[key];
+        } else {
+          scalarBaseline[key] = baseline[key];
+          scalarSubmitted[key] = submitted[key];
+        }
+      }
+
+      const scalarDiff = diffPayload(scalarBaseline, scalarSubmitted);
+      const patch = { ...scalarDiff, ...structuralPatch };
+
       const response = await fetch(`/api/admin/event/${event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(patch),
       });
 
       if (!response.ok) {
