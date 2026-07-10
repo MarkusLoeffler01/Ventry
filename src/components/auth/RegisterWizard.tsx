@@ -61,12 +61,12 @@ const accountSchema = z
   });
 
 const personalSchema = z.object({
-  legalName: z.string().trim().min(2, "Required"),
-  addressLine1: z.string().trim().min(2, "Required"),
-  addressLine2: z.string().trim().optional(),
-  addressCity: z.string().trim().min(2, "Required"),
-  addressState: z.string().trim().optional(),
-  addressPostalCode: z.string().trim().min(2, "Required"),
+  legalName: z.string().trim().min(2, "Required").max(200, "Max 200 characters"),
+  addressLine1: z.string().trim().min(2, "Required").max(200, "Max 200 characters"),
+  addressLine2: z.string().trim().max(200, "Max 200 characters").optional(),
+  addressCity: z.string().trim().min(2, "Required").max(120, "Max 120 characters"),
+  addressState: z.string().trim().max(120, "Max 120 characters").optional(),
+  addressPostalCode: z.string().trim().min(2, "Required").max(40, "Max 40 characters"),
   addressCountry: requiredCountryCodeSchema,
 });
 
@@ -576,6 +576,7 @@ export default function RegisterWizard({
             fullWidth
             label={path === "ORGANIZER" ? "Legal / Organization name" : "Legal name"}
             autoComplete="name"
+            inputProps={{ maxLength: 200 }}
             {...personalForm.register("legalName")}
             error={!!personalForm.formState.errors.legalName}
             helperText={personalForm.formState.errors.legalName?.message || " "}
@@ -587,6 +588,7 @@ export default function RegisterWizard({
             fullWidth
             label="Address"
             autoComplete="street-address"
+            inputProps={{ maxLength: 200 }}
             {...personalForm.register("addressLine1")}
             error={!!personalForm.formState.errors.addressLine1}
             helperText={
@@ -599,6 +601,7 @@ export default function RegisterWizard({
             fullWidth
             label="Address line 2"
             autoComplete="address-line2"
+            inputProps={{ maxLength: 200 }}
             {...personalForm.register("addressLine2")}
             error={!!personalForm.formState.errors.addressLine2}
             helperText={
@@ -614,6 +617,7 @@ export default function RegisterWizard({
                 fullWidth
                 label="City"
                 autoComplete="address-level2"
+                inputProps={{ maxLength: 120 }}
                 {...personalForm.register("addressCity")}
                 error={!!personalForm.formState.errors.addressCity}
                 helperText={
@@ -627,6 +631,7 @@ export default function RegisterWizard({
                 fullWidth
                 label="State / Region"
                 autoComplete="address-level1"
+                inputProps={{ maxLength: 120 }}
                 {...personalForm.register("addressState")}
                 error={!!personalForm.formState.errors.addressState}
                 helperText={
@@ -641,6 +646,7 @@ export default function RegisterWizard({
                 fullWidth
                 label="Postal code"
                 autoComplete="postal-code"
+                inputProps={{ maxLength: 40 }}
                 {...personalForm.register("addressPostalCode")}
                 error={!!personalForm.formState.errors.addressPostalCode}
                 helperText={

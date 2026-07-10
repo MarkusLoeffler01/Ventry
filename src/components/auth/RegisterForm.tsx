@@ -134,6 +134,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="Legal name"
           autoComplete="name"
+          inputProps={{ maxLength: 200 }}
           {...register("legalName")}
           error={!!errors.legalName}
           helperText={errors.legalName?.message || " "}
@@ -145,6 +146,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="Address"
           autoComplete="street-address"
+          inputProps={{ maxLength: 200 }}
           {...register("addressLine1")}
           error={!!errors.addressLine1}
           helperText={errors.addressLine1?.message || " "}
@@ -155,6 +157,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="Address line 2"
           autoComplete="address-line2"
+          inputProps={{ maxLength: 200 }}
           {...register("addressLine2")}
           error={!!errors.addressLine2}
           helperText={errors.addressLine2?.message || " "}
@@ -166,6 +169,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="City"
           autoComplete="address-level2"
+          inputProps={{ maxLength: 120 }}
           {...register("addressCity")}
           error={!!errors.addressCity}
           helperText={errors.addressCity?.message || " "}
@@ -176,6 +180,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="State/Region"
           autoComplete="address-level1"
+          inputProps={{ maxLength: 120 }}
           {...register("addressState")}
           error={!!errors.addressState}
           helperText={errors.addressState?.message || " "}
@@ -187,6 +192,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
           fullWidth
           label="Postal code"
           autoComplete="postal-code"
+          inputProps={{ maxLength: 40 }}
           {...register("addressPostalCode")}
           error={!!errors.addressPostalCode}
           helperText={errors.addressPostalCode?.message || " "}

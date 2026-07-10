@@ -21,4 +21,15 @@ describe("userSchema", () => {
   it("rejects countries outside the supported country list", () => {
     expect(userSchema.safeParse({ country: "Narnia" }).success).toBe(false);
   });
+
+  it("rejects future birth dates", () => {
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+
+    expect(userSchema.safeParse({ dateOfBirth: nextYear.toISOString() }).success).toBe(false);
+  });
+
+  it("rejects birth dates older than the realistic age limit", () => {
+    expect(userSchema.safeParse({ dateOfBirth: "1000-01-01T00:00:00.000Z" }).success).toBe(false);
+  });
 });

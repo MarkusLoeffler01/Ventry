@@ -44,6 +44,7 @@ import MyRegistrations from './MyRegistrations';
 import { normalizeCountryCode } from '@/lib/countries';
 import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
 import CountryAutocomplete from '@/components/common/CountryAutocomplete';
+import { calculateRealisticAge, getBirthDateBounds } from '@/lib/user/birthdate';
 
 interface ProfilePicture {
   id: string;
@@ -126,6 +127,44 @@ const PRONOUN_OPTIONS = [
   'choose my own pronouns'
 ];
 
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Display name',
+  legalName: 'Legal name',
+  addressLine1: 'Address',
+  addressLine2: 'Address line 2',
+  addressCity: 'City',
+  addressState: 'State/Region',
+  addressPostalCode: 'Postal code',
+  country: 'Country',
+  addressCountry: 'Address country',
+  bio: 'Bio',
+  dateOfBirth: 'Date of birth',
+  pronouns: 'Pronouns',
+  socialLinks: 'Social links',
+};
+
+// Server validation errors come back as a zod tree: { properties: { field: { errors: [...] } } }.
+// Without this, a rejected save just says "Failed to update profile" with no clue which field broke.
+function extractApiErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const { error } = payload as { error?: unknown };
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return null;
+
+  const properties = (error as { properties?: Record<string, { errors?: string[] }> }).properties;
+  if (properties) {
+    for (const [field, detail] of Object.entries(properties)) {
+      const message = detail?.errors?.[0];
+      if (message) {
+        return `${FIELD_LABELS[field] || field}: ${message}`;
+      }
+    }
+  }
+
+  const topLevelErrors = (error as { errors?: string[] }).errors;
+  return topLevelErrors?.[0] ?? null;
+}
+
 const sectionSx = {
   p: { xs: 2, md: 2.5 },
   border: '1px solid',
@@ -147,7 +186,9 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
     addressPostalCode: user.addressPostalCode || '',
     addressCountry: normalizeCountryCode(user.addressCountry) || '',
     bio: user.bio || '',
-    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
+    dateOfBirth: calculateRealisticAge(user.dateOfBirth) !== null && user.dateOfBirth
+      ? new Date(user.dateOfBirth).toISOString().split('T')[0]
+      : '',
     pronouns: user.pronouns || '',
     showAge: user.showAge ?? true,
     showExactBirthdate: user.showExactBirthdate ?? false,
@@ -214,6 +255,17 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       return;
     }
 
+    const selectedBirthDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : null;
+    const birthDateBounds = getBirthDateBounds();
+    if (
+      selectedBirthDate &&
+      (Number.isNaN(selectedBirthDate.getTime()) || calculateRealisticAge(formData.dateOfBirth) === null)
+    ) {
+      setSaving(false);
+      setError(`Birth date must be between ${birthDateBounds.min} and ${birthDateBounds.max}.`);
+      return;
+    }
+
     const socialLinksPayload: SocialLinks = {};
     if (formData.socialLinks.telegram) socialLinksPayload.telegram = formData.socialLinks.telegram;
     if (formData.socialLinks.twitter) socialLinksPayload.twitter = formData.socialLinks.twitter;
@@ -247,7 +299,14 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        let message = 'Failed to update profile.';
+        try {
+          const payload = await response.json();
+          message = extractApiErrorMessage(payload) ?? message;
+        } catch {
+          // response body wasn't JSON - stick with the generic message
+        }
+        throw new Error(message);
       }
 
       setSuccess(true);
@@ -299,18 +358,8 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
     }
   };
 
-  const calculateAge = (birthDate: Date) => {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
-
+  const birthDateBounds = getBirthDateBounds();
+  const displayedAge = formData.dateOfBirth ? calculateRealisticAge(formData.dateOfBirth) : null;
   const displayNameLength = formData.name.length;
   const displayNameTooLong = displayNameLength > DISPLAY_NAME_MAX_LENGTH;
   const hasCheckInIdentity = Boolean(
@@ -428,6 +477,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   value={formData.legalName}
                   onChange={handleInputChange('legalName')}
                   fullWidth
+                  inputProps={{ maxLength: 200 }}
                   helperText="Used by event staff for ID checks."
                 />
 
@@ -437,6 +487,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   onChange={handleInputChange('addressLine1')}
                   fullWidth
                   autoComplete="street-address"
+                  inputProps={{ maxLength: 200 }}
                 />
 
                 <TextField
@@ -445,6 +496,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   onChange={handleInputChange('addressLine2')}
                   fullWidth
                   autoComplete="address-line2"
+                  inputProps={{ maxLength: 200 }}
                 />
 
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -454,6 +506,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     onChange={handleInputChange('addressCity')}
                     fullWidth
                     autoComplete="address-level2"
+                    inputProps={{ maxLength: 120 }}
                   />
 
                   <TextField
@@ -462,6 +515,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     onChange={handleInputChange('addressState')}
                     fullWidth
                     autoComplete="address-level1"
+                    inputProps={{ maxLength: 120 }}
                   />
                 </Stack>
 
@@ -472,6 +526,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                     onChange={handleInputChange('addressPostalCode')}
                     fullWidth
                     autoComplete="postal-code"
+                    inputProps={{ maxLength: 40 }}
                   />
 
                   <CountryAutocomplete
@@ -508,12 +563,16 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                 fullWidth
                 helperText="Your age will only be shown if you enable it in privacy settings"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: birthDateBounds.min,
+                  max: birthDateBounds.max,
+                }}
               />
 
-              {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
+              {displayedAge !== null && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Chip
-                    label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
+                    label={`Age: ${displayedAge}`}
                     color={formData.showAge ? 'primary' : 'default'}
                     icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
                   />
@@ -544,6 +603,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
                   value={formData.customPronouns}
                   onChange={handleInputChange('customPronouns')}
                   fullWidth
+                  inputProps={{ maxLength: 50 }}
                 />
               )}
             </>
@@ -574,6 +634,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             onChange={handleSocialChange('telegram')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -589,6 +650,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             onChange={handleSocialChange('twitter')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -604,6 +666,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             onChange={handleSocialChange('instagram')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">

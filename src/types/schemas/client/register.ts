@@ -16,27 +16,33 @@ const registerSchema = z
     legalName: z
       .string()
       .trim()
-      .min(2, "Legal name is required"),
+      .min(2, "Legal name is required")
+      .max(200, "Legal name is too long"),
     addressLine1: z
       .string()
       .trim()
-      .min(2, "Address is required"),
+      .min(2, "Address is required")
+      .max(200, "Address is too long"),
     addressLine2: z
       .string()
       .trim()
+      .max(200, "Address is too long")
       .optional(),
     addressCity: z
       .string()
       .trim()
-      .min(2, "City is required"),
+      .min(2, "City is required")
+      .max(120, "City is too long"),
     addressState: z
       .string()
       .trim()
+      .max(120, "State is too long")
       .optional(),
     addressPostalCode: z
       .string()
       .trim()
-      .min(2, "Postal code is required"),
+      .min(2, "Postal code is required")
+      .max(40, "Postal code is too long"),
     addressCountry: requiredCountryCodeSchema,
     password: z
       .string()
