@@ -2,7 +2,7 @@ name: ventry-main
 
 services:
   ventry:
-    image: harbor.m-loeffler.de/ventry/app:main
+    image: harbor.m-loeffler.de/ventry/app:main-foss
     container_name: ventry-main
     restart: unless-stopped
     env_file:
