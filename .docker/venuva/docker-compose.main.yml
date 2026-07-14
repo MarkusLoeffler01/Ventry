@@ -1,24 +1,26 @@
-name: ventry-dev
+name: venuva
 
 services:
   ventry:
-    image: harbor.m-loeffler.de/ventry/app:dev-foss
-    container_name: ventry-dev
+    image: harbor.m-loeffler.de/ventry/app:main-venuva
+    container_name: venuva
     restart: unless-stopped
     env_file:
-      - .dev.env
+      - .prod.env
     environment:
       NODE_ENV: production
       REDIS_URL: redis://redis:6379
     depends_on:
       redis:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:5001:3000"
+    networks:
+      caddy-public:
+        aliases:
+          - venuva
 
   redis:
     image: redis:7-alpine
-    container_name: ventry-redis-dev
+    container_name: venuva-redis-main
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck:
@@ -27,7 +29,12 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ventry-redis-dev-data:/data
+      - venuva-redis-main-data:/data
 
 volumes:
-  ventry-redis-dev-data:
+  venuva-redis-main-data:
+
+networks:
+  caddy-public:
+    external: true
+    name: caddy-public
