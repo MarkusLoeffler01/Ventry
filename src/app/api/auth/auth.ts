@@ -14,6 +14,7 @@ import EmailVerificationMail from "@/components/emails/EmailVerificationMail";
 import { getTrustedOrigins } from "@/lib/security/origins";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
 import { signUpAdditionalFieldsSchema } from "@/types/schemas/signup";
+import { resolveUniqueUsername, sanitizeUsername } from "@/lib/user/unique-name";
 
 const cookiePrefix = "VENTRY";
 
@@ -75,6 +76,22 @@ export const auth = betterAuth({
             };
         }),
     },
+    databaseHooks: {
+        user: {
+            create: {
+                // Fires for every new user (email/password AND OAuth) right
+                // before the DB insert - the one place a username can be set
+                // that isn't subject to `input: false` field-stripping (see
+                // the `username` additionalField comment above), so this is
+                // the single choke point for auto-generating one.
+                before: async (user) => {
+                    const seed = (typeof user.name === "string" && user.name.trim()) || "user";
+                    const username = await resolveUniqueUsername(sanitizeUsername(seed));
+                    return { data: { username } };
+                },
+            },
+        },
+    },
     user: {
         additionalFields: {
             isAdmin: {
@@ -84,6 +101,35 @@ export const auth = betterAuth({
                 input: false, // not settable by users
             },
             legalName: {
+                type: "string",
+                required: false,
+            },
+            // Unique, changeable handle backing /profile/[username]. Set for
+            // every new user by databaseHooks.user.create.before below
+            // (covers both OAuth and email/password signups at the single
+            // pre-insert choke point), and later only via the dedicated
+            // username-change endpoint (changeUsername()). `input: false`
+            // blocks it from a generic better-auth update-user call, so the
+            // 90-day reservation can't be bypassed.
+            username: {
+                type: "string",
+                required: false,
+                input: false,
+            },
+            // Raw "First Last" name from the OAuth profile, captured once at
+            // signup as a suggestion for the legalName step in
+            // CompleteProfileWizard. Deliberately separate from `legalName`
+            // itself: that field is what gates the onboarding wizard (see
+            // profileCompletion middleware), so pre-filling it here would let
+            // SSO signups skip the wizard entirely.
+            // NOT input:false - better-auth's OAuth-profile merge
+            // (parseAdditionalUserInputFromProviderProfile) silently drops
+            // any additionalField marked input:false before it ever reaches
+            // the DB, which would make mapProfileToUser's value below a
+            // no-op. Harmless to leave settable-by-client: a user can already
+            // freely type any legalName they want via the wizard, so there's
+            // nothing to protect here.
+            oauthLegalNameSuggestion: {
                 type: "string",
                 required: false,
             },
@@ -199,12 +245,15 @@ export const auth = betterAuth({
     socialProviders: {
         google: {
             enabled: true,
+            prompt: "select_account", // Always choose a google account on login
             clientId: process.env.GOOGLE_CLIENT_ID || "",
             clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
             mapProfileToUser(profile) {
+                const clamped = clampDisplayName(profile.name);
                 return {
                     id: profile.sub,
-                    name: clampDisplayName(profile.name),
+                    name: clamped,
+                    oauthLegalNameSuggestion: clamped,
                     email: profile.email,
                     image: profile.picture,
                     emailVerified: profile.email_verified
@@ -217,9 +266,13 @@ export const auth = betterAuth({
             clientId: process.env.GITHUB_CLIENT_ID || "",
             clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
             mapProfileToUser(profile) {
+                const clamped = clampDisplayName(profile.name || profile.login);
                 return {
                     id: profile.id.toString(),
-                    name: clampDisplayName(profile.name || profile.login),
+                    name: clamped,
+                    // profile.login is a handle, not a legal name - only suggest
+                    // one when GitHub actually gave us a "First Last" name.
+                    oauthLegalNameSuggestion: clampDisplayName(profile.name),
                     email: profile.email,
                     image: profile.avatar_url,
                     emailVerified: true // GitHub emails are verified

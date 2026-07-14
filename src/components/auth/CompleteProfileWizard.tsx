@@ -3,10 +3,13 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
+  FormControlLabel,
   Grid,
   InputAdornment,
   Paper,
@@ -32,6 +35,8 @@ import { z } from "zod";
 import authClient from "@/lib/auth/client";
 import { requiredCountryCodeSchema } from "@/types/schemas/country";
 import CountryAutocomplete from "@/components/common/CountryAutocomplete";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { notifyProfilePictureChanged } from "@/lib/user/profilePictureEvents";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -63,10 +68,11 @@ type OrganizerType = "INDIVIDUAL" | "ORGANIZATION";
 
 // ─── Step indices ─────────────────────────────────────────────────────────────
 
-const S_PATH = 0;
-const S_PERSONAL = 1;
-const S_ORGANIZER_TYPE = 2;
-const S_ORG_DETAILS = 3;
+const S_USERNAME = 0;
+const S_PATH = 1;
+const S_PERSONAL = 2;
+const S_ORGANIZER_TYPE = 3;
+const S_ORG_DETAILS = 4;
 
 // ─── Selection Card ───────────────────────────────────────────────────────────
 
@@ -139,12 +145,18 @@ function SelectionCard({
 export default function CompleteProfileWizard({
   callbackUrl,
   defaultLegalName,
+  defaultUsername,
+  avatarUrl,
 }: {
   callbackUrl?: string;
   defaultLegalName?: string;
+  defaultUsername?: string;
+  avatarUrl?: string;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(S_PATH);
+  const [step, setStep] = useState(S_USERNAME);
+  const [username, setUsername] = useState(defaultUsername || "");
+  const [importProfilePicture, setImportProfilePicture] = useState(true);
   const [path, setPath] = useState<Path | null>(null);
   const [organizerType, setOrganizerType] = useState<OrganizerType | null>(null);
   const [personalData, setPersonalData] = useState<PersonalData | null>(null);
@@ -182,6 +194,7 @@ export default function CompleteProfileWizard({
   }, [orgNameValue, orgForm, generateSlug, step]);
 
   const steps = [
+    "Username",
     "Your path",
     "Personal details",
     ...(path === "ORGANIZER" ? ["Organizer type"] : []),
@@ -191,6 +204,24 @@ export default function CompleteProfileWizard({
   const go = (n: number) => {
     setError(null);
     setStep(n);
+  };
+
+  const onUsernameNext = () => {
+    const trimmed = username.trim();
+    if (trimmed.length < 2) {
+      setError("Username must be at least 2 characters.");
+      return;
+    }
+    if (trimmed.length > DISPLAY_NAME_MAX_LENGTH) {
+      setError(`Username must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.`);
+      return;
+    }
+    if (/\s/.test(trimmed)) {
+      setError("Username cannot contain spaces - use hyphens or underscores instead.");
+      return;
+    }
+    setUsername(trimmed);
+    go(S_PATH);
   };
 
   const onPathNext = () => {
@@ -240,6 +271,8 @@ export default function CompleteProfileWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...personal,
+          username,
+          importProfilePicture,
           path,
           organizerType: resolvedOrganizerType ?? undefined,
           ...(org
@@ -252,6 +285,7 @@ export default function CompleteProfileWizard({
         setError(body.error || "Something went wrong");
         return;
       }
+      const body = (await res.json()) as { pictureImported?: boolean };
       // isAdmin (and other fields) changed server-side via a raw fetch, not
       // through an authClient action — the reactive session store that
       // useSession() (AppHeader etc.) reads from only refetches when
@@ -260,6 +294,9 @@ export default function CompleteProfileWizard({
       // (next login, tab focus) happens to trigger a refetch. Flip the
       // signal directly to force it now.
       authClient.$store.notify("$sessionSignal");
+      if (body.pictureImported) {
+        notifyProfilePictureChanged();
+      }
       router.push(callbackUrl || "/");
       router.refresh();
     } catch (err) {
@@ -285,7 +322,65 @@ export default function CompleteProfileWizard({
         </Alert>
       )}
 
-      {/* ── Step 0: Path selection ───────────────────────────────────────── */}
+      {/* ── Step 0: Username ─────────────────────────────────────────────── */}
+      {step === S_USERNAME && (
+        <Box>
+          <Typography variant="h6" gutterBottom fontWeight={600}>
+            Choose your username
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            This is shown on your public profile. We suggested one based on your account name — feel free to change it.
+          </Typography>
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="Username"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            inputProps={{ maxLength: DISPLAY_NAME_MAX_LENGTH }}
+            helperText="No spaces - use hyphens or underscores instead."
+          />
+
+          {avatarUrl && (
+            <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar src={avatarUrl} sx={{ width: 56, height: 56 }} />
+                <Box sx={{ flex: 1 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={importProfilePicture}
+                        onChange={(e) => setImportProfilePicture(e.target.checked)}
+                      />
+                    }
+                    label="Import this as my profile picture"
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    You can always change or remove it later.
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          )}
+
+          <Stack direction="row" justifyContent="flex-end" sx={{ mt: 3 }}>
+            <Button
+              onClick={onUsernameNext}
+              variant="contained"
+              size="large"
+              endIcon={<ArrowForward />}
+              sx={{ py: 1.25 }}
+            >
+              Continue
+            </Button>
+          </Stack>
+        </Box>
+      )}
+
+      {/* ── Step 1: Path selection ───────────────────────────────────────── */}
       {step === S_PATH && (
         <Box>
           <Typography variant="h6" gutterBottom fontWeight={600}>
@@ -317,7 +412,10 @@ export default function CompleteProfileWizard({
             </Grid>
           </Grid>
 
-          <Stack direction="row" justifyContent="flex-end" sx={{ mt: 3 }}>
+          <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
+            <Button onClick={() => go(S_USERNAME)} startIcon={<ArrowBack />} variant="text">
+              Back
+            </Button>
             <Button
               onClick={onPathNext}
               variant="contained"
@@ -331,7 +429,7 @@ export default function CompleteProfileWizard({
         </Box>
       )}
 
-      {/* ── Step 1: Personal details ─────────────────────────────────────── */}
+      {/* ── Step 2: Personal details ─────────────────────────────────────── */}
       {step === S_PERSONAL && (
         <Box component="form" onSubmit={(e) => void onPersonalNext(e)} noValidate>
           <Alert severity="info" sx={{ mb: 2 }}>
@@ -455,7 +553,7 @@ export default function CompleteProfileWizard({
         </Box>
       )}
 
-      {/* ── Step 2: Organizer type ───────────────────────────────────────── */}
+      {/* ── Step 3: Organizer type ───────────────────────────────────────── */}
       {step === S_ORGANIZER_TYPE && (
         <Box>
           <Typography variant="h6" gutterBottom fontWeight={600}>
@@ -515,7 +613,7 @@ export default function CompleteProfileWizard({
         </Box>
       )}
 
-      {/* ── Step 3: Organization details ────────────────────────────────── */}
+      {/* ── Step 4: Organization details ────────────────────────────────── */}
       {step === S_ORG_DETAILS && (
         <Box component="form" onSubmit={(e) => void onOrgDetailsNext(e)} noValidate>
           <Typography variant="h6" gutterBottom fontWeight={600}>

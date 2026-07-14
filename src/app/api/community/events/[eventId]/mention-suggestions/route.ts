@@ -15,11 +15,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ even
     return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
   }
 
-  const q = new URL(req.url).searchParams.get("q")?.trim().replace(/_/g, " ") ?? "";
+  const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
 
   const users = await prisma.user.findMany({
     where: {
-      ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
+      ...(q ? { username: { contains: q, mode: "insensitive" } } : {}),
       OR: [
         { communityPosts: { some: { eventId, status: PostStatus.APPROVED } } },
         {
@@ -37,14 +37,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ even
         },
       ],
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, username: true },
     take: 10,
-    orderBy: { name: "asc" },
+    orderBy: { username: "asc" },
   });
 
   return NextResponse.json({
     users: users
-      .filter(u => u.name)
-      .map(u => ({ id: u.id, name: u.name! })),
+      .filter(u => u.username)
+      .map(u => ({ id: u.id, username: u.username!, name: u.name || u.username! })),
   });
 }

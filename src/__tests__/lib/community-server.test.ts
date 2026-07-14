@@ -121,12 +121,12 @@ describe("serializeCommunityPost — mention pass-through to preloaded comments"
   beforeEach(() => vi.clearAllMocks());
 
   it("passes mentionedUsersById to preloaded comment serialization", () => {
-    const mentionMap = new Map([["u-alice", { id: "u-alice", name: "Alice" }]]);
+    const mentionMap = new Map([["u-alice", { id: "u-alice", name: "Alice", username: "alice" }]]);
     const post = makePost([{ mentionedUserIds: ["u-alice"] }]);
 
     const result = serializeCommunityPost(post, null, mentionMap);
 
-    expect(result.comments[0].mentionedUsers).toEqual([{ id: "u-alice", name: "Alice" }]);
+    expect(result.comments[0].mentionedUsers).toEqual([{ id: "u-alice", name: "Alice", username: "alice" }]);
   });
 
   it("returns empty mentionedUsers when no map provided", () => {
@@ -138,12 +138,12 @@ describe("serializeCommunityPost — mention pass-through to preloaded comments"
   });
 
   it("skips mention IDs not present in the map", () => {
-    const mentionMap = new Map([["u-alice", { id: "u-alice", name: "Alice" }]]);
+    const mentionMap = new Map([["u-alice", { id: "u-alice", name: "Alice", username: "alice" }]]);
     const post = makePost([{ mentionedUserIds: ["u-alice", "u-unknown"] }]);
 
     const result = serializeCommunityPost(post, null, mentionMap);
 
-    expect(result.comments[0].mentionedUsers).toEqual([{ id: "u-alice", name: "Alice" }]);
+    expect(result.comments[0].mentionedUsers).toEqual([{ id: "u-alice", name: "Alice", username: "alice" }]);
   });
 
   it("includes commentCount from _count.comments", () => {

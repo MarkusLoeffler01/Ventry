@@ -29,6 +29,7 @@ async function ProfilePageContent() {
     select: {
       id: true,
       name: true,
+      username: true,
       email: true,
       country: true,
       legalName: true,
@@ -77,12 +78,12 @@ async function ProfilePageContent() {
           <Typography variant="h5" component="h1" fontWeight={700}>
             Profile Settings
           </Typography>
-          {user.name && (
+          {user.username && (
             <Button
               variant="outlined"
               size="small"
               startIcon={<Visibility />}
-              href={`/profile/${encodeURIComponent(user.name)}`}
+              href={`/profile/${encodeURIComponent(user.username)}`}
               target="_blank"
             >
               Preview

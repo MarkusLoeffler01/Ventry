@@ -53,7 +53,7 @@ const mockCommentRow = {
   id: COMMENT_ID,
   postId: POST_ID,
   authorId: USER_ID,
-  content: "Hello @John_Doe!",
+  content: "Hello @[[user-john]]!",
   imageUrls: [],
   gifUrl: null,
   mentionedUserIds: ["user-john"],
@@ -100,14 +100,14 @@ describe("GET /api/community/posts/[postId]/comments", () => {
 
   it("returns comments with mentionedUsers resolved from IDs", async () => {
     p.communityComment.findMany.mockResolvedValue([mockCommentRow]);
-    p.user.findMany.mockResolvedValue([{ id: "user-john", name: "John Doe" }]);
+    p.user.findMany.mockResolvedValue([{ id: "user-john", name: "John Doe", username: "john-doe" }]);
 
     const res = await GET(req(`http://localhost/comments`), PARAMS);
-    const body = await res.json() as { comments: { mentionedUsers: { id: string; name: string }[] }[] };
+    const body = await res.json() as { comments: { mentionedUsers: { id: string; name: string; username: string }[] }[] };
 
     expect(res.status).toBe(200);
     expect(body.comments).toHaveLength(1);
-    expect(body.comments[0].mentionedUsers).toEqual([{ id: "user-john", name: "John Doe" }]);
+    expect(body.comments[0].mentionedUsers).toEqual([{ id: "user-john", name: "John Doe", username: "john-doe" }]);
   });
 
   it("returns empty mentionedUsers for comments with no mentions", async () => {
@@ -210,7 +210,7 @@ describe("POST /api/community/posts/[postId]/comments", () => {
   });
 
   it("notifies a mentioned prior commenter as a reply", async () => {
-    const priorCommenter = { id: "user-john", name: "John Doe" };
+    const priorCommenter = { id: "user-john", name: "John Doe", username: "john-doe" };
     p.user.findMany
       .mockResolvedValueOnce([priorCommenter])
       .mockResolvedValueOnce([priorCommenter]);
@@ -220,11 +220,11 @@ describe("POST /api/community/posts/[postId]/comments", () => {
     p.communityComment.findMany.mockResolvedValueOnce([{ authorId: "user-john" }]);
     p.communityComment.create.mockResolvedValue({
       ...mockCommentRow,
-      content: "Hey @John_Doe",
+      content: "Hey @[[user-john]]",
       mentionedUserIds: ["user-john"],
     });
 
-    const res = await POST(req(`http://localhost/comments`, "POST", { content: "Hey @John_Doe" }), PARAMS);
+    const res = await POST(req(`http://localhost/comments`, "POST", { content: "Hey @[[user-john]]" }), PARAMS);
 
     expect(res.status).toBe(201);
     expect(createNotificationMock).toHaveBeenCalledWith(
@@ -252,24 +252,95 @@ describe("POST /api/community/posts/[postId]/comments", () => {
     expect(createNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("resolves @name tokens and stores user IDs in mentionedUserIds", async () => {
-    const mentioned = { id: "user-john", name: "John Doe" };
-    // First findMany: resolve name → ID. Second findMany: build mention map.
+  it("resolves @[[userId]] tokens and stores verified user IDs in mentionedUserIds", async () => {
+    const mentioned = { id: "user-john", name: "John Doe", username: "john-doe" };
+    // First findMany: verify token id against real users. Second findMany: build mention map.
     p.user.findMany.mockResolvedValueOnce([mentioned]).mockResolvedValueOnce([mentioned]);
-    const created = { ...mockCommentRow, content: "Hey @John_Doe", mentionedUserIds: ["user-john"] };
+    const created = { ...mockCommentRow, content: "Hey @[[user-john]]", mentionedUserIds: ["user-john"] };
     p.communityComment.create.mockResolvedValue(created);
 
     const res = await POST(
-      req(`http://localhost/comments`, "POST", { content: "Hey @John_Doe" }),
+      req(`http://localhost/comments`, "POST", { content: "Hey @[[user-john]]" }),
       PARAMS,
     );
     const body = await res.json() as { comment: { mentionedUsers: { id: string }[] } };
 
     expect(res.status).toBe(201);
-    expect(body.comment.mentionedUsers).toEqual([{ id: "user-john", name: "John Doe" }]);
+    expect(body.comment.mentionedUsers).toEqual([{ id: "user-john", name: "John Doe", username: "john-doe" }]);
     expect(p.communityComment.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ mentionedUserIds: ["user-john"] }),
+      }),
+    );
+  });
+
+  it("resolves a plain @username (not picked from the suggestion dropdown) into a stable id token", async () => {
+    const mentioned = { id: "user-john", name: "John Doe", username: "john-doe" };
+    // 1st findMany: resolve plain "@john-doe" text -> user. 2nd: verify the
+    // resulting @[[user-john]] token id. 3rd: build the mentionedUsers map.
+    p.user.findMany
+      .mockResolvedValueOnce([{ id: "user-john", username: "john-doe" }])
+      .mockResolvedValueOnce([{ id: "user-john" }])
+      .mockResolvedValueOnce([mentioned]);
+    p.communityComment.create.mockResolvedValue({
+      ...mockCommentRow,
+      content: "Hey @[[user-john]] check this out",
+      mentionedUserIds: ["user-john"],
+    });
+
+    const res = await POST(
+      req(`http://localhost/comments`, "POST", { content: "Hey @john-doe check this out" }),
+      PARAMS,
+    );
+    const body = await res.json() as { comment: { mentionedUsers: { id: string }[] } };
+
+    expect(res.status).toBe(201);
+    expect(body.comment.mentionedUsers).toEqual([mentioned]);
+    expect(p.communityComment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          content: "Hey @[[user-john]] check this out",
+          mentionedUserIds: ["user-john"],
+        }),
+      }),
+    );
+  });
+
+  it("leaves an @username with no matching real user as plain text", async () => {
+    p.user.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    p.communityComment.create.mockResolvedValue({
+      ...mockCommentRow,
+      content: "Hey @nobody-here",
+      mentionedUserIds: [],
+    });
+
+    const res = await POST(
+      req(`http://localhost/comments`, "POST", { content: "Hey @nobody-here" }),
+      PARAMS,
+    );
+
+    expect(res.status).toBe(201);
+    expect(p.communityComment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ content: "Hey @nobody-here", mentionedUserIds: [] }),
+      }),
+    );
+  });
+
+  it("ignores a forged/nonexistent mention token id", async () => {
+    p.user.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const created = { ...mockCommentRow, content: "Hey @[[fake-id]]", mentionedUserIds: [] };
+    p.communityComment.create.mockResolvedValue(created);
+
+    const res = await POST(
+      req(`http://localhost/comments`, "POST", { content: "Hey @[[fake-id]]" }),
+      PARAMS,
+    );
+
+    expect(res.status).toBe(201);
+    expect(p.communityComment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ mentionedUserIds: [] }),
       }),
     );
   });

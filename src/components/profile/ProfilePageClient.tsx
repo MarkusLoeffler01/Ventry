@@ -46,6 +46,7 @@ import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
 import CountryAutocomplete from '@/components/common/CountryAutocomplete';
 import { calculateRealisticAge, getBirthDateBounds } from '@/lib/user/birthdate';
 import { diffPayload } from '@/lib/diffPayload';
+import { notifyProfilePictureChanged } from '@/lib/user/profilePictureEvents';
 
 interface ProfilePicture {
   id: string;
@@ -83,6 +84,7 @@ interface ProfileUpdatePayload {
 interface User {
   id: string;
   name?: string | null;
+  username?: string | null;
   email: string;
   country?: string | null;
   legalName?: string | null;
@@ -114,6 +116,7 @@ interface ProfilePageClientProps {
 
 interface ProfileFormData {
   name: string;
+  username: string;
   country: string;
   legalName: string;
   addressLine1: string;
@@ -149,6 +152,7 @@ const PRONOUN_OPTIONS = [
 
 const FIELD_LABELS: Record<string, string> = {
   name: 'Display name',
+  username: 'Username',
   legalName: 'Legal name',
   addressLine1: 'Address',
   addressLine2: 'Address line 2',
@@ -197,6 +201,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
   const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
+    username: user.username || '',
     country: normalizeCountryCode(user.country) || '',
     legalName: user.legalName || '',
     addressLine1: user.addressLine1 || '',
@@ -219,6 +224,12 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       instagram: socialLinks.instagram || '',
     }
   });
+
+  // Tracked separately from ProfileUpdatePayload/baselinePayloadRef: a
+  // username change has side effects (uniqueness + 90-day reservation of the
+  // old handle) that go through their own dedicated endpoint, not the
+  // generic diffed profile PATCH.
+  const usernameBaselineRef = useRef(user.username || '');
 
   const baselinePayloadRef = useRef<ProfileUpdatePayload>({
     name: user.name || '',
@@ -250,6 +261,7 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       if (response.ok) {
         const data = await response.json();
         setProfilePictures(data.profilePictures || []);
+        notifyProfilePictureChanged();
       }
     } catch (error) {
       console.error('Failed to refresh profile pictures:', error);
@@ -295,6 +307,45 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
       setSaving(false);
       setError(`Display name must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.`);
       return;
+    }
+
+    const username = formData.username.trim();
+    if (username !== usernameBaselineRef.current) {
+      if (username.length < 2 || username.length > DISPLAY_NAME_MAX_LENGTH) {
+        setSaving(false);
+        setError(`Username must be between 2 and ${DISPLAY_NAME_MAX_LENGTH} characters.`);
+        return;
+      }
+      if (/\s/.test(username)) {
+        setSaving(false);
+        setError('Username cannot contain spaces.');
+        return;
+      }
+
+      try {
+        const usernameResponse = await fetch('/api/user/username', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+
+        if (!usernameResponse.ok) {
+          let message = 'Failed to update username.';
+          try {
+            const errorPayload = await usernameResponse.json();
+            message = extractApiErrorMessage(errorPayload) ?? message;
+          } catch {
+            // response body wasn't JSON - stick with the generic message
+          }
+          throw new Error(message);
+        }
+
+        usernameBaselineRef.current = username;
+      } catch (err) {
+        setSaving(false);
+        setError(err instanceof Error ? err.message : 'Failed to update username');
+        return;
+      }
     }
 
     const selectedBirthDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : null;
@@ -485,6 +536,15 @@ export default function ProfilePageClient({ user, isOrganization = false }: Prof
             helperText={displayNameTooLong
               ? `Display name must be ${DISPLAY_NAME_MAX_LENGTH} characters or fewer.`
               : `${displayNameLength}/${DISPLAY_NAME_MAX_LENGTH} characters`}
+          />
+
+          <TextField
+            label="Username"
+            value={formData.username}
+            onChange={handleInputChange('username')}
+            fullWidth
+            inputProps={{ maxLength: DISPLAY_NAME_MAX_LENGTH }}
+            helperText="Shown in your profile URL and @mentions. No spaces - use hyphens or underscores instead."
           />
 
           <CountryAutocomplete

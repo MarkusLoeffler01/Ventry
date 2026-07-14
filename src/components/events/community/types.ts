@@ -21,10 +21,11 @@ export type CommunityCommentView = {
   author: {
     id: string;
     name: string;
+    username: string | null;
     imageUrl: string | null;
     isAdmin: boolean;
   };
-  mentionedUsers: { id: string; name: string }[];
+  mentionedUsers: { id: string; name: string; username: string | null }[];
 };
 
 export type CommunityPostView = {
@@ -46,6 +47,7 @@ export type CommunityPostView = {
   author: {
     id: string;
     name: string;
+    username: string | null;
     imageUrl: string | null;
     isAdmin: boolean;
   };

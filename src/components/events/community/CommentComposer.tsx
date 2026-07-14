@@ -17,15 +17,31 @@ import {
   Typography,
 } from "@mui/material";
 import { AddPhotoAlternate, Gif, Send } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
 import GiphyPicker from "./GiphyPicker";
 import type { CommunityCommentView } from "./types";
+
+// Shared between the actual (invisible-text) textarea and the highlight
+// overlay behind it, so both wrap identically and stay pixel-aligned.
+const MENTION_FIELD_FONT_SIZE = "0.875rem";
+const MENTION_FIELD_LINE_HEIGHT = 1.5;
+const MENTION_FIELD_PADDING = "8.5px 14px";
+
+interface MentionTarget {
+  id: string;
+  username: string;
+}
 
 interface CommentComposerProps {
   postId: string;
   eventId: number;
   disabled?: boolean;
-  prefillRequest?: { value: string; seq: number } | null;
+  prefillRequest?: { value: string; seq: number; mention?: MentionTarget } | null;
   onCommentCreated: (comment: CommunityCommentView, pending: boolean) => void;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getErrorMessage(raw: unknown, fallback: string) {
@@ -36,21 +52,79 @@ function getErrorMessage(raw: unknown, fallback: string) {
   return fallback;
 }
 
+function renderHighlightedContent(text: string) {
+  // Highlights any `@run-of-non-space-chars` as a mention-in-progress while
+  // typing, regardless of whether it matches a suggestion or a real user -
+  // this is just live visual feedback, not validation (that happens
+  // server-side at submit time, see resolvePlainMentions in the comments route).
+  const parts = text.split(/(@[^\s@]+)/g);
+  let consumed = 0;
+  return parts.map(part => {
+    const key = `${consumed}-${part}`;
+    consumed += part.length;
+    return part.startsWith("@") && part.length > 1 ? (
+      <Box
+        key={key}
+        component="span"
+        sx={{
+          color: "primary.main",
+          bgcolor: theme => alpha(theme.palette.primary.main, 0.12),
+          borderRadius: "3px",
+        }}
+      >
+        {part}
+      </Box>
+    ) : (
+      <span key={key}>{part}</span>
+    );
+  });
+}
+
 export default function CommentComposer({ postId, eventId, disabled, prefillRequest, onCommentCreated }: CommentComposerProps) {
   const [content, setContent] = useState("");
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const textFieldRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Keeps the highlight overlay's scroll position in sync with the real
+  // (invisible-text) textarea, so highlighted mentions stay aligned once the
+  // content grows past `maxRows` and the textarea starts internally scrolling.
+  useEffect(() => {
+    const el = inputRef.current;
+    const overlay = overlayRef.current;
+    if (!el || !overlay) return;
+    const sync = () => {
+      overlay.scrollTop = el.scrollTop;
+      overlay.scrollLeft = el.scrollLeft;
+    };
+    sync();
+    el.addEventListener("scroll", sync);
+    return () => el.removeEventListener("scroll", sync);
+  // Mount-once: the textarea fires a native "scroll" event any time its
+  // scrollTop changes for any reason (including the browser auto-scrolling
+  // it as typed content grows past maxRows), so no need to re-run per keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Mention autocomplete
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
-  const [suggestions, setSuggestions] = useState<{ id: string; name: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ id: string; username: string; name: string }[]>([]);
   const [highlightIdx, setHighlightIdx] = useState(0);
   const suggestionsOpen = mentionQuery !== null && suggestions.length > 0;
+
+  // Mentions are inserted as friendly `@username` text (good live UX), but
+  // stored as a stable `@[[userId]]` token so they always resolve to the
+  // mentioned user's *current* username - tracked here in insertion order so
+  // submit-time can swap the visible text for the real token.
+  const mentionSpansRef = useRef<MentionTarget[]>([]);
 
   useEffect(() => {
     if (prefillRequest) {
       setContent(c => prefillRequest.value + c);
+      if (prefillRequest.mention) {
+        mentionSpansRef.current.push(prefillRequest.mention);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillRequest?.seq]);
@@ -61,7 +135,7 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
       try {
         const res = await fetch(`/api/community/events/${eventId}/mention-suggestions?q=${encodeURIComponent(mentionQuery)}`);
         if (res.ok) {
-          const data = await res.json() as { users?: { id: string; name: string }[] };
+          const data = await res.json() as { users?: { id: string; username: string; name: string }[] };
           setSuggestions(data.users ?? []);
           setHighlightIdx(0);
         }
@@ -83,11 +157,12 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
     }
   };
 
-  const completeMention = (user: { id: string; name: string }) => {
+  const completeMention = (user: { id: string; username: string }) => {
     const queryEnd = mentionStart + 1 + (mentionQuery?.length ?? 0);
-    const token = `@${user.name.replace(/ /g, "_")} `;
+    const token = `@${user.username} `;
     const newContent = content.slice(0, mentionStart) + token + content.slice(queryEnd);
     setContent(newContent);
+    mentionSpansRef.current.push({ id: user.id, username: user.username });
     setMentionQuery(null);
     setSuggestions([]);
     const newCursorPos = mentionStart + token.length;
@@ -153,11 +228,23 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
     setLoading(true);
 
     try {
+      // Swap each tracked mention's friendly `@username` text for the stable
+      // `@[[userId]]` token, in insertion order. If the user hand-edited a
+      // mention away, its text won't match anymore and it's left as-is
+      // (degrades to plain text, no token embedded).
+      let tokenizedContent = content;
+      for (const mention of mentionSpansRef.current) {
+        tokenizedContent = tokenizedContent.replace(
+          new RegExp(`@${escapeRegExp(mention.username)}(?=\\s|$)`),
+          `@[[${mention.id}]]`,
+        );
+      }
+
       const res = await fetch(`/api/community/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: content.trim() || undefined,
+          content: tokenizedContent.trim() || undefined,
           imageUrls: imageUrl ? [imageUrl] : [],
           gifUrl: gifUrl || undefined,
         }),
@@ -174,6 +261,7 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
 
       onCommentCreated(payload.comment, Boolean(payload.pending));
       setContent("");
+      mentionSpansRef.current = [];
       setImageUrl(null);
       setGifUrl(null);
       setGifPreviewUrl(null);
@@ -225,7 +313,28 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
       ) : null}
 
       <Stack direction="row" spacing={1} alignItems="center">
-        <Box ref={textFieldRef} sx={{ flex: 1, minWidth: 0 }}>
+        <Box ref={textFieldRef} sx={{ flex: 1, minWidth: 0, position: "relative" }}>
+          <Box
+            ref={overlayRef}
+            aria-hidden
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 0,
+              overflow: "hidden",
+              pointerEvents: "none",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              overflowWrap: "break-word",
+              fontFamily: theme => theme.typography.fontFamily,
+              fontSize: MENTION_FIELD_FONT_SIZE,
+              lineHeight: MENTION_FIELD_LINE_HEIGHT,
+              p: MENTION_FIELD_PADDING,
+              color: "text.primary",
+            }}
+          >
+            {renderHighlightedContent(content)}
+          </Box>
           <TextField
             fullWidth
             size="small"
@@ -238,6 +347,24 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
               detectMention(el.value, el.selectionStart ?? el.value.length);
             }}
             disabled={disabled}
+            sx={{
+              position: "relative",
+              zIndex: 1,
+              "& .MuiOutlinedInput-root": { p: 0 },
+              "& .MuiInputBase-input": {
+                p: MENTION_FIELD_PADDING,
+                fontFamily: theme => theme.typography.fontFamily,
+                fontSize: MENTION_FIELD_FONT_SIZE,
+                lineHeight: MENTION_FIELD_LINE_HEIGHT,
+                color: "transparent",
+                caretColor: theme => theme.palette.text.primary,
+              },
+              "& .MuiInputBase-input::placeholder": {
+                color: "text.secondary",
+                opacity: 1,
+                WebkitTextFillColor: "currentColor",
+              },
+            }}
             onKeyDown={e => {
               if (suggestionsOpen) {
                 if (e.key === "ArrowDown") {
@@ -331,8 +458,9 @@ export default function CommentComposer({ postId, eventId, disabled, prefillRequ
                 onMouseEnter={() => setHighlightIdx(i)}
               >
                 <ListItemText
-                  primary={`@${user.name}`}
-                  slotProps={{ primary: { variant: "body2" } }}
+                  primary={`@${user.username}`}
+                  secondary={user.name !== user.username ? user.name : undefined}
+                  slotProps={{ primary: { variant: "body2" }, secondary: { variant: "caption" } }}
                 />
               </ListItemButton>
             ))}
