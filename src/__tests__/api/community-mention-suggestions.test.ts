@@ -46,58 +46,42 @@ describe("GET /api/community/events/[eventId]/mention-suggestions", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns matching users filtered by name prefix", async () => {
+  it("returns matching users filtered by username prefix", async () => {
     getSessionMock.mockReturnValue({ user: { id: "u1" } });
     p.user.findMany.mockResolvedValue([
-      { id: "u-alice", name: "Alice Smith" },
-      { id: "u-alex", name: "Alex Jones" },
+      { id: "u-alice", name: "Alice Smith", username: "alice-smith" },
+      { id: "u-alex", name: "Alex Jones", username: "alex-jones" },
     ]);
 
     const res = await GET(makeReq("al"), PARAMS);
-    const body = await res.json() as { users: { id: string; name: string }[] };
+    const body = await res.json() as { users: { id: string; username: string; name: string }[] };
 
     expect(res.status).toBe(200);
     expect(body.users).toHaveLength(2);
-    expect(body.users[0].name).toBe("Alice Smith");
+    expect(body.users[0].username).toBe("alice-smith");
 
-    // Query must be forwarded (spaces decoded from underscores)
     expect(p.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          name: { contains: "al", mode: "insensitive" },
+          username: { contains: "al", mode: "insensitive" },
         }),
       }),
     );
   });
 
-  it("searches without name filter when query is empty", async () => {
+  it("searches without a username filter when query is empty", async () => {
     getSessionMock.mockReturnValue({ user: { id: "u1" } });
-    p.user.findMany.mockResolvedValue([{ id: "u-bob", name: "Bob" }]);
+    p.user.findMany.mockResolvedValue([{ id: "u-bob", name: "Bob", username: "bob" }]);
 
     const res = await GET(makeReq(""), PARAMS);
     const body = await res.json() as { users: { id: string }[] };
 
     expect(res.status).toBe(200);
     expect(body.users).toHaveLength(1);
-    // No `name` key in where when query empty
+    // No `username` filter key in where when query empty
     expect(p.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.not.objectContaining({ name: expect.anything() }),
-      }),
-    );
-  });
-
-  it("converts underscores to spaces before querying", async () => {
-    getSessionMock.mockReturnValue({ user: { id: "u1" } });
-    p.user.findMany.mockResolvedValue([]);
-
-    await GET(makeReq("John_Doe"), PARAMS);
-
-    expect(p.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          name: { contains: "John Doe", mode: "insensitive" },
-        }),
+        where: expect.not.objectContaining({ username: expect.anything() }),
       }),
     );
   });
@@ -115,11 +99,11 @@ describe("GET /api/community/events/[eventId]/mention-suggestions", () => {
     expect(branches).toContain(String(EVENT_ID));
   });
 
-  it("omits users with null names from results", async () => {
+  it("omits users with no username from results", async () => {
     getSessionMock.mockReturnValue({ user: { id: "u1" } });
     p.user.findMany.mockResolvedValue([
-      { id: "u-named", name: "Alice" },
-      { id: "u-noname", name: null },
+      { id: "u-named", name: "Alice", username: "alice" },
+      { id: "u-nousername", name: "Nameless", username: null },
     ]);
 
     const res = await GET(makeReq("a"), PARAMS);
@@ -127,5 +111,15 @@ describe("GET /api/community/events/[eventId]/mention-suggestions", () => {
 
     expect(body.users).toHaveLength(1);
     expect(body.users[0].id).toBe("u-named");
+  });
+
+  it("falls back to username when name is missing", async () => {
+    getSessionMock.mockReturnValue({ user: { id: "u1" } });
+    p.user.findMany.mockResolvedValue([{ id: "u1", name: null, username: "just-a-handle" }]);
+
+    const res = await GET(makeReq("just"), PARAMS);
+    const body = await res.json() as { users: { id: string; name: string; username: string }[] };
+
+    expect(body.users[0].name).toBe("just-a-handle");
   });
 });

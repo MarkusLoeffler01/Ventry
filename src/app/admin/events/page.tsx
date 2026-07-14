@@ -1,21 +1,24 @@
 import { prisma } from "@/lib/prisma/prisma";
 import EventList from "@/components/admin/events/EventList";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter } from "@/lib/auth/admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect } from "next/navigation";
 import type { SerializedEvent } from "@/types/event";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
 
-export default function AdminEventsPage() {
+type Props = { searchParams: Promise<{ orgFilter?: string }> };
+
+export default function AdminEventsPage({ searchParams }: Props) {
     return (
         <Suspense fallback={<PageLoadingState />}>
-            <AdminEventsPageContent />
+            <AdminEventsPageContent searchParams={searchParams} />
         </Suspense>
     );
 }
 
-async function AdminEventsPageContent() {
+async function AdminEventsPageContent({ searchParams }: Props) {
+    const { orgFilter } = await searchParams;
     const authResult = await checkAdminAuth();
     
     if (!authResult.authorized) {
@@ -30,7 +33,13 @@ async function AdminEventsPageContent() {
         );
     }
 
+    if (!authResult.adminId) {
+        return <div style={{ padding: '20px', color: 'red' }}>Admin profile incomplete.</div>;
+    }
+
+    const eventFilter = await adminEventFilter(authResult.adminId, orgFilter);
     const events = await prisma.event.findMany({
+        where: eventFilter,
         include: {
             _count: {
                 select: { registrations: true }

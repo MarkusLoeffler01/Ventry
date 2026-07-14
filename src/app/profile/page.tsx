@@ -29,6 +29,7 @@ async function ProfilePageContent() {
     select: {
       id: true,
       name: true,
+      username: true,
       email: true,
       country: true,
       legalName: true,
@@ -59,6 +60,7 @@ async function ProfilePageContent() {
       socialLinks: true,
       createdAt: true,
       updatedAt: true,
+      adminProfile: { select: { type: true } },
     }
   });
 
@@ -67,6 +69,7 @@ async function ProfilePageContent() {
   }
 
   const profilePictures = await refreshSignedUrls(user.profilePictures);
+  const isOrganization = user.adminProfile?.type === "ORGANIZATION";
 
   return (
     <Container maxWidth="md">
@@ -75,19 +78,22 @@ async function ProfilePageContent() {
           <Typography variant="h5" component="h1" fontWeight={700}>
             Profile Settings
           </Typography>
-          {user.name && (
+          {user.username && (
             <Button
               variant="outlined"
               size="small"
               startIcon={<Visibility />}
-              href={`/profile/${encodeURIComponent(user.name)}`}
+              href={`/profile/${encodeURIComponent(user.username)}`}
               target="_blank"
             >
               Preview
             </Button>
           )}
         </Box>
-        <ProfilePageClient user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }} />
+        <ProfilePageClient
+          user={{ ...user, profilePictures, socialLinks: user.socialLinks as { telegram?: string; twitter?: string; instagram?: string } | null }}
+          isOrganization={isOrganization}
+        />
       </Box>
     </Container>
   );

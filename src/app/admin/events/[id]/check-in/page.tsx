@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import PageLoadingState from "@/components/common/PageLoadingState";
 import AdminCheckInScanner from "@/components/admin/check-ins/AdminCheckInScanner";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { prisma } from "@/lib/prisma/prisma";
 
 export default function AdminEventCheckInPage({
@@ -22,14 +22,14 @@ async function AdminEventCheckInPageContent({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const authResult = await checkAdminAuth();
-  if (!authResult.authorized) {
-    redirect("/login?callbackUrl=/admin/events");
-  }
-
   const eventId = Number((await params).id);
   if (Number.isNaN(eventId)) {
     notFound();
+  }
+
+  const authResult = await checkEventAdminAuth(eventId);
+  if (!authResult.authorized) {
+    redirect("/login?callbackUrl=/admin/events");
   }
 
   const event = await prisma.event.findUnique({

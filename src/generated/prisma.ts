@@ -1,17 +1,26 @@
 export {
+  AdminInvitationStatus,
+  AdminOrgPermission,
+  AdminType,
   CommunityFeedbackType,
   CommunityPostType,
+  EventStatus,
   ModerationAction,
   NotificationType,
   PaymentStatus,
   PostStatus,
   Prisma,
   PrismaClient,
+  ProductType,
   RegistrationStatus,
   SupportTicketStatus,
 } from "./prisma/client";
 
 export type {
+  Admin,
+  AdminInvitation,
+  AdminOrganization,
+  AdminOrganizationMembership,
   CommunityPost,
   Event,
   Payment,

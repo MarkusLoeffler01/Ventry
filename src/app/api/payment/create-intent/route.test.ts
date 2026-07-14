@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth/session", () => ({
@@ -19,20 +19,40 @@ vi.mock("@/lib/stripe", () => ({
       create: vi.fn(),
     },
   },
+  calculatePlatformFeeAmount: (amountInCents: number) => {
+    const feePercent = Number(process.env.PLATFORM_FEE_PERCENT) || 0;
+    if (feePercent <= 0) return 0;
+    return Math.floor((amountInCents * feePercent) / 100);
+  },
+}));
+
+vi.mock("@/lib/billing/platformFee", () => ({
+  shouldApplyPlatformFeeForEvent: vi.fn(),
 }));
 
 import * as createIntentRoute from "@/app/api/payment/create-intent/route";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma/prisma";
 import { stripe } from "@/lib/stripe";
+import { shouldApplyPlatformFeeForEvent } from "@/lib/billing/platformFee";
 
 const mockedGetSession = getSession as unknown as ReturnType<typeof vi.fn>;
 const mockedFindPayment = prisma.payment.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockedCreateIntent = stripe.paymentIntents.create as unknown as ReturnType<typeof vi.fn>;
+const mockedShouldApplyFee = shouldApplyPlatformFeeForEvent as unknown as ReturnType<typeof vi.fn>;
 
 describe("App Router: /api/payment/create-intent", () => {
+  const originalFeePercent = process.env.PLATFORM_FEE_PERCENT;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.PLATFORM_FEE_PERCENT;
+    mockedShouldApplyFee.mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    if (originalFeePercent === undefined) delete process.env.PLATFORM_FEE_PERCENT;
+    else process.env.PLATFORM_FEE_PERCENT = originalFeePercent;
   });
 
   it("returns 401 when the user is not authenticated", async () => {
@@ -115,5 +135,77 @@ describe("App Router: /api/payment/create-intent", () => {
       },
       on_behalf_of: "acct_123",
     });
+  });
+
+  it("deducts the platform fee when PLATFORM_FEE_PERCENT is configured", async () => {
+    process.env.PLATFORM_FEE_PERCENT = "2";
+    mockedGetSession.mockResolvedValue({ user: { id: "user-1" } });
+    mockedFindPayment.mockResolvedValue({
+      id: "payment-1",
+      amount: 49.99,
+      currency: "EUR",
+      registrationId: "registration-1",
+      userId: "user-1",
+      registration: {
+        eventId: 7,
+        event: {
+          owner: {
+            stripeConnectId: "acct_123",
+          },
+        },
+      },
+    });
+    mockedCreateIntent.mockResolvedValue({ client_secret: "pi_secret_123" });
+
+    await createIntentRoute.POST(
+      new NextRequest("http://localhost/api/payment/create-intent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ paymentId: "payment-1" }),
+      }),
+    );
+
+    // 4999 cents * 2% = 99.98 -> rounds down to 99
+    expect(mockedCreateIntent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 4999,
+        application_fee_amount: 99,
+        on_behalf_of: "acct_123",
+      }),
+    );
+  });
+
+  it("skips the platform fee while the event is under its free-ticket threshold", async () => {
+    process.env.PLATFORM_FEE_PERCENT = "2";
+    mockedShouldApplyFee.mockResolvedValue(false);
+    mockedGetSession.mockResolvedValue({ user: { id: "user-1" } });
+    mockedFindPayment.mockResolvedValue({
+      id: "payment-1",
+      amount: 49.99,
+      currency: "EUR",
+      registrationId: "registration-1",
+      userId: "user-1",
+      registration: {
+        eventId: 7,
+        event: {
+          owner: {
+            stripeConnectId: "acct_123",
+          },
+        },
+      },
+    });
+    mockedCreateIntent.mockResolvedValue({ client_secret: "pi_secret_123" });
+
+    await createIntentRoute.POST(
+      new NextRequest("http://localhost/api/payment/create-intent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ paymentId: "payment-1" }),
+      }),
+    );
+
+    expect(mockedShouldApplyFee).toHaveBeenCalledWith(7);
+    const callArgs = mockedCreateIntent.mock.calls[0][0];
+    expect(callArgs.application_fee_amount).toBeUndefined();
   });
 });

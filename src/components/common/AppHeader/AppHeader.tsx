@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSession } from "@/lib/auth/client";
 import { usePathname } from "next/navigation";
 import NotificationBell from "@/components/common/NotificationBell/NotificationBell";
+import { PROFILE_PICTURE_CHANGED_EVENT } from "@/lib/user/profilePictureEvents";
 
 type ProfilePictureEntry = { signedUrl: string | null; isPrimary: boolean; order: number };
 type ProfilePictureResponse = { profilePictures?: ProfilePictureEntry[] };
@@ -32,37 +33,54 @@ export default function AppHeader() {
 
     const [visible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
+    // `user.image` is the raw OAuth-provider avatar URL, set at signup
+    // regardless of whether the user ever opts in to importing it (see the
+    // "Import this as my profile picture" checkbox in CompleteProfileWizard).
+    // It must never be used as a display fallback here - only an actual
+    // `ProfilePicture` row (created via that opt-in import, or a manual
+    // upload) means the user has chosen an avatar. No picture yet -> initials.
     const [profilePictureState, setProfilePictureState] = useState<{ userId: string; url: string | null } | null>(null);
     const profileImageUrl = profilePictureState && profilePictureState.userId === user?.id
         ? profilePictureState.url
-        : user?.image ?? null;
+        : null;
 
-    useEffect(() => {
-        if (!user?.id) {
+    const userId = user?.id;
+    const fetchProfilePicture = useCallback((signal?: AbortSignal) => {
+        if (!userId) {
             return;
         }
 
-        const controller = new AbortController();
-
-        fetch(`/api/user/profile-picture?userId=${encodeURIComponent(user.id)}`, {
-            signal: controller.signal,
-        })
+        fetch(`/api/user/profile-picture?userId=${encodeURIComponent(userId)}`, { signal })
             .then(r => r.ok ? r.json() as Promise<ProfilePictureResponse> : null)
             .then(data => {
                 const pics = data?.profilePictures ?? [];
                 const primary = pics.find(p => p.isPrimary) ?? pics[0] ?? null;
-                setProfilePictureState({ userId: user.id, url: primary?.signedUrl ?? user.image ?? null });
+                setProfilePictureState({ userId, url: primary?.signedUrl ?? null });
             })
             .catch((error: unknown) => {
                 if (error instanceof DOMException && error.name === "AbortError") {
                     return;
                 }
 
-                setProfilePictureState({ userId: user.id, url: user.image ?? null });
+                setProfilePictureState({ userId, url: null });
             });
+    }, [userId]);
 
+    useEffect(() => {
+        const controller = new AbortController();
+        fetchProfilePicture(controller.signal);
         return () => controller.abort();
-    }, [user?.id, user?.image]);
+    }, [fetchProfilePicture]);
+
+    // The gallery (upload/set-primary/delete/reorder) and the onboarding
+    // OAuth-avatar import both live outside this component and mutate the
+    // same ProfilePicture rows - this event is how they tell the header to
+    // refetch instead of showing a stale avatar until the next full reload.
+    useEffect(() => {
+        const handler = () => fetchProfilePicture();
+        window.addEventListener(PROFILE_PICTURE_CHANGED_EVENT, handler);
+        return () => window.removeEventListener(PROFILE_PICTURE_CHANGED_EVENT, handler);
+    }, [fetchProfilePicture]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -127,14 +145,14 @@ export default function AppHeader() {
                     </Link>
 
                     {user?.isAdmin && (
-                        <Typography
-                            component={Link}
-                            href={isInAdminArea ? "/" : "/admin"}
-                            variant="h6"
-                            sx={{ color: "#f50057", fontWeight: "bold", textDecoration: "none", "&:hover": { opacity: 0.8 }, transition: "opacity 0.2s", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }}
-                        >
-                            {isInAdminArea ? "← Leave admin area" : "Admin"}
-                        </Typography>
+                        <Link href={isInAdminArea ? "/" : "/admin"} style={{ textDecoration: "none" }}>
+                            <Typography
+                                variant="h6"
+                                sx={{ color: "#f50057", fontWeight: "bold", "&:hover": { opacity: 0.8 }, transition: "opacity 0.2s", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }}
+                            >
+                                {isInAdminArea ? "← Leave admin area" : "Admin"}
+                            </Typography>
+                        </Link>
                     )}
                 </Box>
                 

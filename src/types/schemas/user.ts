@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { optionalCountryCodeSchema } from "@/types/schemas/country";
 
 /**
  * User self-registration schema
@@ -67,7 +68,7 @@ export const userSelfSchema = z.object({
     email: z.string().email("Invalid email address"),
     password: z.string().min(8, "Password must be at least 8 characters long"),
     profilePicture: z.string().url("Invalid URL").optional().nullable(),
-  country: z.string().max(100).optional().nullable(),
+  country: optionalCountryCodeSchema,
     isAdmin: z.boolean().optional(),
     emailVerified: z.boolean().optional(),
 });

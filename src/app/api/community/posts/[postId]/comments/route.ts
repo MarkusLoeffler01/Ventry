@@ -7,6 +7,7 @@ import {
   communityCommentInclude,
   loadCommunityActor,
   loadCommunityEvent,
+  refreshCommunityCommentsProfilePictures,
   serializeCommunityComment,
 } from "@/lib/community/server";
 import { getSession } from "@/lib/auth/session";
@@ -23,23 +24,61 @@ function toErrorResponse(error: unknown, logMessage: string) {
   return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
 }
 
-function parseMentionNames(content: string | null | undefined): string[] {
+// Mentions are stored as a stable @[[userId]] token (see CommentComposer),
+// so they always resolve to whatever the mentioned user's *current*
+// username is at render time, regardless of any renames since. Extracts the
+// candidate ids - callers must still verify these against real users before
+// trusting them, since content is client-supplied.
+function parseMentionTokenIds(content: string | null | undefined): string[] {
   if (!content) return [];
-  const matches = content.match(/@(\S+)/g) ?? [];
-  return matches.map(m => m.slice(1).replace(/_/g, " "));
+  const matches = [...content.matchAll(/@\[\[([a-zA-Z0-9_-]+)\]\]/g)];
+  return matches.map(m => m[1]);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The composer only tracks a mention span (-> `@[[id]]` token) when it's
+// inserted via the autocomplete dropdown or a reply prefill. A user can also
+// just type a real `@someusername` by hand without ever seeing/picking a
+// suggestion, so any plain `@username` still left in the content at submit
+// time must be resolved here too - it should always link up if the username
+// is real, not only when it happened to come from the dropdown.
+async function resolvePlainMentions(content: string): Promise<string> {
+  const withoutTokens = content.replace(/@\[\[[a-zA-Z0-9_-]+\]\]/g, "");
+  const candidates = [...new Set([...withoutTokens.matchAll(/@([^\s@]+)/g)].map(m => m[1]))];
+  if (candidates.length === 0) return content;
+
+  const users = await prisma.user.findMany({
+    where: { username: { in: candidates } },
+    select: { id: true, username: true },
+  });
+
+  let resolved = content;
+  for (const user of users) {
+    if (!user.username) continue;
+    resolved = resolved.replace(
+      new RegExp(`@${escapeRegExp(user.username)}(?![\\w-])`, "g"),
+      `@[[${user.id}]]`,
+    );
+  }
+  return resolved;
 }
 
 function buildCommentLink(eventId: number, postId: string, commentId: string) {
   return `/events/${eventId}#post-${postId}-comment-${commentId}`;
 }
 
-async function buildMentionedUsersMap(userIds: string[]): Promise<Map<string, { id: string; name: string }>> {
+async function buildMentionedUsersMap(
+  userIds: string[],
+): Promise<Map<string, { id: string; name: string; username: string | null }>> {
   if (userIds.length === 0) return new Map();
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, username: true },
   });
-  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User" }]));
+  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User", username: u.username }]));
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
@@ -82,6 +121,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
 
     const allMentionedIds = [...new Set(page.flatMap(c => c.mentionedUserIds))];
     const mentionedUsersById = await buildMentionedUsersMap(allMentionedIds);
+    await refreshCommunityCommentsProfilePictures(page);
 
     return NextResponse.json(
       {
@@ -128,12 +168,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
     assertCommunityEnabled(event);
     await assertCanWriteInCommunity(actor, event);
 
-    const mentionNames = parseMentionNames(parsed.data.content);
+    const content = parsed.data.content ? await resolvePlainMentions(parsed.data.content) : parsed.data.content;
+
+    const mentionTokenIds = parseMentionTokenIds(content);
     let mentionedUserIds = parsed.data.mentionedUserIds;
-    if (mentionNames.length > 0) {
+    if (mentionTokenIds.length > 0) {
+      // Never trust token ids blindly - content is client-supplied, so a
+      // forged/nonexistent id must not end up in mentionedUserIds.
       const resolved = await prisma.user.findMany({
-        where: { name: { in: mentionNames } },
-        select: { id: true, name: true },
+        where: { id: { in: mentionTokenIds } },
+        select: { id: true },
       });
       mentionedUserIds = [...new Set([...mentionedUserIds, ...resolved.map(u => u.id)])];
     }
@@ -144,7 +188,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
       data: {
         postId,
         authorId: actor.id,
-        content: parsed.data.content || null,
+        content: content || null,
         imageUrls: parsed.data.imageUrls,
         gifUrl: parsed.data.gifUrl || null,
         mentionedUserIds,
@@ -154,6 +198,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
     });
 
     const mentionedUsersById = await buildMentionedUsersMap(mentionedUserIds);
+    await refreshCommunityCommentsProfilePictures([comment]);
 
     if (comment.status === PostStatus.APPROVED) {
       const commenterName = await prisma.user

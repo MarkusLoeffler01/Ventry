@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma";
 import { CommunityFeedbackType, CommunityPostType, ModerationAction, PostStatus } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma/prisma";
+import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import type { CommunityCommentView } from "@/components/events/community/types";
 
 export const COMMUNITY_REACTIONS = ["LIKE", "LOVE", "CELEBRATE", "HELPFUL"] as const;
@@ -44,7 +45,9 @@ export const communityCommentInclude = {
     select: {
       id: true,
       name: true,
+      username: true,
       image: true,
+      isAdmin: true,
       profilePictures: {
         orderBy: [
           { isPrimary: "desc" as const },
@@ -53,7 +56,10 @@ export const communityCommentInclude = {
         ],
         take: 1,
         select: {
+          id: true,
           signedUrl: true,
+          storagePath: true,
+          cachedUntil: true,
           isPrimary: true,
         },
       },
@@ -70,7 +76,9 @@ export const communityPostInclude = {
     select: {
       id: true,
       name: true,
+      username: true,
       image: true,
+      isAdmin: true,
       profilePictures: {
         orderBy: [
           { isPrimary: "desc" as const },
@@ -79,7 +87,10 @@ export const communityPostInclude = {
         ],
         take: 1,
         select: {
+          id: true,
           signedUrl: true,
+          storagePath: true,
+          cachedUntil: true,
           isPrimary: true,
         },
       },
@@ -100,6 +111,7 @@ export const communityPostInclude = {
         select: {
           id: true,
           name: true,
+          username: true,
           image: true,
           profilePictures: {
             orderBy: [
@@ -109,7 +121,10 @@ export const communityPostInclude = {
             ],
             take: 1,
             select: {
+              id: true,
               signedUrl: true,
+              storagePath: true,
+              cachedUntil: true,
               isPrimary: true,
             },
           },
@@ -145,6 +160,16 @@ export type CommunityEventAccess = {
   communityModerated: boolean;
   communityModerateComments: boolean;
   communityAttendeesOnly: boolean;
+};
+
+type CommunityAuthorWithProfilePictures = {
+  profilePictures: {
+    id: string;
+    signedUrl: string | null;
+    storagePath: string;
+    cachedUntil: Date | string | null;
+    isPrimary: boolean;
+  }[];
 };
 
 function isCommunityFeedbackType(value: unknown): value is typeof CommunityFeedbackType[keyof typeof CommunityFeedbackType] {
@@ -300,19 +325,53 @@ export function assertCanDeletePost(
 
 export async function buildMentionMapForPosts(
   posts: { comments: { mentionedUserIds: string[] }[] }[],
-): Promise<Map<string, { id: string; name: string }>> {
+): Promise<Map<string, { id: string; name: string; username: string | null }>> {
   const allIds = [...new Set(posts.flatMap(p => p.comments.flatMap(c => c.mentionedUserIds)))];
   if (allIds.length === 0) return new Map();
   const users = await prisma.user.findMany({
     where: { id: { in: allIds } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, username: true },
   });
-  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User" }]));
+  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User", username: u.username }]));
+}
+
+async function refreshCommunityAuthorsProfilePictures(authors: CommunityAuthorWithProfilePictures[]) {
+  const picturesById = new Map<string, CommunityAuthorWithProfilePictures["profilePictures"][number]>();
+
+  for (const author of authors) {
+    for (const picture of author.profilePictures) {
+      picturesById.set(picture.id, picture);
+    }
+  }
+
+  if (picturesById.size === 0) {
+    return;
+  }
+
+  const refreshedPictures = await refreshSignedUrls([...picturesById.values()]);
+  const refreshedById = new Map(refreshedPictures.map(picture => [picture.id, picture]));
+
+  for (const author of authors) {
+    author.profilePictures = author.profilePictures.map(picture => refreshedById.get(picture.id) ?? picture);
+  }
+}
+
+export async function refreshCommunityPostsProfilePictures(posts: CommunityPostWithInclude[]) {
+  await refreshCommunityAuthorsProfilePictures(
+    posts.flatMap(post => [
+      post.author,
+      ...post.comments.map(comment => comment.author),
+    ]),
+  );
+}
+
+export async function refreshCommunityCommentsProfilePictures(comments: CommunityCommentWithInclude[]) {
+  await refreshCommunityAuthorsProfilePictures(comments.map(comment => comment.author));
 }
 
 export function serializeCommunityComment(
   comment: CommunityCommentWithInclude,
-  mentionedUsersById?: Map<string, { id: string; name: string }>,
+  mentionedUsersById?: Map<string, { id: string; name: string; username: string | null }>,
 ): CommunityCommentView {
   return {
     id: comment.id,
@@ -326,18 +385,20 @@ export function serializeCommunityComment(
     author: {
       id: comment.author.id,
       name: comment.author.name || "Attendee",
+      username: comment.author.username,
       imageUrl: comment.author.profilePictures[0]?.signedUrl || comment.author.image || null,
+      isAdmin: comment.author.isAdmin,
     },
     mentionedUsers: comment.mentionedUserIds
       .map(id => mentionedUsersById?.get(id))
-      .filter((u): u is { id: string; name: string } => u !== undefined),
+      .filter((u): u is { id: string; name: string; username: string | null } => u !== undefined),
   };
 }
 
 export function serializeCommunityPost(
   post: CommunityPostWithInclude,
   viewerUserId?: string | null,
-  mentionedUsersById?: Map<string, { id: string; name: string }>,
+  mentionedUsersById?: Map<string, { id: string; name: string; username: string | null }>,
 ) {
   const feedbacks = normalizeCommunityFeedbackEntries(post.feedbackEntries, {
     content: post.content,
@@ -379,7 +440,9 @@ export function serializeCommunityPost(
     author: {
       id: post.author.id,
       name: post.author.name || "Attendee",
+      username: post.author.username,
       imageUrl: post.author.profilePictures[0]?.signedUrl || post.author.image || null,
+      isAdmin: post.author.isAdmin,
     },
     reactions: reactionCounts,
     viewerReactions,

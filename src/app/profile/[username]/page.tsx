@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   Container,
   Paper,
@@ -14,6 +14,7 @@ import EmptyState from "@/components/profile/EmptyState";
 import { refreshSignedUrls } from "@/lib/user/profilePicture";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
+import { calculateRealisticAge } from "@/lib/user/birthdate";
 
 interface ProfilePicture {
   id: string;
@@ -31,19 +32,6 @@ interface SocialLinks {
   instagram?: string;
 }
 
-function calculateAge(birthDate: Date): number {
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-
-  return age;
-}
-
 export default function ProfileViewPage({ params }: { params: Promise<{ username: string }> }) {
   return (
     <Suspense fallback={<PageLoadingState />}>
@@ -53,18 +41,19 @@ export default function ProfileViewPage({ params }: { params: Promise<{ username
 }
 
 async function ProfileViewPageContent({ params }: { params: Promise<{ username: string }> }) {
-  const { username } = await params;
+  const { username: slug } = await params;
 
-  // Support both username (name) and legacy ID-based URLs
+  // Support both the current username and legacy ID-based URLs
   const user = await prisma.user.findFirst({
     where: {
       OR: [
-        { name: username },
-        { id: username },
+        { username: slug },
+        { id: slug },
       ]
     },
     select: {
       name: true,
+      username: true,
       country: true,
       profilePictures: {
         orderBy: [
@@ -78,29 +67,42 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
       showAge: true,
       showExactBirthdate: true,
       socialLinks: true,
-      pronouns: true
+      pronouns: true,
+      adminProfile: { select: { type: true } },
     }
   });
 
   if (!user) {
+    // The requested handle might be a recently-vacated username still inside
+    // its 90-day reservation window (see changeUsername()) - redirect to
+    // wherever it lives now instead of 404ing.
+    const reservation = await prisma.usernameHistory.findFirst({
+      where: { username: slug, expiresAt: { gt: new Date() } },
+      select: { user: { select: { username: true } } },
+    });
+    if (reservation?.user?.username) {
+      redirect(`/profile/${reservation.user.username}`);
+    }
     notFound();
   }
 
   const validatedPictures = await refreshSignedUrls(user.profilePictures as ProfilePicture[]);
-  const age = user.dateOfBirth ? calculateAge(user.dateOfBirth) : null;
+  const isOrganization = user.adminProfile?.type === "ORGANIZATION";
+  const age = !isOrganization && user.dateOfBirth ? calculateRealisticAge(user.dateOfBirth) : null;
   const socialLinks = user.socialLinks as SocialLinks | null;
 
-  const hasContent = user.bio || user.dateOfBirth || user.pronouns || validatedPictures.length > 1;
+  const hasContent = user.bio || (!isOrganization && (age !== null || user.pronouns)) || validatedPictures.length > 1;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ overflow: 'hidden', mb: 3 }}>
         <ProfileHeader
           name={user.name}
-          pronouns={user.pronouns}
+          username={user.username}
+          pronouns={isOrganization ? null : user.pronouns}
           profilePictures={validatedPictures}
           age={age}
-          showAge={user.showAge}
+          showAge={!isOrganization && user.showAge}
           country={user.country}
           socialLinks={socialLinks}
         />
@@ -114,13 +116,15 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
 
             {user.bio && <ProfileBio bio={user.bio} />}
 
-            <PersonalInfo
-              dateOfBirth={user.dateOfBirth}
-              showAge={user.showAge}
-              showExactBirthdate={user.showExactBirthdate}
-              pronouns={user.pronouns}
-              age={age}
-            />
+            {!isOrganization && (
+              <PersonalInfo
+                dateOfBirth={age !== null ? user.dateOfBirth : null}
+                showAge={user.showAge}
+                showExactBirthdate={user.showExactBirthdate}
+                pronouns={user.pronouns}
+                age={age}
+              />
+            )}
           </Stack>
         </CardContent>
       </Paper>

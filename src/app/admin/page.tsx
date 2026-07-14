@@ -14,26 +14,51 @@ import {
 } from "@mui/icons-material";
 import StatCard from "@/components/admin/StatCard/StatCard";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter } from "@/lib/auth/admin";
 import { redirect } from "next/navigation";
 
-async function getDashboardStats() {
+async function getDashboardStats(adminId: string, orgScope?: string) {
+    const eventFilter = await adminEventFilter(adminId, orgScope);
+
     const [
-        totalUsers,
-        verifiedUsers,
+        totalRegistrants,
+        verifiedRegistrants,
         totalTickets,
         openTickets,
         eventsByStatus,
         revenue,
     ] = await Promise.all([
-        prisma.user.count(),
-        prisma.user.count({ where: { emailVerified: true } }),
-        prisma.supportTicket.count(),
-        prisma.supportTicket.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
-        prisma.event.groupBy({ by: ["status"], _count: { _all: true } }),
+        // Unique users registered to this admin's events
+        prisma.registration.groupBy({
+            by: ["userId"],
+            where: { event: eventFilter },
+        }).then((rows) => rows.length),
+        // Unique verified users registered to this admin's events
+        prisma.registration.groupBy({
+            by: ["userId"],
+            where: {
+                event: eventFilter,
+                user: { emailVerified: true },
+            },
+        }).then((rows) => rows.length),
+        prisma.supportTicket.count({ where: { event: eventFilter } }),
+        prisma.supportTicket.count({
+            where: {
+                event: eventFilter,
+                status: { in: ["OPEN", "IN_PROGRESS"] },
+            },
+        }),
+        prisma.event.groupBy({
+            by: ["status"],
+            where: eventFilter,
+            _count: { _all: true },
+        }),
         prisma.payment.aggregate({
             _sum: { amount: true },
-            where: { paymentStatus: "COMPLETED" },
+            where: {
+                paymentStatus: "COMPLETED",
+                registration: { event: eventFilter },
+            },
         }),
     ]);
 
@@ -42,8 +67,8 @@ async function getDashboardStats() {
     ) as Record<string, number>;
 
     return {
-        totalUsers,
-        verifiedUsers,
+        totalRegistrants,
+        verifiedRegistrants,
         totalTickets,
         openTickets,
         draftEvents: eventCounts.DRAFT ?? 0,
@@ -61,27 +86,27 @@ function StatSkeleton() {
     );
 }
 
-async function DashboardStats() {
-    const stats = await getDashboardStats();
-    const verifiedPct = stats.totalUsers
-        ? Math.round((stats.verifiedUsers / stats.totalUsers) * 100)
+async function DashboardStats({ adminId, orgScope }: { adminId: string; orgScope?: string }) {
+    const stats = await getDashboardStats(adminId, orgScope);
+    const verifiedPct = stats.totalRegistrants
+        ? Math.round((stats.verifiedRegistrants / stats.totalRegistrants) * 100)
         : 0;
 
     return (
         <>
-            {/* Users */}
+            {/* Registrants */}
             <Grid size={12}>
-                <Typography variant="h6" fontWeight={600} color="text.secondary">Users</Typography>
+                <Typography variant="h6" fontWeight={600} color="text.secondary">Registrants</Typography>
                 <Divider sx={{ mt: 0.5, mb: 2 }} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-                <StatCard label="Total Users" value={stats.totalUsers} Icon={People} color="primary.main" />
+                <StatCard label="Total Registrants" value={stats.totalRegistrants} Icon={People} color="primary.main" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                 <StatCard
-                    label="Verified Users"
-                    value={stats.verifiedUsers}
-                    sub={`${verifiedPct}% of all users`}
+                    label="Verified Registrants"
+                    value={stats.verifiedRegistrants}
+                    sub={`${verifiedPct}% of registrants`}
                     Icon={VerifiedUser}
                     color="success.main"
                 />
@@ -127,7 +152,7 @@ async function DashboardStats() {
             <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                 <StatCard
                     label="Total Revenue (completed)"
-                    value={`€\u202f${stats.totalRevenue.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    value={`€ ${stats.totalRevenue.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     Icon={AttachMoney}
                     color="success.main"
                     sub="See Billing for full breakdown"
@@ -137,9 +162,21 @@ async function DashboardStats() {
     );
 }
 
-export default async function AdminDashboardPage() {
+type Props = { searchParams: Promise<{ orgFilter?: string }> };
+
+export default async function AdminDashboardPage({ searchParams }: Props) {
     const auth = await checkAdminAuth();
     if (!auth.authorized) redirect("/login");
+
+    if (!auth.adminId) {
+        return (
+            <Box>
+                <Typography color="error">Admin profile incomplete.</Typography>
+            </Box>
+        );
+    }
+
+    const { orgFilter } = await searchParams;
 
     return (
         <Box>
@@ -153,7 +190,7 @@ export default async function AdminDashboardPage() {
                         <StatSkeleton key={i} />
                     ))}
                 >
-                    <DashboardStats />
+                    <DashboardStats adminId={auth.adminId} orgScope={orgFilter} />
                 </Suspense>
             </Grid>
         </Box>

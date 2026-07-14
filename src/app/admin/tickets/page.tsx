@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Alert, Box, Typography } from "@mui/material";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma/prisma";
 import AdminTicketsOverview from "@/components/admin/tickets/AdminTicketsOverview";
 import type { AdminTicket } from "@/components/admin/tickets/AdminTicketsOverview";
@@ -34,15 +34,18 @@ type AdminTicketRow = Prisma.SupportTicketGetPayload<{
   include: typeof adminTicketInclude;
 }>;
 
-export default function AdminTicketsPage() {
+type Props = { searchParams: Promise<{ orgFilter?: string }> };
+
+export default function AdminTicketsPage({ searchParams }: Props) {
   return (
     <Suspense fallback={<PageLoadingState />}>
-      <AdminTicketsPageContent />
+      <AdminTicketsPageContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function AdminTicketsPageContent() {
+async function AdminTicketsPageContent({ searchParams }: Props) {
+  const { orgFilter } = await searchParams;
   const authResult = await checkAdminAuth();
 
   if (!authResult.authorized) {
@@ -61,15 +64,9 @@ async function AdminTicketsPageContent() {
     return <Alert severity="error">Your account has no admin profile.</Alert>;
   }
 
+  const eventFilter = await adminEventFilter(authResult.adminId, orgFilter);
   const tickets = await prisma.supportTicket.findMany({
-    where: {
-      event: {
-        OR: [
-          { ownerId: authResult.adminId },
-          { ownerId: null },
-        ],
-      },
-    },
+    where: { event: eventFilter },
     include: adminTicketInclude,
     orderBy: {
       updatedAt: "desc",

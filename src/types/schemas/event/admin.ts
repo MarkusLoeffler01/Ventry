@@ -43,7 +43,12 @@ type AdminGetEventInput = z.infer<typeof adminGetEventSchema>;
  */
 // Apply `.partial()` to the base schema first, then safe-extend with admin-only fields.
 // This avoids attempting to extend an object that already contains refinements.
-const adminUpdateEventSchema = EventBaseObject.partial().extend(AdminOnlySchema.shape).superRefine(checkDateOrder).strict();
+// `status` is redefined without AdminOnlySchema's `.default("DRAFT")`: a diffed/partial
+// PATCH that omits an unchanged `status` must not silently reset it back to DRAFT.
+const adminUpdateEventSchema = EventBaseObject.partial().extend({
+    ...AdminOnlySchema.shape,
+    status: z.enum(["DRAFT", "PUBLISHED", "CANCELLED"]).optional(),
+}).superRefine(checkDateOrder).strict();
 type AdminUpdateEventInput = z.input<typeof adminUpdateEventSchema>;
 
 

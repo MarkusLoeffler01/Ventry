@@ -152,6 +152,20 @@ export default function CommunityPostCard({
                   {post.author.name}
                 </Typography>
               </MuiLink>
+              {post.author.username ? (
+                <Typography variant="caption" color="text.secondary">
+                  @{post.author.username}
+                </Typography>
+              ) : null}
+              {post.author.isAdmin ? (
+                <Chip
+                  label="Organizer"
+                  size="small"
+                  color="secondary"
+                  variant="filled"
+                  sx={{ fontSize: "0.6rem", height: 18, fontWeight: 700 }}
+                />
+              ) : null}
               {post.pinned ? (
                 <Tooltip title="Pinned post">
                   <PushPin sx={{ fontSize: "0.95rem" }} color="primary" />

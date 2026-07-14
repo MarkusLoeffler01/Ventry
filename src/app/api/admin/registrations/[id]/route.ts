@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
+import { checkAdminAuth, adminEventFilter, checkEventAdminAuth, forbiddenResponse } from "@/lib/auth/admin";
 import { NotificationType, type Prisma } from "@/generated/prisma";
 import { renderComponentToHTML } from "@/lib/helpers/html";
 import RegistrationUpdateMail from "@/components/emails/RegistrationUpdateMail";
@@ -65,13 +65,17 @@ export async function PATCH(
             return forbiddenResponse(authResult.error);
         }
 
+        if (!authResult.adminId) {
+            return NextResponse.json({ error: "Admin profile incomplete" }, { status: 403 });
+        }
+
         const id = (await params).id;
         const body = await req.json();
-        
-        const { 
-            status, 
-            preferences, 
-            customFieldData, 
+
+        const {
+            status,
+            preferences,
+            customFieldData,
             paymentStatus,
             paymentAmount,
             notes: changeReason
@@ -84,6 +88,22 @@ export async function PATCH(
         }) as RegistrationWithAdminContext | null;
 
         if (!current) return NextResponse.json({ error: "Registration not found" }, { status: 404 });
+
+        // Verify this admin owns the event this registration belongs to
+        const eventFilter = await adminEventFilter(authResult.adminId);
+        const accessible = await prisma.event.findFirst({
+            where: { id: current.eventId, ...eventFilter },
+            select: { id: true },
+        });
+        if (!accessible) return forbiddenResponse("No access to this registration");
+
+        // Org-member access to approval status changes requires EVENT_APPROVAL permission
+        if (status === "APPROVED") {
+          const approvalAuth = await checkEventAdminAuth(current.eventId, "EVENT_APPROVAL", req.headers);
+          if (!approvalAuth.authorized) {
+            return forbiddenResponse(approvalAuth.error ?? "EVENT_APPROVAL permission required");
+          }
+        }
 
         const changes: Array<{ label: string; old: string; new: string }> = [];
 

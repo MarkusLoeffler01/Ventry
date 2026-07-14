@@ -5,6 +5,7 @@ import {
   Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   IconButton,
@@ -32,10 +33,38 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function renderCommentText(text: string, mentionedUsers: { id: string; name: string }[]) {
-  const parts = text.split(/(@\S+)/g);
+type MentionedUser = { id: string; name: string; username: string | null };
+
+// New-format mentions store a stable `@[[userId]]` token (see
+// CommentComposer), so they always resolve to whatever the mentioned user's
+// *current* username is - a pure id lookup, no string-matching. Older
+// comments (pre-rework) still have the legacy literal `@Name_With_Underscores`
+// text baked in, so those are matched by name as a fallback - unchanged,
+// still fragile to renames, but not regressed.
+function renderCommentText(text: string, mentionedUsers: MentionedUser[]) {
+  const parts = text.split(/(@\[\[[a-zA-Z0-9_-]+\]\]|@\S+)/g);
   return parts.map((part) => {
     if (!part.startsWith("@")) return part;
+
+    const tokenMatch = part.match(/^@\[\[([a-zA-Z0-9_-]+)\]\]$/);
+    if (tokenMatch) {
+      const user = mentionedUsers.find(u => u.id === tokenMatch[1]);
+      if (user?.username) {
+        return (
+          <MuiLink
+            key={`mention-${user.id}`}
+            component={NextLink}
+            href={`/profile/${user.username}`}
+            fontWeight={700}
+            underline="hover"
+          >
+            @{user.username}
+          </MuiLink>
+        );
+      }
+      return null;
+    }
+
     const token = part.slice(1);
     const nameToMatch = token.replace(/_/g, " ");
     const user = mentionedUsers.find(u => u.name === nameToMatch || u.name.replace(/ /g, "_") === token);
@@ -44,7 +73,7 @@ function renderCommentText(text: string, mentionedUsers: { id: string; name: str
         <MuiLink
           key={`mention-${user.id}-${token}`}
           component={NextLink}
-          href={`/profile/${user.id}`}
+          href={`/profile/${user.username ?? user.id}`}
           fontWeight={700}
           underline="hover"
         >
@@ -81,7 +110,9 @@ export default function CommentList({
   const [loadingMore, setLoadingMore] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [displayedTotal, setDisplayedTotal] = useState(totalCount);
-  const [prefillRequest, setPrefillRequest] = useState<{ value: string; seq: number } | null>(null);
+  const [prefillRequest, setPrefillRequest] = useState<
+    { value: string; seq: number; mention?: { id: string; username: string } } | null
+  >(null);
   const [targetCommentId, setTargetCommentId] = useState<string | null>(null);
 
   const handleCommentCreated = (comment: CommunityCommentView, pending: boolean) => {
@@ -92,9 +123,14 @@ export default function CommentList({
     }
   };
 
-  const handleReply = (authorName: string) => {
-    const mention = `@${authorName.replace(/ /g, "_")} `;
-    setPrefillRequest(prev => ({ value: mention, seq: (prev?.seq ?? 0) + 1 }));
+  const handleReply = (author: { id: string; username: string | null }) => {
+    const username = author.username;
+    if (!username) return;
+    setPrefillRequest(prev => ({
+      value: `@${username} `,
+      seq: (prev?.seq ?? 0) + 1,
+      mention: { id: author.id, username },
+    }));
   };
 
   const handleLoadMore = useCallback(async () => {
@@ -233,7 +269,7 @@ export default function CommentList({
                   </Avatar>
                 </NextLink>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={0.5} alignItems="baseline" flexWrap="wrap" useFlexGap>
+                  <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
                     <MuiLink
                       component={NextLink}
                       href={`/profile/${comment.author.id}`}
@@ -244,6 +280,20 @@ export default function CommentList({
                         {comment.author.name}
                       </Typography>
                     </MuiLink>
+                    {comment.author.username ? (
+                      <Typography variant="caption" color="text.secondary">
+                        @{comment.author.username}
+                      </Typography>
+                    ) : null}
+                    {comment.author.isAdmin ? (
+                      <Chip
+                        label="Organizer"
+                        size="small"
+                        color="secondary"
+                        variant="filled"
+                        sx={{ fontSize: "0.55rem", height: 16, fontWeight: 700 }}
+                      />
+                    ) : null}
                     <Typography variant="caption" color="text.secondary">
                       {createdAt}
                     </Typography>
@@ -274,7 +324,7 @@ export default function CommentList({
                       size="small"
                       variant="text"
                       startIcon={<Reply sx={{ fontSize: "0.85rem" }} />}
-                      onClick={() => handleReply(comment.author.name)}
+                      onClick={() => handleReply(comment.author)}
                       sx={{ mt: 0.25, minWidth: 0, p: "2px 6px", fontSize: "0.7rem", textTransform: "none", color: "text.secondary" }}
                     >
                       Reply

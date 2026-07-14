@@ -99,7 +99,7 @@ async function EventDetailPageContent({
 
   if (!event) notFound();
 
-  // Check if user is admin or owner
+  // Check if user owns or has org access to this event
   let canEdit = false;
   if (session?.user?.id) {
     const dbUser = await prisma.user.findUnique({
@@ -108,12 +108,18 @@ async function EventDetailPageContent({
         isAdmin: true,
         adminProfile: {
           select: {
-            id: true
-          }
-        }
-      }
+            id: true,
+            organizationMemberships: { select: { organizationId: true } },
+          },
+        },
+      },
     });
-    canEdit = !!dbUser?.isAdmin || event.ownerId === dbUser?.adminProfile?.id;
+    const adminId = dbUser?.adminProfile?.id;
+    const orgIds = dbUser?.adminProfile?.organizationMemberships.map((m) => m.organizationId) ?? [];
+    canEdit =
+      !!adminId &&
+      (event.ownerId === adminId ||
+        (event.organizationId != null && orgIds.includes(event.organizationId)));
   }
 
   // If it was a scheduled draft, update its status to PUBLISHED proactively

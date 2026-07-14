@@ -1,0 +1,41 @@
+name: venuva-dev
+
+services:
+  venuva-dev:
+    image: harbor.m-loeffler.de/ventry/app:dev-venuva
+    container_name: venuva-dev
+    restart: unless-stopped
+    env_file:
+      - .dev.env
+    environment:
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      caddy-public:
+        aliases:
+          - venuva-dev
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: venuva-redis-dev
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - venuva-redis-dev-data:/data
+
+volumes:
+  venuva-redis-dev-data:
+
+networks:
+  caddy-public:
+    external: true
+    name: caddy-public

@@ -41,8 +41,12 @@ import {
 import ProfilePictureGallery from './ProfilePictureGallery';
 import LinkedAccounts from './LinkedAccounts';
 import MyRegistrations from './MyRegistrations';
-import { COUNTRIES } from '@/lib/countries';
+import { normalizeCountryCode } from '@/lib/countries';
 import { DISPLAY_NAME_MAX_LENGTH } from '@/lib/user/display-name';
+import CountryAutocomplete from '@/components/common/CountryAutocomplete';
+import { calculateRealisticAge, getBirthDateBounds } from '@/lib/user/birthdate';
+import { diffPayload } from '@/lib/diffPayload';
+import { notifyProfilePictureChanged } from '@/lib/user/profilePictureEvents';
 
 interface ProfilePicture {
   id: string;
@@ -58,9 +62,29 @@ interface SocialLinks {
   instagram?: string;
 }
 
+interface ProfileUpdatePayload {
+  name: string;
+  country: string | null;
+  legalName: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  bio: string;
+  dateOfBirth: string | undefined;
+  pronouns: string;
+  showAge: boolean;
+  showExactBirthdate: boolean;
+  socialLinks: SocialLinks;
+  [key: string]: unknown;
+}
+
 interface User {
   id: string;
   name?: string | null;
+  username?: string | null;
   email: string;
   country?: string | null;
   legalName?: string | null;
@@ -87,10 +111,12 @@ interface User {
 
 interface ProfilePageClientProps {
   user: User;
+  isOrganization?: boolean;
 }
 
 interface ProfileFormData {
   name: string;
+  username: string;
   country: string;
   legalName: string;
   addressLine1: string;
@@ -124,6 +150,45 @@ const PRONOUN_OPTIONS = [
   'choose my own pronouns'
 ];
 
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Display name',
+  username: 'Username',
+  legalName: 'Legal name',
+  addressLine1: 'Address',
+  addressLine2: 'Address line 2',
+  addressCity: 'City',
+  addressState: 'State/Region',
+  addressPostalCode: 'Postal code',
+  country: 'Country',
+  addressCountry: 'Address country',
+  bio: 'Bio',
+  dateOfBirth: 'Date of birth',
+  pronouns: 'Pronouns',
+  socialLinks: 'Social links',
+};
+
+// Server validation errors come back as a zod tree: { properties: { field: { errors: [...] } } }.
+// Without this, a rejected save just says "Failed to update profile" with no clue which field broke.
+function extractApiErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const { error } = payload as { error?: unknown };
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return null;
+
+  const properties = (error as { properties?: Record<string, { errors?: string[] }> }).properties;
+  if (properties) {
+    for (const [field, detail] of Object.entries(properties)) {
+      const message = detail?.errors?.[0];
+      if (message) {
+        return `${FIELD_LABELS[field] || field}: ${message}`;
+      }
+    }
+  }
+
+  const topLevelErrors = (error as { errors?: string[] }).errors;
+  return topLevelErrors?.[0] ?? null;
+}
+
 const sectionSx = {
   p: { xs: 2, md: 2.5 },
   border: '1px solid',
@@ -132,20 +197,23 @@ const sectionSx = {
   bgcolor: 'background.paper',
 };
 
-export default function ProfilePageClient({ user }: ProfilePageClientProps) {
+export default function ProfilePageClient({ user, isOrganization = false }: ProfilePageClientProps) {
   const socialLinks = (user.socialLinks as SocialLinks | null | undefined) ?? {};
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user.name || '',
-    country: user.country || '',
+    username: user.username || '',
+    country: normalizeCountryCode(user.country) || '',
     legalName: user.legalName || '',
     addressLine1: user.addressLine1 || '',
     addressLine2: user.addressLine2 || '',
     addressCity: user.addressCity || '',
     addressState: user.addressState || '',
     addressPostalCode: user.addressPostalCode || '',
-    addressCountry: user.addressCountry || '',
+    addressCountry: normalizeCountryCode(user.addressCountry) || '',
     bio: user.bio || '',
-    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
+    dateOfBirth: calculateRealisticAge(user.dateOfBirth) !== null && user.dateOfBirth
+      ? new Date(user.dateOfBirth).toISOString().split('T')[0]
+      : '',
     pronouns: user.pronouns || '',
     showAge: user.showAge ?? true,
     showExactBirthdate: user.showExactBirthdate ?? false,
@@ -157,6 +225,34 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     }
   });
 
+  // Tracked separately from ProfileUpdatePayload/baselinePayloadRef: a
+  // username change has side effects (uniqueness + 90-day reservation of the
+  // old handle) that go through their own dedicated endpoint, not the
+  // generic diffed profile PATCH.
+  const usernameBaselineRef = useRef(user.username || '');
+
+  const baselinePayloadRef = useRef<ProfileUpdatePayload>({
+    name: user.name || '',
+    country: normalizeCountryCode(user.country) || null,
+    legalName: user.legalName || null,
+    addressLine1: user.addressLine1 || null,
+    addressLine2: user.addressLine2 || null,
+    addressCity: user.addressCity || null,
+    addressState: user.addressState || null,
+    addressPostalCode: user.addressPostalCode || null,
+    addressCountry: normalizeCountryCode(user.addressCountry) || null,
+    bio: user.bio || '',
+    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString() : undefined,
+    pronouns: user.pronouns || '',
+    showAge: user.showAge ?? true,
+    showExactBirthdate: user.showExactBirthdate ?? false,
+    socialLinks: {
+      ...(socialLinks.telegram && { telegram: socialLinks.telegram }),
+      ...(socialLinks.twitter && { twitter: socialLinks.twitter }),
+      ...(socialLinks.instagram && { instagram: socialLinks.instagram }),
+    },
+  });
+
   const [profilePictures, setProfilePictures] = useState<ProfilePicture[]>(user.profilePictures);
 
   const refreshProfilePictures = async () => {
@@ -165,6 +261,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
       if (response.ok) {
         const data = await response.json();
         setProfilePictures(data.profilePictures || []);
+        notifyProfilePictureChanged();
       }
     } catch (error) {
       console.error('Failed to refresh profile pictures:', error);
@@ -212,6 +309,56 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
       return;
     }
 
+    const username = formData.username.trim();
+    if (username !== usernameBaselineRef.current) {
+      if (username.length < 2 || username.length > DISPLAY_NAME_MAX_LENGTH) {
+        setSaving(false);
+        setError(`Username must be between 2 and ${DISPLAY_NAME_MAX_LENGTH} characters.`);
+        return;
+      }
+      if (/\s/.test(username)) {
+        setSaving(false);
+        setError('Username cannot contain spaces.');
+        return;
+      }
+
+      try {
+        const usernameResponse = await fetch('/api/user/username', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+
+        if (!usernameResponse.ok) {
+          let message = 'Failed to update username.';
+          try {
+            const errorPayload = await usernameResponse.json();
+            message = extractApiErrorMessage(errorPayload) ?? message;
+          } catch {
+            // response body wasn't JSON - stick with the generic message
+          }
+          throw new Error(message);
+        }
+
+        usernameBaselineRef.current = username;
+      } catch (err) {
+        setSaving(false);
+        setError(err instanceof Error ? err.message : 'Failed to update username');
+        return;
+      }
+    }
+
+    const selectedBirthDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : null;
+    const birthDateBounds = getBirthDateBounds();
+    if (
+      selectedBirthDate &&
+      (Number.isNaN(selectedBirthDate.getTime()) || calculateRealisticAge(formData.dateOfBirth) === null)
+    ) {
+      setSaving(false);
+      setError(`Birth date must be between ${birthDateBounds.min} and ${birthDateBounds.max}.`);
+      return;
+    }
+
     const socialLinksPayload: SocialLinks = {};
     if (formData.socialLinks.telegram) socialLinksPayload.telegram = formData.socialLinks.telegram;
     if (formData.socialLinks.twitter) socialLinksPayload.twitter = formData.socialLinks.twitter;
@@ -220,34 +367,52 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
       ? formData.customPronouns?.trim() || ''
       : formData.pronouns;
 
+    const payload: ProfileUpdatePayload = {
+      name: displayName,
+      country: formData.country || null,
+      legalName: formData.legalName || null,
+      addressLine1: formData.addressLine1 || null,
+      addressLine2: formData.addressLine2 || null,
+      addressCity: formData.addressCity || null,
+      addressState: formData.addressState || null,
+      addressPostalCode: formData.addressPostalCode || null,
+      addressCountry: formData.addressCountry || null,
+      bio: formData.bio,
+      dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
+      pronouns,
+      showAge: formData.showAge,
+      showExactBirthdate: formData.showExactBirthdate,
+      socialLinks: socialLinksPayload,
+    };
+
+    const diff = diffPayload(baselinePayloadRef.current, payload);
+
+    if (Object.keys(diff).length === 0) {
+      setSaving(false);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      return;
+    }
+
     try {
       const response = await fetch('/api/user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          name: displayName,
-          country: formData.country || null,
-          legalName: formData.legalName || null,
-          addressLine1: formData.addressLine1 || null,
-          addressLine2: formData.addressLine2 || null,
-          addressCity: formData.addressCity || null,
-          addressState: formData.addressState || null,
-          addressPostalCode: formData.addressPostalCode || null,
-          addressCountry: formData.addressCountry || null,
-          bio: formData.bio,
-          dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString() : undefined,
-          pronouns,
-          showAge: formData.showAge,
-          showExactBirthdate: formData.showExactBirthdate,
-          socialLinks: socialLinksPayload,
-        })
+        body: JSON.stringify({ id: user.id, ...diff })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        let message = 'Failed to update profile.';
+        try {
+          const errorPayload = await response.json();
+          message = extractApiErrorMessage(errorPayload) ?? message;
+        } catch {
+          // response body wasn't JSON - stick with the generic message
+        }
+        throw new Error(message);
       }
 
+      baselinePayloadRef.current = payload;
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -297,18 +462,8 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
     }
   };
 
-  const calculateAge = (birthDate: Date) => {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
-
+  const birthDateBounds = getBirthDateBounds();
+  const displayedAge = formData.dateOfBirth ? calculateRealisticAge(formData.dateOfBirth) : null;
   const displayNameLength = formData.name.length;
   const displayNameTooLong = displayNameLength > DISPLAY_NAME_MAX_LENGTH;
   const hasCheckInIdentity = Boolean(
@@ -384,22 +539,20 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
           />
 
           <TextField
+            label="Username"
+            value={formData.username}
+            onChange={handleInputChange('username')}
+            fullWidth
+            inputProps={{ maxLength: DISPLAY_NAME_MAX_LENGTH }}
+            helperText="Shown in your profile URL and @mentions. No spaces - use hyphens or underscores instead."
+          />
+
+          <CountryAutocomplete
             label="Country"
             value={formData.country}
-            onChange={handleInputChange('country')}
-            select
-            fullWidth
+            onChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
             helperText="Shown on your profile with a flag"
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            {COUNTRIES.map((c) => (
-              <MenuItem key={c.code} value={c.code}>
-                {String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(0) - 65)}{String.fromCodePoint(0x1f1e6 + c.code.charCodeAt(1) - 65)} {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
 
           <Accordion variant="outlined" disableGutters sx={{ borderRadius: 1, '&:before': { display: 'none' } }}>
             <AccordionSummary
@@ -410,10 +563,12 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                 <Badge color="action" sx={{ flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="subtitle1" fontWeight={700}>
-                    Check-in Identity
+                    {isOrganization ? "Organization Details" : "Check-in Identity"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Legal name and address for on-site verification.
+                    {isOrganization
+                      ? "Legal name and address of your organization."
+                      : "Legal name and address for on-site verification."}
                   </Typography>
                 </Box>
                 <Chip
@@ -435,6 +590,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                   value={formData.legalName}
                   onChange={handleInputChange('legalName')}
                   fullWidth
+                  inputProps={{ maxLength: 200 }}
                   helperText="Used by event staff for ID checks."
                 />
 
@@ -444,6 +600,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                   onChange={handleInputChange('addressLine1')}
                   fullWidth
                   autoComplete="street-address"
+                  inputProps={{ maxLength: 200 }}
                 />
 
                 <TextField
@@ -452,6 +609,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                   onChange={handleInputChange('addressLine2')}
                   fullWidth
                   autoComplete="address-line2"
+                  inputProps={{ maxLength: 200 }}
                 />
 
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -461,6 +619,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                     onChange={handleInputChange('addressCity')}
                     fullWidth
                     autoComplete="address-level2"
+                    inputProps={{ maxLength: 120 }}
                   />
 
                   <TextField
@@ -469,6 +628,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                     onChange={handleInputChange('addressState')}
                     fullWidth
                     autoComplete="address-level1"
+                    inputProps={{ maxLength: 120 }}
                   />
                 </Stack>
 
@@ -479,14 +639,13 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
                     onChange={handleInputChange('addressPostalCode')}
                     fullWidth
                     autoComplete="postal-code"
+                    inputProps={{ maxLength: 40 }}
                   />
 
-                  <TextField
+                  <CountryAutocomplete
                     label="Address country"
                     value={formData.addressCountry}
-                    onChange={handleInputChange('addressCountry')}
-                    fullWidth
-                    autoComplete="country-name"
+                    onChange={(value) => setFormData(prev => ({ ...prev, addressCountry: value }))}
                   />
                 </Stack>
               </Stack>
@@ -502,56 +661,65 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             multiline
             rows={4}
             fullWidth
-            placeholder="Tell us about yourself..."
+            placeholder={isOrganization ? "Tell us about your organization..." : "Tell us about yourself..."}
             inputProps={{ maxLength: 500 }}
             helperText={`${formData.bio.length}/500 characters`}
           />
 
-          <TextField
-            label="Date of Birth"
-            type="date"
-            value={formData.dateOfBirth}
-            onChange={handleInputChange('dateOfBirth')}
-            fullWidth
-            helperText="Your age will only be shown if you enable it in privacy settings"
-            InputLabelProps={{ shrink: true }}
-          />
-
-          {formData.dateOfBirth && !Number.isNaN(new Date(formData.dateOfBirth).getTime()) && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip
-                label={`Age: ${calculateAge(new Date(formData.dateOfBirth))}`}
-                color={formData.showAge ? 'primary' : 'default'}
-                icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+          {!isOrganization && (
+            <>
+              <TextField
+                label="Date of Birth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={handleInputChange('dateOfBirth')}
+                fullWidth
+                helperText="Your age will only be shown if you enable it in privacy settings"
+                InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: birthDateBounds.min,
+                  max: birthDateBounds.max,
+                }}
               />
-              <Typography variant="body2" color="text.secondary">
-                {formData.showAge ? 'Visible to others' : 'Hidden from others'}
-              </Typography>
-            </Box>
-          )}
 
-          <TextField
-            label="Pronouns"
-            value={formData.pronouns}
-            onChange={handleInputChange('pronouns')}
-            select
-            fullWidth
-            helperText="Help others know how to refer to you"
-          >
-            {PRONOUN_OPTIONS.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            ))}
-          </TextField>
-          {formData.pronouns === "choose my own pronouns" && (
-            <TextField
-              label="Custom Pronouns"
-              type="text"
-              value={formData.customPronouns}
-              onChange={handleInputChange('customPronouns')}
-              fullWidth
-            />
+              {displayedAge !== null && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Chip
+                    label={`Age: ${displayedAge}`}
+                    color={formData.showAge ? 'primary' : 'default'}
+                    icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {formData.showAge ? 'Visible to others' : 'Hidden from others'}
+                  </Typography>
+                </Box>
+              )}
+
+              <TextField
+                label="Pronouns"
+                value={formData.pronouns}
+                onChange={handleInputChange('pronouns')}
+                select
+                fullWidth
+                helperText="Help others know how to refer to you"
+              >
+                {PRONOUN_OPTIONS.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {formData.pronouns === "choose my own pronouns" && (
+                <TextField
+                  label="Custom Pronouns"
+                  type="text"
+                  value={formData.customPronouns}
+                  onChange={handleInputChange('customPronouns')}
+                  fullWidth
+                  inputProps={{ maxLength: 50 }}
+                />
+              )}
+            </>
           )}
         </Stack>
       </Box>
@@ -579,6 +747,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             onChange={handleSocialChange('telegram')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -594,6 +763,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             onChange={handleSocialChange('twitter')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -609,6 +779,7 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
             onChange={handleSocialChange('instagram')}
             fullWidth
             placeholder="username"
+            inputProps={{ maxLength: 100 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -621,63 +792,67 @@ export default function ProfilePageClient({ user }: ProfilePageClientProps) {
         </Stack>
       </Box>
 
-      <Box sx={sectionSx}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 2 }}>
-          <Box>
-            <Typography variant="h5" fontWeight={700}>
-              Privacy Settings
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Control what appears on your public profile.
-            </Typography>
-          </Box>
-          <Chip
-            icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
-            label={formData.showAge ? 'Age visible' : 'Age hidden'}
-            color={formData.showAge ? 'primary' : 'default'}
-            size="small"
-          />
-        </Stack>
-
-        <Stack spacing={2}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={formData.showAge}
-                onChange={(e) => setFormData(prev => ({ ...prev, showAge: e.target.checked }))}
-              />
-            }
-            label="Show my age publicly"
-          />
-          <Typography variant="body2" color="text.secondary">
-            When enabled, your age will be visible to other users.
-          </Typography>
-
-          {formData.showAge && (
-            <>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.showExactBirthdate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, showExactBirthdate: e.target.checked }))}
-                  />
-                }
-                label="Show exact birth date (not just age)"
-              />
-              <Typography variant="body2" color="text.secondary">
-                When enabled, your exact birth date is shown in addition to your age.
+      {!isOrganization && (
+        <Box sx={sectionSx}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mb: 2 }}>
+            <Box>
+              <Typography variant="h5" fontWeight={700}>
+                Privacy Settings
               </Typography>
-            </>
-          )}
-        </Stack>
-      </Box>
+              <Typography variant="body2" color="text.secondary">
+                Control what appears on your public profile.
+              </Typography>
+            </Box>
+            <Chip
+              icon={formData.showAge ? <Visibility /> : <VisibilityOff />}
+              label={formData.showAge ? 'Age visible' : 'Age hidden'}
+              color={formData.showAge ? 'primary' : 'default'}
+              size="small"
+            />
+          </Stack>
 
-      <Box sx={sectionSx}>
-        <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
-          My Registrations
-        </Typography>
-        <MyRegistrations userId={user.id} />
-      </Box>
+          <Stack spacing={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.showAge}
+                  onChange={(e) => setFormData(prev => ({ ...prev, showAge: e.target.checked }))}
+                />
+              }
+              label="Show my age publicly"
+            />
+            <Typography variant="body2" color="text.secondary">
+              When enabled, your age will be visible to other users.
+            </Typography>
+
+            {formData.showAge && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.showExactBirthdate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, showExactBirthdate: e.target.checked }))}
+                    />
+                  }
+                  label="Show exact birth date (not just age)"
+                />
+                <Typography variant="body2" color="text.secondary">
+                  When enabled, your exact birth date is shown in addition to your age.
+                </Typography>
+              </>
+            )}
+          </Stack>
+        </Box>
+      )}
+
+      {!isOrganization && (
+        <Box sx={sectionSx}>
+          <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
+            My Registrations
+          </Typography>
+          <MyRegistrations userId={user.id} />
+        </Box>
+      )}
 
       <Box>
         <LinkedAccounts

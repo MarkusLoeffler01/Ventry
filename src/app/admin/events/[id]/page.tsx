@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma/prisma";
-import { checkAdminAuth } from "@/lib/auth/admin";
+import { checkEventAdminAuth } from "@/lib/auth/event-admin";
 import { normalizeStayPolicy } from "@/lib/events/accommodation";
 import { redirect, notFound } from "next/navigation";
 import EditEventClient from "./EditEventClient";
@@ -36,13 +36,13 @@ async function EditEventPageContent({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const authResult = await checkAdminAuth();
+  const id = Number((await params).id);
+  if (Number.isNaN(id)) notFound();
+
+  const authResult = await checkEventAdminAuth(id);
   if (!authResult.authorized) {
     redirect("/login?callbackUrl=/admin/events");
   }
-
-  const id = Number((await params).id);
-  if (Number.isNaN(id)) notFound();
 
   const event: EditEventData | null = await prisma.event.findUnique({
     where: { id },

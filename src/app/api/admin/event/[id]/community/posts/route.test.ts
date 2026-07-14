@@ -19,13 +19,15 @@ vi.mock("@/lib/community/server", () => ({
   communityPostInclude: {},
   serializeCommunityPost: vi.fn((p: { id: string }) => ({ id: p.id, serialized: true })),
   buildMentionMapForPosts: vi.fn(() => Promise.resolve(new Map([["u1", { id: "u1", name: "Alice" }]]))),
+  refreshCommunityPostsProfilePictures: vi.fn(() => Promise.resolve()),
 }));
 
 import * as postsRoute from "./route";
 import { checkEventAdminAuth } from "@/lib/auth/event-admin";
-import { buildMentionMapForPosts, serializeCommunityPost } from "@/lib/community/server";
+import { buildMentionMapForPosts, refreshCommunityPostsProfilePictures, serializeCommunityPost } from "@/lib/community/server";
 
 const mockedBuildMentionMap = buildMentionMapForPosts as unknown as ReturnType<typeof vi.fn>;
+const mockedRefreshProfilePictures = refreshCommunityPostsProfilePictures as unknown as ReturnType<typeof vi.fn>;
 const mockedSerialize = serializeCommunityPost as unknown as ReturnType<typeof vi.fn>;
 
 const mockedCheckEventAdminAuth = checkEventAdminAuth as unknown as ReturnType<typeof vi.fn>;
@@ -220,6 +222,21 @@ describe("GET /api/admin/event/[id]/community/posts", () => {
     );
 
     expect(mockedBuildMentionMap).toHaveBeenCalledWith(posts);
+  });
+
+  it("refreshes profile pictures before serializing posts", async () => {
+    const posts = makePosts(3);
+    mockedFindMany.mockResolvedValue(posts);
+
+    await postsRoute.GET(
+      getRequest("7"),
+      { params: Promise.resolve({ id: "7" }) },
+    );
+
+    expect(mockedRefreshProfilePictures).toHaveBeenCalledWith(posts);
+    expect(mockedRefreshProfilePictures.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedSerialize.mock.invocationCallOrder[0],
+    );
   });
 
   it("passes mention map from buildMentionMapForPosts to serializeCommunityPost", async () => {

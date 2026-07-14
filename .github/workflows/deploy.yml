@@ -19,17 +19,18 @@ on:
 env:
   HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
   IMAGE_NAME: ventry/app
-  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-  DEPLOY_PATH: /docker/ventry
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [foss, venuva]
     concurrency:
-      group: deploy-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || github.ref_name }}
+      group: deploy-${{ matrix.server }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || github.ref_name }}
       cancel-in-progress: true
 
     steps:
@@ -37,12 +38,19 @@ jobs:
         id: target
         env:
           INPUT_TARGET: ${{ github.event.inputs.target }}
+          SERVER: ${{ matrix.server }}
           DEV_BETTER_AUTH_URL: ${{ secrets.DEV_BETTER_AUTH_URL }}
           MAIN_BETTER_AUTH_URL: ${{ secrets.MAIN_BETTER_AUTH_URL }}
           DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           DEV_DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
           MAIN_DATABASE_URL: ${{ secrets.MAIN_DATABASE_URL }}
+          VENUVA_DEV_BETTER_AUTH_URL: ${{ secrets.VENUVA_DEV_BETTER_AUTH_URL }}
+          VENUVA_MAIN_BETTER_AUTH_URL: ${{ secrets.VENUVA_MAIN_BETTER_AUTH_URL }}
+          VENUVA_DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VENUVA_DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          VENUVA_MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VENUVA_MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          VENUVA_DEV_DATABASE_URL: ${{ secrets.VENUVA_DEV_DATABASE_URL }}
+          VENUVA_MAIN_DATABASE_URL: ${{ secrets.VENUVA_MAIN_DATABASE_URL }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             DEPLOY_TARGET="${INPUT_TARGET}"
@@ -50,27 +58,53 @@ jobs:
             DEPLOY_TARGET="${GITHUB_REF_NAME}"
           fi
 
-          case "${DEPLOY_TARGET}" in
-            dev)
+          case "${DEPLOY_TARGET}-${SERVER}" in
+            dev-foss)
               echo "branch=dev" >> "$GITHUB_OUTPUT"
-              echo "tag=dev" >> "$GITHUB_OUTPUT"
-              echo "compose_file=docker-compose.dev.yml" >> "$GITHUB_OUTPUT"
+              echo "image_tag=dev-foss" >> "$GITHUB_OUTPUT"
+              echo "compose_source=.docker/docker-compose.dev.yml" >> "$GITHUB_OUTPUT"
+              echo "compose_filename=docker-compose.dev.yml" >> "$GITHUB_OUTPUT"
               echo "better_auth_url=${DEV_BETTER_AUTH_URL:-https://dev-ventry.m-loeffler.de}" >> "$GITHUB_OUTPUT"
               echo "stripe_publishable_key=${DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" >> "$GITHUB_OUTPUT"
               echo "health_url=https://dev-ventry.m-loeffler.de/api/health" >> "$GITHUB_OUTPUT"
               echo "database_url=${DEV_DATABASE_URL}" >> "$GITHUB_OUTPUT"
+              echo "deploy_path=/docker/ventry" >> "$GITHUB_OUTPUT"
               ;;
-            main)
+            main-foss)
               echo "branch=main" >> "$GITHUB_OUTPUT"
-              echo "tag=main" >> "$GITHUB_OUTPUT"
-              echo "compose_file=docker-compose.main.yml" >> "$GITHUB_OUTPUT"
+              echo "image_tag=main-foss" >> "$GITHUB_OUTPUT"
+              echo "compose_source=.docker/docker-compose.main.yml" >> "$GITHUB_OUTPUT"
+              echo "compose_filename=docker-compose.main.yml" >> "$GITHUB_OUTPUT"
               echo "better_auth_url=${MAIN_BETTER_AUTH_URL:-https://ventry.m-loeffler.de}" >> "$GITHUB_OUTPUT"
               echo "stripe_publishable_key=${MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" >> "$GITHUB_OUTPUT"
               echo "health_url=https://ventry.m-loeffler.de/api/health" >> "$GITHUB_OUTPUT"
               echo "database_url=${MAIN_DATABASE_URL}" >> "$GITHUB_OUTPUT"
+              echo "deploy_path=/docker/ventry" >> "$GITHUB_OUTPUT"
+              ;;
+            dev-venuva)
+              echo "branch=dev" >> "$GITHUB_OUTPUT"
+              echo "image_tag=dev-venuva" >> "$GITHUB_OUTPUT"
+              echo "compose_source=.docker/venuva/docker-compose.dev.yml" >> "$GITHUB_OUTPUT"
+              echo "compose_filename=docker-compose.dev.yml" >> "$GITHUB_OUTPUT"
+              echo "better_auth_url=${VENUVA_DEV_BETTER_AUTH_URL:-https://dev.venuva.dog}" >> "$GITHUB_OUTPUT"
+              echo "stripe_publishable_key=${VENUVA_DEV_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" >> "$GITHUB_OUTPUT"
+              echo "health_url=https://dev.venuva.dog/api/health" >> "$GITHUB_OUTPUT"
+              echo "database_url=${VENUVA_DEV_DATABASE_URL}" >> "$GITHUB_OUTPUT"
+              echo "deploy_path=/docker/venuva" >> "$GITHUB_OUTPUT"
+              ;;
+            main-venuva)
+              echo "branch=main" >> "$GITHUB_OUTPUT"
+              echo "image_tag=main-venuva" >> "$GITHUB_OUTPUT"
+              echo "compose_source=.docker/venuva/docker-compose.main.yml" >> "$GITHUB_OUTPUT"
+              echo "compose_filename=docker-compose.main.yml" >> "$GITHUB_OUTPUT"
+              echo "better_auth_url=${VENUVA_MAIN_BETTER_AUTH_URL:-https://venuva.dog}" >> "$GITHUB_OUTPUT"
+              echo "stripe_publishable_key=${VENUVA_MAIN_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" >> "$GITHUB_OUTPUT"
+              echo "health_url=https://venuva.dog/api/health" >> "$GITHUB_OUTPUT"
+              echo "database_url=${VENUVA_MAIN_DATABASE_URL}" >> "$GITHUB_OUTPUT"
+              echo "deploy_path=/docker/venuva" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "Unsupported deployment target: ${DEPLOY_TARGET}" >&2
+              echo "Unsupported deployment target: ${DEPLOY_TARGET}-${SERVER}" >&2
               exit 1
               ;;
           esac
@@ -104,7 +138,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.HARBOR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.target.outputs.tag }}
+          tags: ${{ env.HARBOR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.target.outputs.image_tag }}
           build-args: |
             BETTER_AUTH_URL=${{ steps.target.outputs.better_auth_url }}
             NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ steps.target.outputs.stripe_publishable_key }}
@@ -122,7 +156,8 @@ jobs:
 
       - name: Configure SSH
         env:
-          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_HOST: ${{ matrix.server == 'foss' && secrets.DEPLOY_HOST || secrets.VENUVA_DEPLOY_HOST }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ matrix.server == 'foss' && secrets.DEPLOY_SSH_PRIVATE_KEY || secrets.VENUVA_DEPLOY_SSH_PRIVATE_KEY }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
@@ -130,16 +165,22 @@ jobs:
           ssh-keyscan -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
 
       - name: Sync compose file to server
+        env:
+          DEPLOY_HOST: ${{ matrix.server == 'foss' && secrets.DEPLOY_HOST || secrets.VENUVA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ matrix.server == 'foss' && secrets.DEPLOY_USER || secrets.VENUVA_DEPLOY_USER }}
         run: |
-          scp ".docker/${{ steps.target.outputs.compose_file }}" \
-            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/${{ steps.target.outputs.compose_file }}"
+          scp "${{ steps.target.outputs.compose_source }}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${{ steps.target.outputs.deploy_path }}/${{ steps.target.outputs.compose_filename }}"
 
       - name: Deploy on server
+        env:
+          DEPLOY_HOST: ${{ matrix.server == 'foss' && secrets.DEPLOY_HOST || secrets.VENUVA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ matrix.server == 'foss' && secrets.DEPLOY_USER || secrets.VENUVA_DEPLOY_USER }}
         run: |
           ssh "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "cd '${DEPLOY_PATH}' && \
-             docker compose -f '${{ steps.target.outputs.compose_file }}' pull && \
-             docker compose -f '${{ steps.target.outputs.compose_file }}' up -d"
+            "cd '${{ steps.target.outputs.deploy_path }}' && \
+             docker compose -f '${{ steps.target.outputs.compose_filename }}' pull && \
+             docker compose -f '${{ steps.target.outputs.compose_filename }}' up -d"
 
       - name: Verify deployment
         run: |

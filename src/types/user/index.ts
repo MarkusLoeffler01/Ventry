@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { optionalCountryCodeSchema } from "@/types/schemas/country";
+import { optionalBirthDateSchema } from "@/types/schemas/birthdate";
 
 // Define user validation schema
 const userSchema = z.object({
@@ -7,16 +9,16 @@ const userSchema = z.object({
   email: z.email().optional(),
   password: z.string().min(8).optional(),
   profilePicture: z.url().nullable().optional(),
-  country: z.string().max(100).nullable().optional(),
+  country: optionalCountryCodeSchema,
   legalName: z.string().max(200).nullable().optional(),
   addressLine1: z.string().max(200).nullable().optional(),
   addressLine2: z.string().max(200).nullable().optional(),
   addressCity: z.string().max(120).nullable().optional(),
   addressState: z.string().max(120).nullable().optional(),
   addressPostalCode: z.string().max(40).nullable().optional(),
-  addressCountry: z.string().max(120).nullable().optional(),
+  addressCountry: optionalCountryCodeSchema,
   bio: z.string().max(500).optional(),
-  dateOfBirth: z.string().nullable().optional(),
+  dateOfBirth: optionalBirthDateSchema,
   pronouns: z.string().max(50).optional(),
   showAge: z.boolean().optional(),
   showExactBirthdate: z.boolean().optional(),

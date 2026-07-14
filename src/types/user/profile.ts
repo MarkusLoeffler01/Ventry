@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { optionalCountryCodeSchema } from "@/types/schemas/country";
+import { optionalBirthDateSchema } from "@/types/schemas/birthdate";
 
 // Enhanced user schema with new profile fields
 export const enhancedUserSchema = z.object({
   name: z.string().min(2).max(DISPLAY_NAME_MAX_LENGTH).optional(),
   email: z.email().optional(),
   bio: z.string().max(500).optional(),
-  dateOfBirth: z.string().date().optional(), // ISO date string (YYYY-MM-DD)
+  dateOfBirth: optionalBirthDateSchema,
   pronouns: z.string().max(50).optional(),
   legalName: z.string().max(200).optional().nullable(),
   addressLine1: z.string().max(200).optional().nullable(),
@@ -14,7 +16,7 @@ export const enhancedUserSchema = z.object({
   addressCity: z.string().max(120).optional().nullable(),
   addressState: z.string().max(120).optional().nullable(),
   addressPostalCode: z.string().max(40).optional().nullable(),
-  addressCountry: z.string().max(120).optional().nullable(),
+  addressCountry: optionalCountryCodeSchema,
   profilePictures: z.array(z.object({
     id: z.string(),
     signedUrl: z.string().url().nullable(),
