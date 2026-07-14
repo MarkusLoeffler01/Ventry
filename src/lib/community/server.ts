@@ -45,6 +45,7 @@ export const communityCommentInclude = {
     select: {
       id: true,
       name: true,
+      username: true,
       image: true,
       isAdmin: true,
       profilePictures: {
@@ -75,6 +76,7 @@ export const communityPostInclude = {
     select: {
       id: true,
       name: true,
+      username: true,
       image: true,
       isAdmin: true,
       profilePictures: {
@@ -109,6 +111,7 @@ export const communityPostInclude = {
         select: {
           id: true,
           name: true,
+          username: true,
           image: true,
           profilePictures: {
             orderBy: [
@@ -322,14 +325,14 @@ export function assertCanDeletePost(
 
 export async function buildMentionMapForPosts(
   posts: { comments: { mentionedUserIds: string[] }[] }[],
-): Promise<Map<string, { id: string; name: string }>> {
+): Promise<Map<string, { id: string; name: string; username: string | null }>> {
   const allIds = [...new Set(posts.flatMap(p => p.comments.flatMap(c => c.mentionedUserIds)))];
   if (allIds.length === 0) return new Map();
   const users = await prisma.user.findMany({
     where: { id: { in: allIds } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, username: true },
   });
-  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User" }]));
+  return new Map(users.map(u => [u.id, { id: u.id, name: u.name ?? "User", username: u.username }]));
 }
 
 async function refreshCommunityAuthorsProfilePictures(authors: CommunityAuthorWithProfilePictures[]) {
@@ -368,7 +371,7 @@ export async function refreshCommunityCommentsProfilePictures(comments: Communit
 
 export function serializeCommunityComment(
   comment: CommunityCommentWithInclude,
-  mentionedUsersById?: Map<string, { id: string; name: string }>,
+  mentionedUsersById?: Map<string, { id: string; name: string; username: string | null }>,
 ): CommunityCommentView {
   return {
     id: comment.id,
@@ -382,19 +385,20 @@ export function serializeCommunityComment(
     author: {
       id: comment.author.id,
       name: comment.author.name || "Attendee",
+      username: comment.author.username,
       imageUrl: comment.author.profilePictures[0]?.signedUrl || comment.author.image || null,
       isAdmin: comment.author.isAdmin,
     },
     mentionedUsers: comment.mentionedUserIds
       .map(id => mentionedUsersById?.get(id))
-      .filter((u): u is { id: string; name: string } => u !== undefined),
+      .filter((u): u is { id: string; name: string; username: string | null } => u !== undefined),
   };
 }
 
 export function serializeCommunityPost(
   post: CommunityPostWithInclude,
   viewerUserId?: string | null,
-  mentionedUsersById?: Map<string, { id: string; name: string }>,
+  mentionedUsersById?: Map<string, { id: string; name: string; username: string | null }>,
 ) {
   const feedbacks = normalizeCommunityFeedbackEntries(post.feedbackEntries, {
     content: post.content,
@@ -436,6 +440,7 @@ export function serializeCommunityPost(
     author: {
       id: post.author.id,
       name: post.author.name || "Attendee",
+      username: post.author.username,
       imageUrl: post.author.profilePictures[0]?.signedUrl || post.author.image || null,
       isAdmin: post.author.isAdmin,
     },

@@ -26,6 +26,7 @@ interface SocialLinks {
 
 interface ProfileHeaderProps {
   name: string | null;
+  username?: string | null;
   pronouns: string | null;
   profilePictures: ProfilePicture[];
   age: number | null;
@@ -55,6 +56,7 @@ const chipSx = {
 
 export default function ProfileHeader({
   name,
+  username,
   pronouns,
   profilePictures,
   age,
@@ -128,6 +130,15 @@ export default function ProfileHeader({
           >
             {name || 'Anonymous User'}
           </Typography>
+
+          {username && (
+            <Typography
+              variant="body1"
+              sx={{ mb: 2, opacity: 0.85, fontWeight: 500 }}
+            >
+              @{username}
+            </Typography>
+          )}
 
           <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
             {pronouns && (

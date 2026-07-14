@@ -1,7 +1,18 @@
 import { prisma } from "@/lib/prisma/prisma";
 import * as supa from "../supabase";
+import { USER_CONFIG } from "@/lib/config";
+import { buildJpegCompressionCandidate, isStorageSizeError } from "@/lib/images/compression";
 
 const SIGNED_URL_REFRESH_SKEW_MS = 5 * 60 * 1000;
+const MAX_IMPORT_BYTES = USER_CONFIG.MAX_PROFILE_PIC_SIZE_MB * 1024 * 1024;
+const MAX_IMPORT_STORAGE_BYTES = USER_CONFIG.MAX_PROFILE_PIC_STORAGE_SIZE_MB * 1024 * 1024;
+const IMPORT_COMPRESSION_ATTEMPTS = [
+    { width: 1600, quality: 78 },
+    { width: 1400, quality: 70 },
+    { width: 1200, quality: 62 },
+    { width: 1000, quality: 54 },
+    { width: 800, quality: 46 },
+];
 
 type ProfilePicture = {
     userId: string;
@@ -107,6 +118,55 @@ export async function add(props: AddProfilePictureParams) {
             }
         }
     });
+}
+
+/**
+ * Best-effort import of an OAuth provider's avatar as the user's first,
+ * primary profile picture. `imageUrl` must come from our own DB (the
+ * `user.image` value we set from Google/GitHub's profile at signup) - never
+ * pass through a client-supplied URL here, or this becomes an SSRF vector.
+ */
+export async function importOAuthProfilePicture(userId: string, imageUrl: string) {
+    const response = await fetch(imageUrl);
+    if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) {
+        throw new Error(`Unable to fetch OAuth avatar (status ${response.status})`);
+    }
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > MAX_IMPORT_BYTES) {
+        throw new Error("OAuth avatar exceeds size limit");
+    }
+
+    const fileName = `profile-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+
+    for (const attempt of IMPORT_COMPRESSION_ATTEMPTS) {
+        const candidate = await buildJpegCompressionCandidate(bytes, attempt);
+        if (candidate.buffer.length > MAX_IMPORT_STORAGE_BYTES) continue;
+
+        try {
+            const uploadResult = await supa.uploadProfilePicture(candidate.buffer, userId, fileName);
+            const signedUrlData = await supa.getSignedUrl(uploadResult.path, 24 * 60 * 60);
+            await add({
+                userId,
+                path: uploadResult.path,
+                signedUrl: signedUrlData.signedUrl,
+                expiresIn: signedUrlData.expiresIn,
+            });
+
+            const picture = await prisma.profilePicture.findFirst({
+                where: { userID: userId, storagePath: uploadResult.path },
+                orderBy: { createdAt: "desc" },
+            });
+            if (picture) {
+                await setPrimary({ userId, id: picture.id, path: uploadResult.path });
+            }
+            return;
+        } catch (error) {
+            if (!isStorageSizeError(error)) throw error;
+        }
+    }
+
+    throw new Error(`Could not compress OAuth avatar below ${USER_CONFIG.MAX_PROFILE_PIC_STORAGE_SIZE_MB}MB`);
 }
 
 type RemoveProfilePicture = Omit<ProfilePicture, "path">;

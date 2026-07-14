@@ -4,9 +4,21 @@ import { prisma } from "@/lib/prisma/prisma";
 import { getSession } from "@/lib/auth/session";
 import { AdminType } from "@/generated/prisma";
 import { requiredCountryCodeSchema } from "@/types/schemas/country";
+import { DISPLAY_NAME_MAX_LENGTH } from "@/lib/user/display-name";
+import { importOAuthProfilePicture } from "@/lib/user/profilePicture";
+import { isUsernameAvailable } from "@/lib/user/unique-name";
+import { changeUsername } from "@/lib/user/change-username";
 
 const schema = z
   .object({
+    username: z
+      .string()
+      .trim()
+      .min(2)
+      .max(DISPLAY_NAME_MAX_LENGTH)
+      .regex(/^\S+$/, "Username cannot contain spaces")
+      .optional(),
+    importProfilePicture: z.boolean().optional(),
     legalName: z.string().trim().min(2),
     addressLine1: z.string().trim().min(2),
     addressLine2: z.string().trim().optional().nullable(),
@@ -72,6 +84,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { username: true, image: true },
+  });
+
+  if (data.username && !(await isUsernameAvailable(data.username, userId))) {
+    return NextResponse.json({ error: "Username already taken" }, { status: 409 });
+  }
+
+  if (data.username) {
+    await changeUsername(userId, data.username);
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
@@ -116,5 +141,17 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  return NextResponse.json({ success: true }, { status: 200 });
+  let pictureImported = false;
+  if (data.importProfilePicture && currentUser?.image) {
+    try {
+      await importOAuthProfilePicture(userId, currentUser.image);
+      pictureImported = true;
+    } catch (error) {
+      // Non-fatal - onboarding must not fail just because the avatar
+      // fetch/compression did. User can add a picture later from /profile.
+      console.error("Failed to import OAuth profile picture:", error);
+    }
+  }
+
+  return NextResponse.json({ success: true, pictureImported }, { status: 200 });
 }

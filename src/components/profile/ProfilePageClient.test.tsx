@@ -12,6 +12,7 @@ vi.mock("@/components/common/CountryAutocomplete", () => ({
 const BASE_USER = {
   id: "user-1",
   name: "Alice Example",
+  username: "alice-example",
   email: "alice@example.com",
   country: "US",
   legalName: null,
@@ -90,5 +91,62 @@ describe("ProfilePageClient PATCH diffing", () => {
     const [, options] = fetchMock.mock.calls[1];
     const body = JSON.parse((options as RequestInit).body as string);
     expect(body).toEqual({ id: "user-1", bio: "New bio text" });
+  });
+});
+
+function setupRoutedFetch(handlers: Record<string, { status: number; body?: unknown }>) {
+  const mock = vi.fn(async (url: string, _options?: RequestInit) => {
+    const path = new URL(url, "http://localhost").pathname;
+    const handler = handlers[path] ?? { status: 200 };
+    return new Response(JSON.stringify(handler.body ?? {}), { status: handler.status });
+  });
+  vi.stubGlobal("fetch", mock);
+  return mock;
+}
+
+describe("ProfilePageClient username changes", () => {
+  it("calls the dedicated username endpoint before the general profile PATCH", async () => {
+    const fetchMock = setupRoutedFetch({
+      "/api/user/username": { status: 200 },
+      "/api/user": { status: 200 },
+    });
+    render(<ProfilePageClient user={BASE_USER} />);
+
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "alice-new" } });
+    fireEvent.change(screen.getByLabelText("Display Name"), { target: { value: "Alice Updated" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    const [firstUrl, firstOptions] = fetchMock.mock.calls[0];
+    expect(new URL(firstUrl as string, "http://localhost").pathname).toBe("/api/user/username");
+    expect(JSON.parse((firstOptions as RequestInit).body as string)).toEqual({ username: "alice-new" });
+
+    const [secondUrl] = fetchMock.mock.calls[1];
+    expect(new URL(secondUrl as string, "http://localhost").pathname).toBe("/api/user");
+  });
+
+  it("skips the username endpoint entirely when the username is unchanged", async () => {
+    const fetchMock = setupRoutedFetch({ "/api/user": { status: 200 } });
+    render(<ProfilePageClient user={BASE_USER} />);
+
+    fireEvent.change(screen.getByLabelText("Display Name"), { target: { value: "Alice Updated" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(new URL(fetchMock.mock.calls[0][0] as string, "http://localhost").pathname).toBe("/api/user");
+  });
+
+  it("surfaces a 409 from the username endpoint and does not proceed to the profile PATCH", async () => {
+    const fetchMock = setupRoutedFetch({
+      "/api/user/username": { status: 409, body: { error: "Username already taken" } },
+    });
+    render(<ProfilePageClient user={BASE_USER} />);
+
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "taken-name" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(screen.getByText("Username already taken")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

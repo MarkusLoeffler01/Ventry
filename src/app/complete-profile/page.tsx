@@ -52,7 +52,9 @@ async function CompleteProfilePageContent({
 
           <CompleteProfileWizard
             callbackUrl={callbackUrl}
-            defaultLegalName={session.user.name ?? undefined}
+            defaultLegalName={session.user.oauthLegalNameSuggestion ?? undefined}
+            defaultUsername={session.user.username ?? undefined}
+            avatarUrl={session.user.image ?? undefined}
           />
         </Paper>
       </Box>

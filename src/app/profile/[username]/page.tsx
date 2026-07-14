@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   Container,
   Paper,
@@ -41,18 +41,19 @@ export default function ProfileViewPage({ params }: { params: Promise<{ username
 }
 
 async function ProfileViewPageContent({ params }: { params: Promise<{ username: string }> }) {
-  const { username } = await params;
+  const { username: slug } = await params;
 
-  // Support both username (name) and legacy ID-based URLs
+  // Support both the current username and legacy ID-based URLs
   const user = await prisma.user.findFirst({
     where: {
       OR: [
-        { name: username },
-        { id: username },
+        { username: slug },
+        { id: slug },
       ]
     },
     select: {
       name: true,
+      username: true,
       country: true,
       profilePictures: {
         orderBy: [
@@ -72,6 +73,16 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
   });
 
   if (!user) {
+    // The requested handle might be a recently-vacated username still inside
+    // its 90-day reservation window (see changeUsername()) - redirect to
+    // wherever it lives now instead of 404ing.
+    const reservation = await prisma.usernameHistory.findFirst({
+      where: { username: slug, expiresAt: { gt: new Date() } },
+      select: { user: { select: { username: true } } },
+    });
+    if (reservation?.user?.username) {
+      redirect(`/profile/${reservation.user.username}`);
+    }
     notFound();
   }
 
@@ -87,6 +98,7 @@ async function ProfileViewPageContent({ params }: { params: Promise<{ username: 
       <Paper elevation={3} sx={{ overflow: 'hidden', mb: 3 }}>
         <ProfileHeader
           name={user.name}
+          username={user.username}
           pronouns={isOrganization ? null : user.pronouns}
           profilePictures={validatedPictures}
           age={age}

@@ -152,6 +152,11 @@ export default function CommunityPostCard({
                   {post.author.name}
                 </Typography>
               </MuiLink>
+              {post.author.username ? (
+                <Typography variant="caption" color="text.secondary">
+                  @{post.author.username}
+                </Typography>
+              ) : null}
               {post.author.isAdmin ? (
                 <Chip
                   label="Organizer"
