@@ -282,6 +282,7 @@ export default function CommunitySection({
                 post={post}
                 canDelete={Boolean(canModerate || post.authorId === currentUserId)}
                 canModerate={canModerate}
+                currentUserId={currentUserId}
                 communityModerated={communityModerated}
                 deleteDisabled={!currentUserId || actionPostId === post.id}
                 moderateDisabled={Boolean(moderatingPostId)}

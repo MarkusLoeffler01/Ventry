@@ -63,6 +63,7 @@ interface CommunityPostCardProps {
   post: CommunityPostView;
   canDelete: boolean;
   canModerate?: boolean;
+  currentUserId?: string | null;
   communityModerated?: boolean;
   deleteDisabled?: boolean;
   moderateDisabled?: boolean;
@@ -77,6 +78,7 @@ export default function CommunityPostCard({
   post,
   canDelete,
   canModerate,
+  currentUserId,
   communityModerated = true,
   deleteDisabled,
   moderateDisabled,
@@ -348,7 +350,8 @@ export default function CommunityPostCard({
           eventId={post.eventId}
           initialComments={post.comments}
           totalCount={post.commentCount}
-          canDelete={canDelete}
+          canModerate={canModerate}
+          currentUserId={currentUserId}
           composerDisabled={composerDisabled}
         />
       </Stack>

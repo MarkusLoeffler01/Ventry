@@ -30,7 +30,6 @@ import {
 import { alpha } from "@mui/material/styles";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { z } from "zod";
 import authClient from "@/lib/auth/client";
 import { requiredCountryCodeSchema } from "@/types/schemas/country";
@@ -153,7 +152,6 @@ export default function CompleteProfileWizard({
   defaultUsername?: string;
   avatarUrl?: string;
 }) {
-  const router = useRouter();
   const [step, setStep] = useState(S_USERNAME);
   const [username, setUsername] = useState(defaultUsername || "");
   const [importProfilePicture, setImportProfilePicture] = useState(true);
@@ -297,8 +295,14 @@ export default function CompleteProfileWizard({
       if (body.pictureImported) {
         notifyProfilePictureChanged();
       }
-      router.push(callbackUrl || "/");
-      router.refresh();
+      // Hard navigation, not router.push(): a client-side transition here can
+      // race the profileCompletion middleware's own getSession() read (still
+      // pre-update) into a redirect back to /complete-profile, which then
+      // blank-renders instead of resolving - a known interaction between
+      // redirect() inside a Suspense boundary and soft navigation under this
+      // app's cacheComponents config. A full navigation always re-reads the
+      // now-committed session server-side, so it can't hit that race.
+      window.location.href = callbackUrl || "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

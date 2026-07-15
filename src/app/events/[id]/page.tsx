@@ -34,6 +34,7 @@ import CommunitySection from "@/components/events/community/CommunitySection";
 import type { SerializedEvent, SerializedProduct } from "@/types/event";
 import { Suspense } from "react";
 import PageLoadingState from "@/components/common/PageLoadingState";
+import { getCountryFlag, getCountryByCode } from "@/lib/countries";
 
 const eventDateFormatter = new Intl.DateTimeFormat("en-US");
 
@@ -526,7 +527,7 @@ interface AttendeeCardProps {
 /**
  * Attendee card for the event attendees list.
  */
-function AttendeeCard({ attendee }: AttendeeCardProps) {
+export function AttendeeCard({ attendee }: AttendeeCardProps) {
   const initials = attendee.name
     .split(' ')
     .filter(Boolean)
@@ -534,6 +535,7 @@ function AttendeeCard({ attendee }: AttendeeCardProps) {
     .slice(0, 2)
     .join('')
     .toUpperCase();
+  const countryData = attendee.country ? getCountryByCode(attendee.country) : null;
 
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
@@ -550,9 +552,9 @@ function AttendeeCard({ attendee }: AttendeeCardProps) {
             <Typography variant="subtitle1" fontWeight="bold">
               {attendee.name}
             </Typography>
-            {attendee.country ? (
+            {countryData ? (
               <Typography variant="body2" color="text.secondary">
-                {attendee.country}
+                {getCountryFlag(countryData.code)} {countryData.name}
               </Typography>
             ) : (
               <Typography variant="body2" color="text.secondary">
