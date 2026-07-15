@@ -1,14 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-
-// Importing page.tsx pulls in its module-scope dependencies even though this
-// test only exercises the AttendeeCard sub-component - stub out the ones
-// that would otherwise throw/hit real infra outside a request context.
-vi.mock("@/lib/prisma/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }));
-vi.mock("next/navigation", () => ({ notFound: vi.fn() }));
-
-const { AttendeeCard } = await import("./page");
+import { AttendeeCard } from "./AttendeeCard";
 
 describe("AttendeeCard country display", () => {
   it("renders a flag and the full country name instead of the raw ISO code", () => {
