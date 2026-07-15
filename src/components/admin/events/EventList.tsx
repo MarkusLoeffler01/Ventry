@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Box, 
   Button, 
@@ -36,6 +36,9 @@ interface EventListProps {
 
 export default function EventList({ initialEvents }: EventListProps) {
   const [events, setEvents] = useState<SerializedEvent[]>(initialEvents);
+  useEffect(() => {
+    setEvents(initialEvents);
+  }, [initialEvents]);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

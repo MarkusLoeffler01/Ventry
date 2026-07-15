@@ -90,7 +90,8 @@ interface CommentListProps {
   eventId: number;
   initialComments: CommunityCommentView[];
   totalCount: number;
-  canDelete: boolean;
+  canModerate?: boolean;
+  currentUserId?: string | null;
   composerDisabled?: boolean;
 }
 
@@ -99,7 +100,8 @@ export default function CommentList({
   eventId,
   initialComments,
   totalCount,
-  canDelete,
+  canModerate,
+  currentUserId,
   composerDisabled,
 }: CommentListProps) {
   const [comments, setComments] = useState<CommunityCommentView[]>(initialComments);
@@ -236,6 +238,8 @@ export default function CommentList({
               timeStyle: "short",
             }).format(new Date(comment.createdAt));
 
+            const canDeleteComment = Boolean(canModerate || comment.author.id === currentUserId);
+
             return (
               <Stack
                 id={`post-${postId}-comment-${comment.id}`}
@@ -331,7 +335,7 @@ export default function CommentList({
                     </Button>
                   ) : null}
                 </Box>
-                {canDelete ? (
+                {canDeleteComment ? (
                   <Tooltip title="Delete comment">
                     <span>
                       <IconButton

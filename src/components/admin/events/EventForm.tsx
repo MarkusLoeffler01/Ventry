@@ -1265,12 +1265,12 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
               <Box>
                 <Typography variant="subtitle2" gutterBottom>Event Banner</Typography>
                 {watchImageUrl && (
-                  <Box sx={{ mb: 2, position: "relative", width: "100%", height: { xs: 240, md: 320 } }}>
+                  <Box sx={{ mb: 2, position: "relative", width: "100%", maxWidth: 480, aspectRatio: "1200 / 630" }}>
                     <Image
                       src={watchImageUrl}
                       alt="Preview"
                       fill
-                      sizes="(min-width: 900px) 320px, 100vw"
+                      sizes="(min-width: 900px) 480px, 100vw"
                       style={{ objectFit: "cover", borderRadius: 8 }}
                     />
                   </Box>
@@ -1659,7 +1659,8 @@ export default function EventForm({ initialData, onSubmit, loading: externalLoad
                             <Typography variant="subtitle2" gutterBottom>Dropdown Options</Typography>
                             <Stack spacing={1}>
                               {(watch(`customFields.${index}.options`) || []).map((option: string, optionIndex: number) => (
-                                <Stack key={`${option || "option"}-${optionIndex}`} direction="row" spacing={1} alignItems="center">
+                                // biome-ignore lint/suspicious/noArrayIndexKey: rows are plain controlled TextFields (no per-item local state), and a content-derived key here was the actual bug (remounted + lost focus on every keystroke)
+                                <Stack key={`custom-field-option-${optionIndex}`} direction="row" spacing={1} alignItems="center">
                                   <TextField
                                     size="small"
                                     placeholder={`Option ${optionIndex + 1}`}
